@@ -62,22 +62,22 @@ const projectData = (translateFunction?: TranslatorFunction): object => {
                 currentCostume: 0,
                 costumes: [
                     {
-                        assetId: 'bcf454acf82e4504149f7ffe07081dbc',
+                        assetId: '5725a8084faf50b168d3a8102e369860',
                         name: translator(messages.costume, {index: 1}),
                         bitmapResolution: 1,
-                        md5ext: 'bcf454acf82e4504149f7ffe07081dbc.svg',
+                        md5ext: '5725a8084faf50b168d3a8102e369860.svg',
                         dataFormat: 'svg',
-                        rotationCenterX: 48,
-                        rotationCenterY: 50
+                        rotationCenterX: 110,
+                        rotationCenterY: 60
                     },
                     {
-                        assetId: '0fb9be3e8397c983338cb71dc84d0b25',
+                        assetId: '282fc26cd2b4b7bee9bf36413b41fcb1',
                         name: translator(messages.costume, {index: 2}),
                         bitmapResolution: 1,
-                        md5ext: '0fb9be3e8397c983338cb71dc84d0b25.svg',
+                        md5ext: '282fc26cd2b4b7bee9bf36413b41fcb1.svg',
                         dataFormat: 'svg',
-                        rotationCenterX: 46,
-                        rotationCenterY: 53
+                        rotationCenterX: 110,
+                        rotationCenterY: 60
                     }
                 ],
                 sounds: [
