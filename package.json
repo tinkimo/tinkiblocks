@@ -45,5 +45,8 @@
     "husky": "8.0.3",
     "npm": "10.9.8",
     "ts-node": "10.9.2"
+  },
+  "dependencies": {
+    "sweetalert": "^2.1.2"
   }
 }

@@ -13,6 +13,9 @@ import videoSensingInsetIconURL from './videoSensing/video-sensing-small.svg';
 import text2speechIconURL from './text2speech/text2speech.png';
 import text2speechInsetIconURL from './text2speech/text2speech-small.svg';
 
+import tinkibotIconURL from './tinkibot/tinkibot.png';
+import tinkibotInsetIconURL from './tinkibot/tinkimo-small.png';
+
 import translateIconURL from './translate/translate.png';
 import translateInsetIconURL from './translate/translate-small.png';
 
@@ -151,6 +154,27 @@ export default [
         ),
         featured: true,
         internetConnectionRequired: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Tinkibot"
+                description="Name for the Tinkibot extension"
+                id="gui.extension.tinkibot.name"
+            />
+        ),
+        extensionId: 'tinkibot',
+        iconURL: tinkibotIconURL,
+        insetIconURL: tinkibotInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Control one or more Tinkibots"
+                description="Description for the Tinkibot extension"
+                id="gui.extension.tinkibot.description"
+            />
+        ),
+        featured: true,
+        internetConnectionRequired: false
     },
     {
         name: (
