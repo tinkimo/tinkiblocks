@@ -141,11 +141,27 @@ class TinkibotBlocks {
                     arguments: {
                         IMAGE: {
                             type: ArgumentType.STRING,
-                            defaultValue: 'tinkimo',
+                            defaultValue: 'logo',
                             menu: "image_options"
                         },
                     }
                 }, 
+                {
+                    opcode: 'mosaic',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.mosaic',
+                        default: 'create mosaic of [IMAGE]',
+                        description: 'show an image from the library'
+                    }),
+                    arguments: {
+                        IMAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'logo',
+                            menu: "image_options"
+                        },
+                    }
+                },                 
                 '---',                          
                 {
                     opcode: 'move',
@@ -225,11 +241,11 @@ class TinkibotBlocks {
                 },
                 image_options: {
                     acceptReporters: true,
-                    items: ['tinkimo', 'cowboy','indian','biker','buider']
+                    items: ['logo', 'cowboy','indian','biker','buider']
                 }, 
                 direction_options: {
                     acceptReporters: true,
-                    items: ['forward', 'backward']
+                    items: ['forward', 'reverse']
                 },    
                 rotation_options: {
                     acceptReporters: true,
@@ -318,6 +334,9 @@ class TinkibotBlocks {
            } else if (report_type === 'display_image') {
                 value = msg['value'];
                 command_response = value; 
+           } else if (report_type === 'mosaic') {
+                value = msg['value'];
+                command_response = value;                 
            } else if (report_type === 'move') {
                 value = msg['value'];
                 command_response = value;  
@@ -391,6 +410,24 @@ class TinkibotBlocks {
             return command_response;
         }
     } 
+    mosaic(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let image = args['IMAGE'];
+            msg = {"command": "mosaic","image":image};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    }     
 
     move(args) {
         if (!connected) {
