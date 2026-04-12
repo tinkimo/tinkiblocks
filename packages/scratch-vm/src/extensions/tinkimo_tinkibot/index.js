@@ -60,6 +60,7 @@ const ANALOG_INPUT = 6;
 //  TINKIMO RESPONSES
 //-----------------------------------
 let measured_distance=0;
+let measured_voltage=0;
 let command_response="";
 
 
@@ -129,6 +130,17 @@ class TinkibotBlocks {
                         },
                     }
                 },
+                {
+                    opcode: 'measure_voltage',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureVoltage',
+                        default: 'measure battery voltage',
+                        description: 'Measure the internale battery voltage.'
+                    }),
+                    arguments: {
+                    }
+                },                
                 '---',                          
                 {
                     opcode: 'display_image',
@@ -328,6 +340,9 @@ class TinkibotBlocks {
            if (report_type === 'measure_distance') {
                 value = msg['value'];
                 measured_distance = value;  
+           } else if (report_type === 'measure_voltage') {
+                value = msg['value'];
+                measured_voltage = value;                  
            } else if (report_type === 'play_sound') {
                 value = msg['value'];
                 command_response = value;  
@@ -371,7 +386,25 @@ class TinkibotBlocks {
             window.socket.send(msg);
             return measured_distance;
         }
-    }    
+    }
+
+    measure_voltage(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            msg = {"command": "measure_voltage"};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return measured_voltage;
+        }
+    }         
 
     play_sound(args) {
         if (!connected) {
