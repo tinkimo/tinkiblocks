@@ -62,7 +62,8 @@ const ANALOG_INPUT = 6;
 let measured_distance=0;
 let measured_voltage=0;
 let command_response="";
-
+let measured_left=0;
+let measured_right=0;
 
 /**
  * Class for the text2speech blocks.
@@ -140,7 +141,29 @@ class TinkibotBlocks {
                     }),
                     arguments: {
                     }
-                },                
+                },  
+                {
+                    opcode: 'measure_left_encoder_count',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureLeftEncoderCount',
+                        default: 'measure left encoder count',
+                        description: 'Measure the left encoder count.'
+                    }),
+                    arguments: {
+                    }
+                }, 
+                {
+                    opcode: 'measure_right_encoder_count',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureRightEncoderCount',
+                        default: 'measure right encoder count',
+                        description: 'Measure the right encoder count.'
+                    }),
+                    arguments: {
+                    }
+                },                                               
                 '---',                          
                 {
                     opcode: 'display_image',
@@ -170,7 +193,7 @@ class TinkibotBlocks {
                         IMAGE: {
                             type: ArgumentType.STRING,
                             defaultValue: 'logo',
-                            menu: "image_options"
+                            menu: "mosaic_options"
                         },
                     }
                 },                 
@@ -253,8 +276,12 @@ class TinkibotBlocks {
                 },
                 image_options: {
                     acceptReporters: true,
-                    items: ['logo', 'cowboy','indian','biker','buider']
+                    items: ['logo', 'confused','happy','worried','game-over','scared']
                 }, 
+                mosaic_options: {
+                    acceptReporters: true,
+                    items: ['logo', 'cowboy','indian','biker','buider']
+                },                 
                 direction_options: {
                     acceptReporters: true,
                     items: ['forward', 'reverse']
@@ -342,7 +369,13 @@ class TinkibotBlocks {
                 measured_distance = value;  
            } else if (report_type === 'measure_voltage') {
                 value = msg['value'];
-                measured_voltage = value;                  
+                measured_voltage = value; 
+           } else if (report_type === 'measure_enc_right') {
+                value = msg['value'];
+                measured_right= value;                                    
+           } else if (report_type === 'measure_enc_left') {
+                value = msg['value'];
+                measured_left= value;                                    
            } else if (report_type === 'play_sound') {
                 value = msg['value'];
                 command_response = value;  
@@ -404,7 +437,43 @@ class TinkibotBlocks {
             window.socket.send(msg);
             return measured_voltage;
         }
-    }         
+    }  
+
+    measure_right_encoder_count(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            msg = {"command": "measure_enc_right"};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return measured_right;
+        }
+    }
+
+    measure_left_encoder_count(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            msg = {"command": "measure_enc_left"};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return measured_left;
+        }
+    }                 
 
     play_sound(args) {
         if (!connected) {
