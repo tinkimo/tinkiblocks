@@ -99,6 +99,21 @@ class TinkibotBlocks {
             color3: '#F97316',      
             blocks: [
                 {
+                    opcode: 'volume',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.volume',
+                        default: 'set volume [VALUE]',
+                        description: 'set the speaker volume'
+                    }),
+                    arguments: {
+                        VALUE: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 5
+                        }                        
+                    }
+                },                 
+                {
                     opcode: 'play_sound',
                     blockType: BlockType.COMMAND,
                     text: formatMessage({
@@ -124,11 +139,6 @@ class TinkibotBlocks {
                         description: 'Measure the distance in centimeters'
                     }),
                     arguments: {
-                        PIN: {
-                            type: ArgumentType.NUMBER,
-                            defaultValue: '0',
-                            menu: 'analog_pins'
-                        },
                     }
                 },
                 {
@@ -142,28 +152,6 @@ class TinkibotBlocks {
                     arguments: {
                     }
                 },  
-                {
-                    opcode: 'measure_left_encoder_count',
-                    blockType: BlockType.REPORTER,
-                   text: formatMessage({
-                        id: 'tinkibot.measureLeftEncoderCount',
-                        default: 'measure left encoder count',
-                        description: 'Measure the left encoder count.'
-                    }),
-                    arguments: {
-                    }
-                }, 
-                {
-                    opcode: 'measure_right_encoder_count',
-                    blockType: BlockType.REPORTER,
-                   text: formatMessage({
-                        id: 'tinkibot.measureRightEncoderCount',
-                        default: 'measure right encoder count',
-                        description: 'Measure the right encoder count.'
-                    }),
-                    arguments: {
-                    }
-                },                                               
                 '---',                          
                 {
                     opcode: 'display_image',
@@ -196,7 +184,82 @@ class TinkibotBlocks {
                             menu: "mosaic_options"
                         },
                     }
-                },                 
+                }, 
+                '---',                          
+                {
+                    opcode: 'measure_left_encoder_count',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureLeftEncoderCount',
+                        default: 'measure left encoder count',
+                        description: 'Measure the left encoder count.'
+                    }),
+                    arguments: {
+                    }
+                }, 
+                {
+                    opcode: 'measure_right_encoder_count',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureRightEncoderCount',
+                        default: 'measure right encoder count',
+                        description: 'Measure the right encoder count.'
+                    }),
+                    arguments: {
+                    }
+                },                                               
+                {
+                    opcode: 'drive',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.drive',
+                        default: 'drive [MOTOR] motor(s) at speed [SPEED]',
+                        description: 'start the motors running at a particular speed'
+                    }),
+                    arguments: {
+                        MOTOR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'both',
+                            menu: "motor_options"
+                        },
+                        SPEED: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 1
+                        }                        
+                    }
+                },                                 
+                {
+                    opcode: 'stop',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.stop',
+                        default: 'stop [MOTOR] motor(s)',
+                        description: 'stop the motors'
+                    }),
+                    arguments: {
+                        MOTOR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'both',
+                            menu: "motor_options"
+                        },                      
+                    }
+                },                                 
+                {
+                    opcode: 'brake',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.brake',
+                        default: 'brake [MOTOR] motor(s)',
+                        description: 'apply brake to motors'
+                    }),
+                    arguments: {
+                        MOTOR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'both',
+                            menu: "motor_options"
+                        },                      
+                    }
+                },                                 
                 '---',                          
                 {
                     opcode: 'move',
@@ -289,7 +352,11 @@ class TinkibotBlocks {
                 rotation_options: {
                     acceptReporters: true,
                     items: ['clockwise', 'anticlockwise']
-                },                                             
+                },  
+                motor_options: {
+                    acceptReporters: true,
+                    items: ['right', 'left', 'both']
+                },                                                             
             }
         };
     }
@@ -397,6 +464,18 @@ class TinkibotBlocks {
            } else if (report_type === 'moonwalk') {
                 value = msg['value'];
                 command_response = value; 
+           } else if (report_type === 'drive') {
+                value = msg['value'];
+                command_response = value;   
+           } else if (report_type === 'stop') {
+                value = msg['value'];
+                command_response = value; 
+           } else if (report_type === 'brake') {
+                value = msg['value'];
+                command_response = value;   
+           } else if (report_type === 'volume') {
+                value = msg['value'];
+                command_response = value;                                                               
             }
         };
     }
@@ -570,6 +649,83 @@ class TinkibotBlocks {
             return command_response;
         }
     } 
+    volume(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let value = args['VALUE'];
+
+            msg = {"command": "set","volume":value};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+    drive(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let motor = args['MOTOR'];
+            let speed = args['SPEED'];
+            msg = {"command": "drive","motor":motor,"speed":speed};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
+    stop(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let motor = args['MOTOR'];
+            msg = {"command": "stop","motor":motor};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
+    brake(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let motor = args['MOTOR'];
+            msg = {"command": "brake","motor":motor};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
 
     wiggle(args) {
         if (!connected) {
