@@ -335,7 +335,7 @@ class TinkibotBlocks {
             menus: {
                 sound_options: {
                     acceptReporters: true,
-                    items: ['startup', 'shutdown']
+                    items: ['startup', 'shutdown',"ugggh","growl","haha","sad"]
                 },
                 image_options: {
                     acceptReporters: true,
