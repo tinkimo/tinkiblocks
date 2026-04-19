@@ -21,7 +21,7 @@ describe('projectSaverHOC', () => {
                 config: legacyConfig,
                 projectChanged: false,
                 projectState: {},
-                projectTitle: 'Scratch Project',
+                projectTitle: 'Tinkiblocks Project',
                 timeout: {
                     autoSaveTimeoutId: null
                 }
