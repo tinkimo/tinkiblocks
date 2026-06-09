@@ -168,8 +168,40 @@ class TinkibotBlocks {
                             menu: "image_options"
                         },
                     }
-                }, 
+                },
                 {
+                    opcode: 'display_letter',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.displayLetter',
+                        default: 'display letter [IMAGE]',
+                        description: 'show a single letter on the screen'
+                    }),
+                    arguments: {
+                        IMAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'A',
+                            menu: "letter_options"
+                        },
+                    }
+                },                  
+                {
+                    opcode: 'display_number',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.displayNumber',
+                        default: 'display number [IMAGE]',
+                        description: 'show a single number on the screen'
+                    }),
+                    arguments: {
+                        IMAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: '0',
+                            menu: "number_options"
+                        },
+                    }
+                },  
+                {                
                     opcode: 'mosaic',
                     blockType: BlockType.COMMAND,
                     text: formatMessage({
@@ -185,6 +217,72 @@ class TinkibotBlocks {
                         },
                     }
                 }, 
+                {
+                    opcode: 'write_text',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.writeText',
+                        default: 'write text [MESSAGE] at [X],[Y]',
+                        description: 'write some text to the screen'
+                    }),
+                    arguments: {
+                        MESSAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: "Tinkibots Rule!"
+                        },
+                        X: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 3
+                        },
+                        Y: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 70
+                        }                                                                            
+                    }
+                },                 
+                {
+                    opcode: 'text_colour',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.textColour',
+                        default: 'change the text colour to [COLOUR]',
+                        description: 'change the text colour'
+                    }),
+                    arguments: {
+                        COLOUR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'black',
+                            menu: "colour_options"
+                        },                                                                           
+                    }
+                },                 
+                {
+                    opcode: 'background_colour',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.backgroundColour',
+                        default: 'change the background colour to [COLOUR]',
+                        description: 'change the background colour'
+                    }),
+                    arguments: {
+                        COLOUR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'cyan',
+                            menu: "colour_options"
+                        },                                                                           
+                    }
+                }, 
+                {
+                    opcode: 'clear',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.clear',
+                        default: 'clear the screen',
+                        description: 'clear the screen'
+                    }),
+                    arguments: {                                                                        
+                    }
+                },                                 
                 '---',                          
                 {
                     opcode: 'measure_left_encoder_count',
@@ -300,7 +398,31 @@ class TinkibotBlocks {
                             defaultValue: 90
                         }                        
                     }
-                },                                                   
+                },    
+                {
+                    opcode: 'arc',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.arc',
+                        default: 'arc [DIRECTION] [DEGREES] degrees, radius [RADIUS]',
+                        description: 'create an arc with the tinkibot'
+                    }),
+                    arguments: {
+                        DIRECTION: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'left',
+                            menu: "direction_options"
+                        },
+                        DEGREES: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 45
+                        },
+                        RADIUS: {
+                            type: ArgumentType.NUMBER,
+                            defaultValue: 30
+                        }                                                     
+                    }
+                },                                                                
                 {
                     opcode: 'wiggle',
                     blockType: BlockType.COMMAND,
@@ -335,12 +457,23 @@ class TinkibotBlocks {
             menus: {
                 sound_options: {
                     acceptReporters: true,
-                    items: ['startup', 'shutdown',"ugggh","growl","haha","sad"]
+                    items: ['startup', 'shutdown',"ugggh","growl","haha","sad",'charger','chicken',
+                        'dog-barking','faart','spell','strum']
                 },
                 image_options: {
                     acceptReporters: true,
-                    items: ['logo', 'confused','happy','worried','game-over','scared']
+                    items: ['annoyed','biker','builder','embarassed',
+                        'feeling-ill','indian','love','sad',
+                        'logo', 'confused','happy','worried','game-over','scared']
                 }, 
+                letter_options: {
+                    acceptReporters: true,
+                    items: ['A', 'B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+                },                 
+                number_options: {
+                    acceptReporters: true,
+                    items: ['0','1','2','3','4','5','6','7','8','9']
+                },                 
                 mosaic_options: {
                     acceptReporters: true,
                     items: ['logo', 'cowboy','indian','biker','buider']
@@ -356,7 +489,11 @@ class TinkibotBlocks {
                 motor_options: {
                     acceptReporters: true,
                     items: ['right', 'left', 'both']
-                },                                                             
+                },  
+                colour_options: {
+                    acceptReporters: true,
+                    items: ['red', 'yellow', 'pink','green','orange','purple','blue','cyan','black','white']
+                },                                                                                          
             }
         };
     }
@@ -449,6 +586,12 @@ class TinkibotBlocks {
            } else if (report_type === 'display_image') {
                 value = msg['value'];
                 command_response = value; 
+           } else if (report_type === 'display_number') {
+                value = msg['value'];
+                command_response = value; 
+           } else if (report_type === 'display_letter') {
+                value = msg['value'];
+                command_response = value;                                 
            } else if (report_type === 'mosaic') {
                 value = msg['value'];
                 command_response = value;                 
@@ -460,7 +603,16 @@ class TinkibotBlocks {
                 command_response = value;  
            } else if (report_type === 'wiggle') {
                 value = msg['value'];
-                command_response = value;                                                                                                    
+                command_response = value;  
+           } else if (report_type === 'text_colour') {
+                value = msg['value'];
+                command_response = value;                                                                                                                   
+           } else if (report_type === 'background_colour') {
+                value = msg['value'];
+                command_response = value;                                                                                                                   
+           } else if (report_type === 'clear') {
+                value = msg['value'];
+                command_response = value;                                                                                                                   
            } else if (report_type === 'moonwalk') {
                 value = msg['value'];
                 command_response = value; 
@@ -472,7 +624,13 @@ class TinkibotBlocks {
                 command_response = value; 
            } else if (report_type === 'brake') {
                 value = msg['value'];
+                command_response = value; 
+           } else if (report_type === 'write_text') {
+                value = msg['value'];
                 command_response = value;   
+           } else if (report_type === 'arc') {
+                value = msg['value'];
+                command_response = value;                                   
            } else if (report_type === 'volume') {
                 value = msg['value'];
                 command_response = value;                                                               
@@ -591,6 +749,119 @@ class TinkibotBlocks {
             return command_response;
         }
     } 
+
+    display_letter(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let image = args['IMAGE'];
+            msg = {"command": "display_image","image":image};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
+    display_number(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let image = args['IMAGE'];
+            msg = {"command": "display_image","image":image};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+   write_text(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let message = args['MESSAGE'];
+            let x = args['X'];
+            let y = args['Y'];
+            msg = {"command": "write_text","x":x,"y":y,"message":message};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+   text_colour(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let colour = args['COLOUR'];
+            msg = {"command": "text_colour","colour":colour};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+   background_colour(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let colour = args['COLOUR'];
+            msg = {"command": "background_colour","colour":colour};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
+    clear(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            msg = {"command": "clear"};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    }
+
     mosaic(args) {
         if (!connected) {
             if (!connection_pending) {
@@ -649,6 +920,27 @@ class TinkibotBlocks {
             return command_response;
         }
     } 
+    arc(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.analog_read.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let direction = args['DIRECTION'];
+            let degrees = args['DEGREES'];
+            let radius = args['RADIUS'];
+            msg = {"command": "arc","direction":direction,"degrees":degrees,"radius":radius};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+
     volume(args) {
         if (!connected) {
             if (!connection_pending) {

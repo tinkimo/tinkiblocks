@@ -1,0 +1,1 @@
+npm run -w @scratch/scratch-gui start
