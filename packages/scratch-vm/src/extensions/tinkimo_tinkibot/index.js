@@ -131,6 +131,64 @@ class TinkibotBlocks {
                 },
                 '---',                          
                 {
+                    opcode: 'measure_line_sensor',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.measureLineSensor',
+                        default: 'measure line sensor [SENSOR]',
+                        description: 'Measure the line sensor value'
+                    }),
+                    arguments: {
+                        SENSOR: {
+                            type: ArgumentType.STRING,
+                            defaultValue: '4',
+                            menu: "line_sensors_options"
+                        },                   
+                    }
+                    
+                }, 
+                '---',                          
+                {
+                    opcode: 'read_button',
+                    blockType: BlockType.REPORTER,
+                   text: formatMessage({
+                        id: 'tinkibot.readButton',
+                        default: 'was [BUTTON] pressed?',
+                        description: 'Was button pressed?'
+                    }),
+                    arguments: {
+                        BUTTON: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'top-left',
+                            menu: "button_options"
+                        },                   
+                    }
+                    
+                },  
+                {
+                    opcode: 'button_led',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.buttonLed',
+                        default: 'set [BUTTON] to [STATE]',
+                        description: 'turn on or off an LED button'
+                    }),
+                    arguments: {
+                        BUTTON: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'top-left',
+                            menu: "button_options"
+                        },
+                        STATE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'on',
+                            menu: "state_options"
+                        }                                                                            
+                    }
+                },                 
+
+                '---',                          
+                {
                     opcode: 'measure_distance',
                     blockType: BlockType.REPORTER,
                    text: formatMessage({
@@ -477,7 +535,11 @@ class TinkibotBlocks {
                 mosaic_options: {
                     acceptReporters: true,
                     items: ['logo', 'cowboy','indian','biker','buider']
-                },                 
+                },  
+                button_options: {
+                    acceptReporters: true,
+                    items: ['top-left', 'top-right','bottom-left','bottom-right']
+                },                                 
                 direction_options: {
                     acceptReporters: true,
                     items: ['forward', 'reverse']
@@ -489,11 +551,19 @@ class TinkibotBlocks {
                 motor_options: {
                     acceptReporters: true,
                     items: ['right', 'left', 'both']
-                },  
+                }, 
+                state_options: {
+                    acceptReporters: true,
+                    items: ['on', 'off']
+                },                   
                 colour_options: {
                     acceptReporters: true,
                     items: ['red', 'yellow', 'pink','green','orange','purple','blue','cyan','black','white']
-                },                                                                                          
+                }, 
+                line_sensors_options: {
+                    acceptReporters: true,
+                    items: ['1','2','3','4','5','6','7']
+                },                                                                                                           
             }
         };
     }
@@ -525,7 +595,6 @@ class TinkibotBlocks {
         } else {
             connect_attempt = true;
             window.socket = new WebSocket("ws://127.0.0.1:9006");
-            msg = JSON.stringify({"id": "to_rpi_pico_gateway"});
         }
 
 
@@ -538,6 +607,7 @@ class TinkibotBlocks {
             // connection complete
             connected = true;
             connect_attempt = true;
+            connection_pending = false;
             // the message is built above
             try {
                 //ws.send(msg);
@@ -558,8 +628,9 @@ class TinkibotBlocks {
             pin_modes.fill(-1);
             if (alerted === false) {
                 alerted = true;
-                alert(FormWSClosed[the_locale]);}
+                alert("Tinkibot has disconnected!");}
             connected = false;
+            connection_pending = false;
         };
 
         // reporter messages from the board
@@ -584,6 +655,9 @@ class TinkibotBlocks {
                 value = msg['value'];
                 command_response = value;  
            } else if (report_type === 'display_image') {
+                value = msg['value'];
+                command_response = value;                 
+           } else if (report_type === 'measure_line_sensor') {
                 value = msg['value'];
                 command_response = value; 
            } else if (report_type === 'display_number') {
@@ -630,8 +704,14 @@ class TinkibotBlocks {
                 command_response = value;   
            } else if (report_type === 'arc') {
                 value = msg['value'];
-                command_response = value;                                   
+                command_response = value;   
            } else if (report_type === 'volume') {
+                value = msg['value'];
+                command_response = value;    
+           } else if (report_type === 'read_button') {
+                value = msg['value'];
+                command_response = value;                                                                  
+           } else if (report_type === 'button_led') {
                 value = msg['value'];
                 command_response = value;                                                               
             }
@@ -648,7 +728,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.measure_distance.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             msg = {"command": "measure_distance"};
@@ -666,7 +746,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.measure_voltage.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             msg = {"command": "measure_voltage"};
@@ -684,7 +764,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.measure_right_encoder_count.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             msg = {"command": "measure_enc_right"};
@@ -702,7 +782,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.measure_left_encoder_count.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             msg = {"command": "measure_enc_left"};
@@ -710,7 +790,45 @@ class TinkibotBlocks {
             window.socket.send(msg);
             return measured_left;
         }
-    }                 
+    } 
+
+    read_button(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.read_button.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let button = args['BUTTON'];
+            msg = {"command": "read_button","button":button};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
+    button_led(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.button_led.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let button = args['BUTTON'];
+            let state = args['STATE'];
+            msg = {"command": "button_led","button":button,"state":state};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    } 
 
     play_sound(args) {
         if (!connected) {
@@ -720,7 +838,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.play_sound.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let sound = args['SOUND'];
@@ -739,7 +857,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.display_image.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let image = args['IMAGE'];
@@ -750,6 +868,25 @@ class TinkibotBlocks {
         }
     } 
 
+    measure_line_sensor(args) {
+        if (!connected) {
+            if (!connection_pending) {
+                this.connect();
+                connection_pending = true;
+            }
+        }
+        if (!connected) {
+            let callbackEntry = [this.measure_line_sensor.bind(this), args];
+            wait_open.push(callbackEntry);
+        } else {
+            let lineSensor = args['SENSOR'];
+            msg = {"command": "measure_line_sensor","sensor":lineSensor};
+            msg = JSON.stringify(msg);
+            window.socket.send(msg);
+            return command_response;
+        }
+    }
+
     display_letter(args) {
         if (!connected) {
             if (!connection_pending) {
@@ -758,7 +895,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.display_letter.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let image = args['IMAGE'];
@@ -777,7 +914,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.display_number.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let image = args['IMAGE'];
@@ -795,7 +932,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.write_text.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let message = args['MESSAGE'];
@@ -815,7 +952,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.text_colour.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let colour = args['COLOUR'];
@@ -833,7 +970,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.background_colour.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let colour = args['COLOUR'];
@@ -852,7 +989,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.clear.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             msg = {"command": "clear"};
@@ -870,7 +1007,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.mosaic.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let image = args['IMAGE'];
@@ -889,7 +1026,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.move.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let direction = args['DIRECTION'];
@@ -909,7 +1046,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.rotate.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let rotation = args['ROTATION'];
@@ -928,7 +1065,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.arc.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let direction = args['DIRECTION'];
@@ -949,7 +1086,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.volume.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let value = args['VALUE'];
@@ -968,7 +1105,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.drive.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let motor = args['MOTOR'];
@@ -988,7 +1125,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.stop.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let motor = args['MOTOR'];
@@ -1007,7 +1144,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.brake.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let motor = args['MOTOR'];
@@ -1027,7 +1164,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.wiggle.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let times = args['TIMES'];
@@ -1046,7 +1183,7 @@ class TinkibotBlocks {
             }
         }
         if (!connected) {
-            let callbackEntry = [this.analog_read.bind(this), args];
+            let callbackEntry = [this.moonwalk.bind(this), args];
             wait_open.push(callbackEntry);
         } else {
             let steps = args['STEPS'];
