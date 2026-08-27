@@ -1,6 +1,7 @@
 const test = require('tap').test;
 
 const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
+const VirtualMachine = require('../../src/virtual-machine');
 
 class MockWebSocket {
     constructor () {
@@ -20,6 +21,13 @@ class MockWebSocket {
         this.onmessage({data: JSON.stringify({report, value})});
     }
 }
+
+test('Tinkibot is loaded when the virtual machine starts', t => {
+    const vm = new VirtualMachine();
+
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibot'), true);
+    t.end();
+});
 
 test('Tinkibot commands wait for each response before sending the next command', async t => {
     global.window = {};

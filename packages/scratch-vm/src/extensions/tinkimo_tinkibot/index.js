@@ -48,7 +48,6 @@ class TinkibotBlocks {
      */
     getInfo () {
         the_locale = this._setLocale();        
-        this.connect();
 
         return {
             id: 'tinkibot',
