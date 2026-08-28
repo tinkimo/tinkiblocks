@@ -41,6 +41,7 @@ class TinkibotBlocks {
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
         this._pendingResponse = null;
+        this._buttonEvent = null;
         if (typeof WebSocket !== 'undefined') this.connect();
     }
 
@@ -132,7 +133,8 @@ class TinkibotBlocks {
                 },  
                 {
                     opcode: 'when_button_event',
-                    blockType: BlockType.EVENT,
+                    blockType: BlockType.HAT,
+                    isEdgeActivated: false,
                     text: formatMessage({
                         id: 'tinkibot.whenButtonEvent',
                         default: 'Listen for button [BUTTON] being [STATE]',
@@ -606,10 +608,9 @@ class TinkibotBlocks {
         window.socket.onmessage = message => {
             const response = JSON.parse(message.data);
             if (response.event === 'button') {
-                this.runtime.startHats('tinkibot_when_button_event', {
-                    BUTTON: response.button,
-                    STATE: response.state
-                });
+                this._buttonEvent = response;
+                this.runtime.startHats('tinkibot_when_button_event');
+                this._buttonEvent = null;
             }
             if (this._pendingResponse && response.report === this._pendingResponse.command) {
                 const {resolve} = this._pendingResponse;
@@ -653,6 +654,12 @@ class TinkibotBlocks {
 
     read_button (args) {
         return this._sendCommand({command: 'read_button', button: args.BUTTON});
+    }
+
+    when_button_event (args) {
+        return Boolean(this._buttonEvent &&
+            this._buttonEvent.button === args.BUTTON &&
+            this._buttonEvent.state === args.STATE);
     }
 
     button_led (args) {
