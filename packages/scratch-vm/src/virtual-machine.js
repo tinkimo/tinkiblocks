@@ -26,16 +26,8 @@ require('canvas-toBlob');
 
 const RESERVED_NAMES = ['_mouse_', '_stage_', '_edge_', '_myself_', '_random_'];
 
-const CORE_EXTENSIONS = [
-    // 'motion',
-    // 'looks',
-    // 'sound',
-    // 'events',
-    // 'control',
-    // 'sensing',
-    // 'operators',
-    // 'variables',
-    // 'myBlocks'
+const ALWAYS_LOADED_EXTENSIONS = [
+    'tinkibot'
 ];
 
 /**
@@ -159,8 +151,7 @@ class VirtualMachine extends EventEmitter {
 
         this.extensionManager = new ExtensionManager(this.runtime);
 
-        // Load core extensions
-        for (const id of CORE_EXTENSIONS) {
+        for (const id of ALWAYS_LOADED_EXTENSIONS) {
             this.extensionManager.loadExtensionIdSync(id);
         }
 
