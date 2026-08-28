@@ -73,3 +73,39 @@ test('Tinkibot reporters return the response for their own request', async t => 
     delete global.window;
     delete global.WebSocket;
 });
+
+test('Tinkibot button events start matching event hats', t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+
+    const startedHats = [];
+    const extension = new TinkibotBlocks({
+        startHats: (opcode, fields) => startedHats.push({opcode, fields})
+    });
+    const eventBlock = extension.getInfo().blocks.find(block => block.opcode === 'when_button_event');
+
+    t.equal(eventBlock.blockType, 'event');
+    t.strictSame(eventBlock.arguments.BUTTON, {
+        type: 'string',
+        defaultValue: 'top-left',
+        menu: 'button_options'
+    });
+    t.strictSame(eventBlock.arguments.STATE, {
+        type: 'string',
+        defaultValue: 'pressed',
+        menu: 'button_state_options'
+    });
+
+    MockWebSocket.instance.respond('unrelated', 'response');
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({nickname: 'orange', event: 'button', button: 'bottom-left', state: 'released'})
+    });
+    t.strictSame(startedHats, [{
+        opcode: 'tinkibot_when_button_event',
+        fields: {BUTTON: 'bottom-left', STATE: 'released'}
+    }]);
+
+    delete global.window;
+    delete global.WebSocket;
+    t.end();
+});

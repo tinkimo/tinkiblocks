@@ -41,6 +41,7 @@ class TinkibotBlocks {
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
         this._pendingResponse = null;
+        if (typeof WebSocket !== 'undefined') this.connect();
     }
 
     /**
@@ -124,11 +125,32 @@ class TinkibotBlocks {
                         BUTTON: {
                             type: ArgumentType.STRING,
                             defaultValue: 'top-left',
-                            menu: "button_options"
+                            menu: 'button_options'
                         },                   
                     }
                     
                 },  
+                {
+                    opcode: 'when_button_event',
+                    blockType: BlockType.EVENT,
+                    text: formatMessage({
+                        id: 'tinkibot.whenButtonEvent',
+                        default: 'Listen for button [BUTTON] being [STATE]',
+                        description: 'Run when a button changes to the selected state'
+                    }),
+                    arguments: {
+                        BUTTON: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'top-left',
+                            menu: "button_options"
+                        },
+                        STATE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: 'pressed',
+                            menu: 'button_state_options'
+                        }
+                    }
+                },
                 {
                     opcode: 'button_led',
                     blockType: BlockType.COMMAND,
@@ -519,7 +541,11 @@ class TinkibotBlocks {
                 state_options: {
                     acceptReporters: true,
                     items: ['on', 'off']
-                },                   
+                },
+                button_state_options: {
+                    acceptReporters: true,
+                    items: ['pressed', 'released']
+                },
                 colour_options: {
                     acceptReporters: true,
                     items: ['red', 'yellow', 'pink','green','orange','purple','blue','cyan','black','white']
@@ -579,6 +605,12 @@ class TinkibotBlocks {
 
         window.socket.onmessage = message => {
             const response = JSON.parse(message.data);
+            if (response.event === 'button') {
+                this.runtime.startHats('tinkibot_when_button_event', {
+                    BUTTON: response.button,
+                    STATE: response.state
+                });
+            }
             if (this._pendingResponse && response.report === this._pendingResponse.command) {
                 const {resolve} = this._pendingResponse;
                 this._pendingResponse = null;
