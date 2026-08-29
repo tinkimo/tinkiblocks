@@ -411,6 +411,7 @@ class Blocks extends React.Component {
         // No-op, support may be added in the future
     }
     onVisualReport (data) {
+        this.ScratchBlocks.DropDownDiv.hideWithoutAnimation();
         this.ScratchBlocks.reportValue(data.id, data.value);
     }
     getToolboxXML () {

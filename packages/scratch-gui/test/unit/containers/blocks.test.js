@@ -63,3 +63,23 @@ describe('Blocks container onWorkspaceUpdate', () => {
         expect(instance.ScratchBlocks.Events.enable).toHaveBeenCalled();
     });
 });
+
+describe('Blocks container onVisualReport', () => {
+    test('closes the current report before showing another one', () => {
+        const instance = {
+            ScratchBlocks: {
+                DropDownDiv: {
+                    hideWithoutAnimation: jest.fn()
+                },
+                reportValue: jest.fn()
+            }
+        };
+
+        Blocks.prototype.onVisualReport.call(instance, {id: 'block-id', value: 'result'});
+
+        expect(instance.ScratchBlocks.DropDownDiv.hideWithoutAnimation).toHaveBeenCalled();
+        expect(instance.ScratchBlocks.reportValue).toHaveBeenCalledWith('block-id', 'result');
+        expect(instance.ScratchBlocks.DropDownDiv.hideWithoutAnimation.mock.invocationCallOrder[0])
+            .toBeLessThan(instance.ScratchBlocks.reportValue.mock.invocationCallOrder[0]);
+    });
+});
