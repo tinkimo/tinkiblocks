@@ -117,6 +117,56 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
   implementation methods.
 - i18n strings in extensions are extracted with `format-message`. Run `npm run i18n:src` after changing them.
 
+## Python coding standards
+
+Follow these standards for any Python code added to the repository. If a Python project in the repository provides
+more specific configuration in `pyproject.toml`, its local configuration takes precedence.
+
+### Style and design
+
+- Target the Python version declared by the project and follow PEP 8 naming, layout, and import conventions. Use
+  Ruff for formatting and linting when introducing Python tooling to a project that does not already have a
+  formatter or linter.
+- Add type annotations to public functions, methods, and module-level data. Prefer precise built-in collection
+  types and avoid `Any` unless data genuinely crosses an untyped boundary. Type-check new Python projects with
+  mypy or Pyright and keep the selected configuration in `pyproject.toml`.
+- Prefer small, focused functions and modules with explicit inputs and return values. Use classes only when state or
+  a clear domain abstraction requires them; use dataclasses for value-like records.
+- Use `pathlib.Path` for filesystem paths, context managers for resources, and standard-library functionality
+  instead of adding dependencies for simple tasks.
+- Catch only exceptions that can be handled meaningfully. Never use a bare `except`, silently discard an error, or
+  use exceptions for ordinary control flow. Preserve the original exception when adding context with `raise ...
+  from ...`.
+- Validate untrusted data at system boundaries. Do not duplicate validation between internal functions, and do not
+  add fallback behavior for states guaranteed by the caller.
+- Write docstrings for public modules, classes, functions, and methods when their purpose, inputs, output, or raised
+  exceptions are not obvious from the signature. Comments should explain why a decision is necessary rather than
+  restating the code.
+- Keep imports at module scope and ordered as standard library, third-party, then local imports. Never wrap imports
+  in `try`/`except` blocks to hide missing dependencies.
+- Do not use mutable values as default arguments. Avoid module-level mutable state, hidden I/O, and nondeterministic
+  behavior unless the feature specifically requires them.
+
+### Python testing
+
+- Use pytest for new Python projects unless an existing package already uses another test framework. Keep tests in
+  a `tests/` directory and name files `test_<subject>.py` and test functions `test_<behavior>`.
+- For a bug fix, first add a test that fails for the reported behavior, then implement the fix. For new
+  functionality, test the public behavior, important boundary cases, invalid external input, and meaningful failure
+  paths.
+- Keep tests deterministic, independent, and order-insensitive. Do not use real network services, wall-clock delays,
+  or shared writable state; use pytest fixtures, temporary paths, dependency injection, and targeted mocks at
+  external boundaries.
+- Prefer assertions on observable results and side effects over implementation details. Use parametrized tests for
+  equivalent input cases, but keep separate tests when failures would represent distinct behaviors.
+- Every test must prove a behavior that could regress. Avoid tests that merely execute code, duplicate another test,
+  or mock the unit under test.
+- Run the narrowest relevant test while iterating, then run the complete Python test suite, formatter check, linter,
+  and type checker before submitting. Document exact project commands in `pyproject.toml`, the package README, or
+  this file when Python tooling is introduced.
+- Treat coverage as a way to find missing scenarios, not as a substitute for meaningful assertions. New and changed
+  behavior should be covered even when the repository does not enforce a numeric coverage threshold.
+
 ## npm workflow
 
 Use `npm ci` from the repo root to install all workspace dependencies from `package-lock.json`.
