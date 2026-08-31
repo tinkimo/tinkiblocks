@@ -49,10 +49,16 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'clear']
     });
-    t.strictSame(infos.map(info => info.color1), ['#D1495B', '#00798C', '#3A7D44', '#7B2CBF', '#B86B00']);
-    for (const info of infos) {
+    t.strictSame(infos.map(info => info.color1), ['#B832D0', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
+    for (const [index, info] of infos.entries()) {
+        const channels = info.color1.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) / 255)
+            .map(channel => channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4));
+        const luminance = (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
         t.equal(info.blockIconURI, info.menuIconURI);
         t.match(decodeURIComponent(info.menuIconURI), new RegExp(info.color1, 'i'));
+        t.match(decodeURIComponent(info.menuIconURI), new RegExp(`<title>${info.name}</title>`));
+        t.not(info.menuIconURI, infos[(index + 1) % infos.length].menuIconURI);
+        t.ok(1.05 / (luminance + 0.05) >= 4.5, `${info.name} remains legible with white text`);
     }
     t.end();
 });
