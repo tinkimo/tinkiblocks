@@ -469,13 +469,22 @@ const GUIComponent = props => {
                                             <svg
                                                 aria-hidden
                                                 className={styles.connectionsTabIcon}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth="1.8"
                                                 viewBox="0 0 24 24"
                                             >
-                                                <path d="M11 3h2v4h-2z" />
-                                                <rect height="15" rx="4" width="16" x="4" y="6" />
-                                                <circle cx="8.5" cy="11.5" r="1.5" />
-                                                <circle cx="15.5" cy="11.5" r="1.5" />
-                                                <path d="M8 16h8v2H8z" />
+                                                <circle cx="7.5" cy="3.5" r="2" />
+                                                <circle cx="16.5" cy="3.5" r="2" />
+                                                <path d="m8.5 5.25 1.5 2.5m5.5-2.5L14 7.75" />
+                                                <path d="M4 12H2.75a2.25 2.25 0 0 0 0 4H4" />
+                                                <path d="M20 12h1.25a2.25 2.25 0 0 1 0 4H20" />
+                                                <rect height="14" rx="3" width="16" x="4" y="7.5" />
+                                                <circle cx="8.5" cy="12.5" r="1.5" />
+                                                <circle cx="15.5" cy="12.5" r="1.5" />
+                                                <path d="M8 17h8v2H8z" />
                                             </svg>
                                             <FormattedMessage
                                                 defaultMessage="Connections"
