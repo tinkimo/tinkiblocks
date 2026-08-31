@@ -162,8 +162,11 @@
 }
 
 .connections-tab-icon {
+    width: 1.375rem;
+    height: 1.375rem;
     margin-right: 0.125rem;
-    font-size: 1.375rem;
+    fill: currentColor;
+    flex-shrink: 0;
 }
 
 [dir="rtl"] .connections-tab-icon {

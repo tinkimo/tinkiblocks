@@ -466,7 +466,17 @@ const GUIComponent = props => {
                                             role="tab"
                                             tabIndex="0"
                                         >
-                                            <span aria-hidden className={styles.connectionsTabIcon}>🤖</span>
+                                            <svg
+                                                aria-hidden
+                                                className={styles.connectionsTabIcon}
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path d="M11 3h2v4h-2z" />
+                                                <rect height="15" rx="4" width="16" x="4" y="6" />
+                                                <circle cx="8.5" cy="11.5" r="1.5" />
+                                                <circle cx="15.5" cy="11.5" r="1.5" />
+                                                <path d="M8 16h8v2H8z" />
+                                            </svg>
                                             <FormattedMessage
                                                 defaultMessage="Connections"
                                                 description="Button to view connected Tinkibot robots"
