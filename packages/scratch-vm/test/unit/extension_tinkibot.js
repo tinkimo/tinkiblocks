@@ -10,7 +10,7 @@ class MockWebSocket {
     }
 
     send (message) {
-        this.sent.push(JSON.parse(message));
+        this.sent.push(message.includes('.claim_released ') ? message : JSON.parse(message));
     }
 
     open () {
@@ -236,7 +236,15 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     }]);
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'robot_claimed',
+        event: 'claim_accepted',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': 'different-blocks-uuid'
+    })});
+    t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'free', 'mismatched claims are ignored');
+
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'claim_accepted',
         nickname: 'orange',
         'bot-uuid': 'orange-robot-uuid',
         'blocks-uuid': blocksUuid
@@ -249,23 +257,25 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     }]);
 
     await runtime.releaseTinkibotRobot('orange-robot-uuid');
-    t.strictSame(MockWebSocket.instance.sent[1], {
-        command: 'release',
-        nickname: 'orange',
-        'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid
-    });
-    MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'robot_released',
-        nickname: 'orange',
-        'bot-uuid': 'orange-robot-uuid'
-    })});
+    t.equal(
+        MockWebSocket.instance.sent[1],
+        `{orange.claim_released orange-robot-uuid ${blocksUuid}}`
+    );
     t.strictSame(runtime.tinkibotConnectedRobots, [{
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
         claimedBy: null,
         claimState: 'free'
     }]);
+
+    await runtime.claimTinkibotRobot('orange-robot-uuid');
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'claim_rejected',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid
+    })});
+    t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'free');
 
     delete global.window;
     delete global.WebSocket;

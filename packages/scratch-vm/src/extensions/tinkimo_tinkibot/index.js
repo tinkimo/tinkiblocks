@@ -34,6 +34,7 @@ class TinkibotBlocks {
         this._pendingResponse = null;
         this._buttonEvent = null;
         this._connectedRobots = [];
+        this._pendingClaims = new Set();
         this._blocksUuid = this._getBlocksUuid();
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
@@ -673,8 +674,16 @@ class TinkibotBlocks {
                         description: 'Message shown when a Tinkibot robot disconnects.'
                     }, {nickname: response.nickname}));
                 }
-            } else if (response.event === 'robot_claimed') {
-                this._updateRobotClaim(response['bot-uuid'], response['blocks-uuid']);
+            } else if (response.event === 'claim_accepted') {
+                if (this._claimResponseMatches(response)) {
+                    this._pendingClaims.delete(response['bot-uuid']);
+                    this._updateRobotClaim(response['bot-uuid'], response['blocks-uuid']);
+                }
+            } else if (response.event === 'claim_rejected') {
+                if (this._claimResponseMatches(response)) {
+                    this._pendingClaims.delete(response['bot-uuid']);
+                    this._updateRobotClaim(response['bot-uuid'], null);
+                }
             } else if (response.event === 'robot_released') {
                 this._updateRobotClaim(response['bot-uuid'], null);
             }
@@ -732,6 +741,14 @@ class TinkibotBlocks {
             Object.assign({}, robot, {claimedBy: blocksUuid}) : robot));
     }
 
+    _claimResponseMatches (response) {
+        const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === response['bot-uuid']);
+        return Boolean(robot &&
+            robot.nickname === response.nickname &&
+            response['blocks-uuid'] === this._blocksUuid &&
+            this._pendingClaims.has(response['bot-uuid']));
+    }
+
     _getBlocksUuid () {
         const newId = () => uuid.v4();
         if (typeof window === 'undefined') return newId();
@@ -753,6 +770,7 @@ class TinkibotBlocks {
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || robot.claimState !== 'free') return;
         await this.connect();
+        this._pendingClaims.add(robot.botUuid);
         window.socket.send(JSON.stringify({
             command: 'claim',
             nickname: robot.nickname,
@@ -765,12 +783,8 @@ class TinkibotBlocks {
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || robot.claimState !== 'paired') return;
         await this.connect();
-        window.socket.send(JSON.stringify({
-            command: 'release',
-            nickname: robot.nickname,
-            'bot-uuid': robot.botUuid,
-            'blocks-uuid': this._blocksUuid
-        }));
+        window.socket.send(`{${robot.nickname}.claim_released ${robot.botUuid} ${this._blocksUuid}}`);
+        this._updateRobotClaim(robot.botUuid, null);
     }
 
     _sendCommand (command, responseCommand = command.command) {

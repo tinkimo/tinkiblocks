@@ -57,8 +57,8 @@ const ConnectionsTab = ({vm}) => {
                                     />
                                 ) : robot.claimState === 'paired' ? (
                                     <FormattedMessage
-                                        defaultMessage="Paired with you"
-                                        description="Status label for a robot paired with this user"
+                                        defaultMessage="Claimed by you"
+                                        description="Status label for a robot claimed by this user"
                                         id="gui.connectionsTab.paired"
                                     />
                                 ) : (
