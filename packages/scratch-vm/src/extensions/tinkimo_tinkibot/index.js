@@ -612,6 +612,24 @@ class TinkibotBlocks {
                 this.runtime.startHats('tinkibot_when_button_event');
                 this._buttonEvent = null;
             }
+            if (this._pendingResponse && response.report === 'error') {
+                const {reject} = this._pendingResponse;
+                this._pendingResponse = null;
+                const errorMessage = response.value === 'command_failed:no_robots_connected' ?
+                    formatMessage({
+                        id: 'tinkibot.noRobotsConnected',
+                        default: 'No Tinkibot robots are connected.',
+                        description: 'Message shown when a command needs a connected Tinkibot.'
+                    }) :
+                    formatMessage({
+                        id: 'tinkibot.commandError',
+                        default: 'Tinkibot command failed: {error}',
+                        description: 'Message shown when a Tinkibot command cannot be completed.'
+                    }, {error: response.value});
+                alert(errorMessage);
+                reject(new Error(response.value));
+                return;
+            }
             if (this._pendingResponse && response.report === this._pendingResponse.command) {
                 const {resolve} = this._pendingResponse;
                 this._pendingResponse = null;
@@ -724,7 +742,7 @@ class TinkibotBlocks {
     }
 
     volume (args) {
-        return this._sendCommand({command: 'set', volume: args.VALUE}, 'volume');
+        return this._sendCommand({command: 'set', volume: args.VALUE});
     }
 
     drive (args) {
