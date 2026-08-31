@@ -796,7 +796,7 @@ class TinkibotBlocks {
         if (!robot || robot.claimState !== 'paired') return;
         await this.connect();
         window.socket.send(JSON.stringify({
-            command: 'claim-released',
+            command: 'unclaim',
             nickname: robot.nickname,
             'bot-uuid': robot.botUuid,
             'blocks-uuid': this._blocksUuid

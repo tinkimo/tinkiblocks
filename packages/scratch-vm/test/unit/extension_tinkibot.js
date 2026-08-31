@@ -260,7 +260,7 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
 
     await runtime.releaseTinkibotRobot('orange-robot-uuid');
     t.strictSame(MockWebSocket.instance.sent[1], {
-        command: 'claim-released',
+        command: 'unclaim',
         nickname: 'orange',
         'bot-uuid': 'orange-robot-uuid',
         'blocks-uuid': blocksUuid
