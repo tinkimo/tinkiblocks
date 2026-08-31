@@ -658,11 +658,7 @@ class TinkibotBlocks {
             } else if (response.event === 'robot_connected') {
                 if (!this._connectedRobots.some(robot => robot.botUuid === response['bot-uuid'])) {
                     this._setConnectedRobots([...this._connectedRobots, response]);
-                    alert(formatMessage({
-                        id: 'tinkibot.robotConnected',
-                        default: '{nickname} is connected!',
-                        description: 'Message shown when a Tinkibot robot connects.'
-                    }, {nickname: response.nickname}));
+                    this.runtime.emit('TINKIBOT_ROBOT_CONNECTION_CHANGED');
                 }
             } else if (response.event === 'robot_disconnected') {
                 if (this._connectedRobots.some(robot => robot.botUuid === response['bot-uuid'])) {
@@ -674,6 +670,7 @@ class TinkibotBlocks {
                         default: '{nickname} has disconnected.',
                         description: 'Message shown when a Tinkibot robot disconnects.'
                     }, {nickname: response.nickname}));
+                    this.runtime.emit('TINKIBOT_ROBOT_CONNECTION_CHANGED');
                 }
             } else if (response.event === 'claim_accepted') {
                 if (this._claimResponseMatches(response)) {

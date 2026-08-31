@@ -184,7 +184,7 @@ test('Tinkibot tracks robot connection events', t => {
         },
         {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
-    t.strictSame(alerts, ['green is connected!']);
+    t.strictSame(alerts, [], 'connecting a robot does not open an alert');
 
     MockWebSocket.instance.onmessage({
         data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'})
@@ -198,8 +198,11 @@ test('Tinkibot tracks robot connection events', t => {
         },
         {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
-    t.strictSame(alerts, ['green is connected!', 'orange has disconnected.']);
-    t.equal(runtime.events.length, 3);
+    t.strictSame(alerts, ['orange has disconnected.']);
+    t.equal(
+        runtime.events.filter(({event}) => event === 'TINKIBOT_ROBOT_CONNECTION_CHANGED').length,
+        2
+    );
 
     delete global.alert;
     delete global.window;

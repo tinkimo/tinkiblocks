@@ -16,7 +16,8 @@ import {
     activateTab,
     BLOCKS_TAB_INDEX,
     COSTUMES_TAB_INDEX,
-    SOUNDS_TAB_INDEX
+    SOUNDS_TAB_INDEX,
+    CONNECTIONS_TAB_INDEX
 } from '../reducers/editor-tab';
 
 import {
@@ -185,6 +186,7 @@ const mapStateToProps = (state, ownProps) => {
         blocksTabVisible: state.scratchGui.editorTab.activeTabIndex === BLOCKS_TAB_INDEX,
         cardsVisible: state.scratchGui.cards.visible,
         connectionModalVisible: state.scratchGui.modals.connectionModal,
+        connectionsTabVisible: state.scratchGui.editorTab.activeTabIndex === CONNECTIONS_TAB_INDEX,
         costumeLibraryVisible: state.scratchGui.modals.costumeLibrary,
         costumesTabVisible: state.scratchGui.editorTab.activeTabIndex === COSTUMES_TAB_INDEX,
         debugModalVisible: state.scratchGui.modals.debugModal,

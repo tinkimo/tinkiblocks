@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import omit from 'lodash.omit';
 import PropTypes from 'prop-types';
-import React, {useEffect, useCallback} from 'react';
+import React, {useEffect, useCallback, useState} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import MediaQuery from 'react-responsive';
@@ -143,6 +143,7 @@ const GUIComponent = props => {
         canUseCloud,
         children,
         connectionModalVisible,
+        connectionsTabVisible,
         costumeLibraryVisible,
         costumesTabVisible,
         debugModalVisible,
@@ -211,6 +212,8 @@ const GUIComponent = props => {
         return <Box {...componentProps}>{children}</Box>;
     }
 
+    const [connectionsChanged, setConnectionsChanged] = useState(false);
+
     useEffect(() => {
         if (props.platform) {
             // TODO: This uses the imported `setPlatform` directly,
@@ -229,6 +232,18 @@ const GUIComponent = props => {
             props.setTheme(DEFAULT_THEME);
         }
     }, [theme, hasActiveMembership, props.setTheme]);
+
+    useEffect(() => {
+        const handleConnectionChange = () => {
+            if (!connectionsTabVisible) setConnectionsChanged(true);
+        };
+        vm.runtime.on('TINKIBOT_ROBOT_CONNECTION_CHANGED', handleConnectionChange);
+        return () => vm.runtime.removeListener('TINKIBOT_ROBOT_CONNECTION_CHANGED', handleConnectionChange);
+    }, [connectionsTabVisible, vm]);
+
+    useEffect(() => {
+        if (connectionsTabVisible) setConnectionsChanged(false);
+    }, [connectionsTabVisible]);
 
     const tabClassNames = {
         tabs: styles.tabs,
@@ -462,7 +477,9 @@ const GUIComponent = props => {
                                             />
                                         </Tab>
                                         <Tab
-                                            className={tabClassNames.tab}
+                                            className={classNames(tabClassNames.tab, {
+                                                [styles.tabChanged]: connectionsChanged
+                                            })}
                                             role="tab"
                                             tabIndex="0"
                                         >
@@ -491,6 +508,15 @@ const GUIComponent = props => {
                                                 description="Button to view connected Tinkibot robots"
                                                 id="gui.gui.connectionsTab"
                                             />
+                                            {connectionsChanged ? (
+                                                <span className={styles.connectionChangeMessage} role="status">
+                                                    <FormattedMessage
+                                                        defaultMessage="Robot list changed"
+                                                        description="Notice that connected robots have changed"
+                                                        id="gui.gui.connectionsChanged"
+                                                    />
+                                                </span>
+                                            ) : null}
                                         </Tab>
                                     </TabList>
                                 </Box>
@@ -638,6 +664,7 @@ GUIComponent.propTypes = {
     canUseCloud: PropTypes.bool,
     cardsVisible: PropTypes.bool,
     children: PropTypes.node,
+    connectionsTabVisible: PropTypes.bool,
     costumeLibraryVisible: PropTypes.bool,
     costumesTabVisible: PropTypes.bool,
     debugModalVisible: PropTypes.bool,

@@ -168,6 +168,40 @@
     flex-shrink: 0;
 }
 
+.tab-changed {
+    color: $ui-orange;
+    background-color: $ui-alert-orange;
+    box-shadow: inset 0 0 0 2px $ui-orange;
+    animation: connection-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.connection-change-message {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@keyframes connection-pulse {
+    from {
+        filter: brightness(1);
+    }
+
+    to {
+        filter: brightness(0.92);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tab-changed {
+        animation: none;
+    }
+}
+
 [dir="rtl"] .connections-tab-icon {
     margin-right: 0;
     margin-left: 0.125rem;
