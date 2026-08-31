@@ -209,6 +209,7 @@ test('Tinkibot tracks robot connection events', t => {
 
 test('Tinkibot claims and releases a robot with the persistent blocks UUID', async t => {
     const storedValues = new Map();
+    const alerts = [];
     global.window = {
         localStorage: {
             getItem: key => storedValues.get(key) || null,
@@ -216,6 +217,7 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
         }
     };
     global.WebSocket = MockWebSocket;
+    global.alert = message => alerts.push(message);
     const runtime = makeRuntime();
     const extension = new TinkibotBlocks(runtime);
     t.equal(extension.runtime, runtime);
@@ -277,6 +279,21 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     })});
     t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'free');
 
+    await runtime.claimTinkibotRobot('orange-robot-uuid');
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        report: 'claim',
+        value: 'The robot has been claimed by another user',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid,
+        timestamp: 1788206612195
+    })});
+    t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'claimed');
+    t.strictSame(alerts, [
+        'orange could not be claimed because another user has already claimed it.'
+    ]);
+
+    delete global.alert;
     delete global.window;
     delete global.WebSocket;
     t.end();

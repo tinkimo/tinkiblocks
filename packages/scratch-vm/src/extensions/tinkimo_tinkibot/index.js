@@ -8,6 +8,7 @@ const BlockType = require('../../extension-support/block-type');
 const categoryStyles = require('./common');
 
 const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
+const CLAIMED_BY_OTHER_USER = 'another-user';
 
 // has an websocket message already been received
 let alerted = false;
@@ -686,6 +687,17 @@ class TinkibotBlocks {
                 }
             } else if (response.event === 'robot_released') {
                 this._updateRobotClaim(response['bot-uuid'], null);
+            }
+            if (response.report === 'claim' &&
+                response.value === 'The robot has been claimed by another user' &&
+                this._claimResponseMatches(response)) {
+                this._pendingClaims.delete(response['bot-uuid']);
+                this._updateRobotClaim(response['bot-uuid'], CLAIMED_BY_OTHER_USER);
+                alert(formatMessage({
+                    id: 'tinkibot.robotAlreadyClaimed',
+                    default: '{nickname} could not be claimed because another user has already claimed it.',
+                    description: 'Message shown when another user has already claimed a Tinkibot robot.'
+                }, {nickname: response.nickname}));
             }
             if (response.event === 'button') {
                 this._buttonEvent = response;
