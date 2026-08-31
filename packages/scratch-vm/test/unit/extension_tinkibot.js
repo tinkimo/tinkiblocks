@@ -133,31 +133,56 @@ test('Tinkibot tracks robot connection events', t => {
     MockWebSocket.instance.onmessage({
         data: JSON.stringify({
             event: 'connected_robots',
-            robots: [
-                {nickname: 'orange', claimed_by: null},
-                {nickname: 'blue', claimed_by: 'another-environment-id'},
-                {nickname: 'orange', claimed_by: null}
+            nicknames: [
+                {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
+                {
+                    nickname: 'blue',
+                    'bot-uuid': 'blue-robot-uuid',
+                    'blocks-uuid': 'another-environment-id'
+                },
+                {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
             ]
         })
     });
     t.strictSame(runtime.tinkibotConnectedRobots, [
-        {nickname: 'orange', claimedBy: null, claimState: 'free'},
-        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'}
+        {nickname: 'orange', botUuid: 'orange-robot-uuid', claimedBy: null, claimState: 'free'},
+        {
+            nickname: 'blue',
+            botUuid: 'blue-robot-uuid',
+            claimedBy: 'another-environment-id',
+            claimState: 'claimed'
+        }
     ]);
     t.strictSame(alerts, [], 'the initial list does not produce a series of pop-ups');
+    runtime.releaseTinkibotRobot('blue-robot-uuid');
+    t.strictSame(MockWebSocket.instance.sent, [], 'a robot claimed by someone else cannot be released');
 
-    MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_connected', nickname: 'green'})});
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({event: 'robot_connected', nickname: 'green', 'bot-uuid': 'green-robot-uuid'})
+    });
     t.strictSame(runtime.tinkibotConnectedRobots, [
-        {nickname: 'orange', claimedBy: null, claimState: 'free'},
-        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'},
-        {nickname: 'green', claimedBy: null, claimState: 'free'}
+        {nickname: 'orange', botUuid: 'orange-robot-uuid', claimedBy: null, claimState: 'free'},
+        {
+            nickname: 'blue',
+            botUuid: 'blue-robot-uuid',
+            claimedBy: 'another-environment-id',
+            claimState: 'claimed'
+        },
+        {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
     t.strictSame(alerts, ['green is connected!']);
 
-    MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange'})});
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'})
+    });
     t.strictSame(runtime.tinkibotConnectedRobots, [
-        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'},
-        {nickname: 'green', claimedBy: null, claimState: 'free'}
+        {
+            nickname: 'blue',
+            botUuid: 'blue-robot-uuid',
+            claimedBy: 'another-environment-id',
+            claimState: 'claimed'
+        },
+        {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
     t.strictSame(alerts, ['green is connected!', 'orange has disconnected.']);
     t.equal(runtime.events.length, 3);
@@ -168,7 +193,7 @@ test('Tinkibot tracks robot connection events', t => {
     t.end();
 });
 
-test('Tinkibot claims a free robot with the persistent environment ID', async t => {
+test('Tinkibot claims and releases a robot with the persistent blocks UUID', async t => {
     const storedValues = new Map();
     global.window = {
         localStorage: {
@@ -181,26 +206,51 @@ test('Tinkibot claims a free robot with the persistent environment ID', async t 
     const extension = new TinkibotBlocks(runtime);
     t.equal(extension.runtime, runtime);
     MockWebSocket.instance.open();
-    MockWebSocket.instance.onmessage({
-        data: JSON.stringify({event: 'connected_robots', robots: [{nickname: 'orange', claimed_by: null}]})
-    });
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'connected_robots',
+        nicknames: [{nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}]
+    })});
 
-    await runtime.claimTinkibotRobot('orange');
-    const environmentId = storedValues.get('tinkiblocks.environmentId');
-    t.match(environmentId, /^[0-9a-f-]{36}$/);
+    await runtime.claimTinkibotRobot('orange-robot-uuid');
+    const blocksUuid = storedValues.get('tinkiblocks.blocksUuid');
+    t.match(blocksUuid, /^[0-9a-f-]{36}$/);
     t.strictSame(MockWebSocket.instance.sent, [{
         command: 'claim',
         nickname: 'orange',
-        uuid: environmentId
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid
     }]);
 
-    MockWebSocket.instance.onmessage({
-        data: JSON.stringify({event: 'robot_claimed', nickname: 'orange', uuid: environmentId})
-    });
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'robot_claimed',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid
+    })});
     t.strictSame(runtime.tinkibotConnectedRobots, [{
         nickname: 'orange',
-        claimedBy: environmentId,
+        botUuid: 'orange-robot-uuid',
+        claimedBy: blocksUuid,
         claimState: 'paired'
+    }]);
+
+    await runtime.releaseTinkibotRobot('orange-robot-uuid');
+    t.strictSame(MockWebSocket.instance.sent[1], {
+        command: 'release',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid
+    });
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'robot_released',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid'
+    })});
+    t.strictSame(runtime.tinkibotConnectedRobots, [{
+        nickname: 'orange',
+        botUuid: 'orange-robot-uuid',
+        claimedBy: null,
+        claimState: 'free'
     }]);
 
     delete global.window;

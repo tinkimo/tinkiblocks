@@ -7,7 +7,7 @@ const BlockType = require('../../extension-support/block-type');
 
 const categoryStyles = require('./common');
 
-const ENVIRONMENT_ID_STORAGE_KEY = 'tinkiblocks.environmentId';
+const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 
 // has an websocket message already been received
 let alerted = false;
@@ -34,8 +34,9 @@ class TinkibotBlocks {
         this._pendingResponse = null;
         this._buttonEvent = null;
         this._connectedRobots = [];
-        this._environmentId = this._getEnvironmentId();
+        this._blocksUuid = this._getBlocksUuid();
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
+        this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         if (typeof WebSocket !== 'undefined') this.connect();
     }
 
@@ -653,7 +654,7 @@ class TinkibotBlocks {
             if (response.event === 'connected_robots') {
                 this._setConnectedRobots(response.robots || response.nicknames);
             } else if (response.event === 'robot_connected') {
-                if (!this._connectedRobots.some(robot => robot.nickname === response.nickname)) {
+                if (!this._connectedRobots.some(robot => robot.botUuid === response['bot-uuid'])) {
                     this._setConnectedRobots([...this._connectedRobots, response]);
                     alert(formatMessage({
                         id: 'tinkibot.robotConnected',
@@ -662,9 +663,9 @@ class TinkibotBlocks {
                     }, {nickname: response.nickname}));
                 }
             } else if (response.event === 'robot_disconnected') {
-                if (this._connectedRobots.some(robot => robot.nickname === response.nickname)) {
+                if (this._connectedRobots.some(robot => robot.botUuid === response['bot-uuid'])) {
                     this._setConnectedRobots(
-                        this._connectedRobots.filter(robot => robot.nickname !== response.nickname)
+                        this._connectedRobots.filter(robot => robot.botUuid !== response['bot-uuid'])
                     );
                     alert(formatMessage({
                         id: 'tinkibot.robotDisconnected',
@@ -673,8 +674,9 @@ class TinkibotBlocks {
                     }, {nickname: response.nickname}));
                 }
             } else if (response.event === 'robot_claimed') {
-                this._setConnectedRobots(this._connectedRobots.map(robot => robot.nickname === response.nickname ?
-                    Object.assign({}, robot, {claimedBy: response.uuid || response.claimed_by}) : robot));
+                this._updateRobotClaim(response['bot-uuid'], response['blocks-uuid']);
+            } else if (response.event === 'robot_released') {
+                this._updateRobotClaim(response['bot-uuid'], null);
             }
             if (response.event === 'button') {
                 this._buttonEvent = response;
@@ -711,44 +713,63 @@ class TinkibotBlocks {
 
     _setConnectedRobots (robots) {
         this._connectedRobots = Array.from(new Map(robots.map(robot => {
-            const normalizedRobot = typeof robot === 'string' ? {nickname: robot, claimedBy: null} : {
+            const normalizedRobot = typeof robot === 'string' ? {nickname: robot, botUuid: null, claimedBy: null} : {
                 nickname: robot.nickname,
-                claimedBy: robot.claimedBy || robot.claimed_by || null
+                botUuid: robot.botUuid || robot['bot-uuid'] || null,
+                claimedBy: robot.claimedBy || robot['blocks-uuid'] || robot.claimed_by || null
             };
-            return [normalizedRobot.nickname, normalizedRobot];
+            return [normalizedRobot.botUuid || normalizedRobot.nickname, normalizedRobot];
         })).values()).map(robot => Object.assign({}, robot, {
             claimState: !robot.claimedBy ? 'free' :
-                robot.claimedBy === this._environmentId ? 'paired' : 'claimed'
+                robot.claimedBy === this._blocksUuid ? 'paired' : 'claimed'
         }));
         this.runtime.tinkibotConnectedRobots = this._connectedRobots.map(robot => Object.assign({}, robot));
         this.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', this.runtime.tinkibotConnectedRobots);
     }
 
-    _getEnvironmentId () {
+    _updateRobotClaim (botUuid, blocksUuid) {
+        this._setConnectedRobots(this._connectedRobots.map(robot => robot.botUuid === botUuid ?
+            Object.assign({}, robot, {claimedBy: blocksUuid}) : robot));
+    }
+
+    _getBlocksUuid () {
         const newId = () => uuid.v4();
         if (typeof window === 'undefined') return newId();
         try {
             const storage = window.localStorage;
             if (!storage) return newId();
-            const storedId = storage.getItem(ENVIRONMENT_ID_STORAGE_KEY);
+            const storedId = storage.getItem(BLOCKS_UUID_STORAGE_KEY);
             if (storedId) return storedId;
-            const environmentId = newId();
-            storage.setItem(ENVIRONMENT_ID_STORAGE_KEY, environmentId);
-            return environmentId;
+            const blocksUuid = newId();
+            storage.setItem(BLOCKS_UUID_STORAGE_KEY, blocksUuid);
+            return blocksUuid;
         } catch (error) {
-            console.warn('TinkibotBlocks._getEnvironmentId: could not access local storage', error);
+            console.warn('TinkibotBlocks._getBlocksUuid: could not access local storage', error);
             return newId();
         }
     }
 
-    async claimRobot (nickname) {
-        const robot = this._connectedRobots.find(connectedRobot => connectedRobot.nickname === nickname);
+    async claimRobot (botUuid) {
+        const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || robot.claimState !== 'free') return;
         await this.connect();
         window.socket.send(JSON.stringify({
             command: 'claim',
-            nickname,
-            uuid: this._environmentId
+            nickname: robot.nickname,
+            'bot-uuid': robot.botUuid,
+            'blocks-uuid': this._blocksUuid
+        }));
+    }
+
+    async releaseRobot (botUuid) {
+        const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
+        if (!robot || robot.claimState !== 'paired') return;
+        await this.connect();
+        window.socket.send(JSON.stringify({
+            command: 'release',
+            nickname: robot.nickname,
+            'bot-uuid': robot.botUuid,
+            'blocks-uuid': this._blocksUuid
         }));
     }
 

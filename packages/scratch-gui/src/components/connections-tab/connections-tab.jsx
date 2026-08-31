@@ -7,20 +7,25 @@ import styles from './connections-tab.css';
 
 const ConnectionsTab = ({vm}) => {
     const [robots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
-    const [claimingNickname, setClaimingNickname] = useState(null);
+    const [pendingBotUuid, setPendingBotUuid] = useState(null);
 
     useEffect(() => {
         const updateRobots = updatedRobots => {
             setRobots(updatedRobots);
-            setClaimingNickname(null);
+            setPendingBotUuid(null);
         };
         vm.runtime.on('TINKIBOT_CONNECTED_ROBOTS_CHANGED', updateRobots);
         return () => vm.runtime.removeListener('TINKIBOT_CONNECTED_ROBOTS_CHANGED', updateRobots);
     }, [vm]);
 
-    const claimRobot = nickname => {
-        setClaimingNickname(nickname);
-        vm.runtime.claimTinkibotRobot(nickname);
+    const claimRobot = botUuid => {
+        setPendingBotUuid(botUuid);
+        vm.runtime.claimTinkibotRobot(botUuid);
+    };
+
+    const releaseRobot = botUuid => {
+        setPendingBotUuid(botUuid);
+        vm.runtime.releaseTinkibotRobot(botUuid);
     };
 
     return (
@@ -38,7 +43,7 @@ const ConnectionsTab = ({vm}) => {
                     {robots.map(robot => (
                         <div
                             className={`${styles.robotCard} ${styles[robot.claimState]}`}
-                            key={robot.nickname}
+                            key={robot.botUuid}
                         >
                             <span aria-hidden className={styles.statusDot} />
                             <span aria-hidden className={styles.robotIcon}>🤖</span>
@@ -67,11 +72,11 @@ const ConnectionsTab = ({vm}) => {
                             {robot.claimState === 'free' ? (
                                 <button
                                     className={styles.claimButton}
-                                    disabled={claimingNickname === robot.nickname}
+                                    disabled={pendingBotUuid === robot.botUuid}
                                     type="button"
-                                    onClick={() => claimRobot(robot.nickname)}
+                                    onClick={() => claimRobot(robot.botUuid)}
                                 >
-                                    {claimingNickname === robot.nickname ? (
+                                    {pendingBotUuid === robot.botUuid ? (
                                         <FormattedMessage
                                             defaultMessage="Claiming…"
                                             description="Button label while a robot claim is being processed"
@@ -82,6 +87,28 @@ const ConnectionsTab = ({vm}) => {
                                             defaultMessage="Claim"
                                             description="Button to claim a robot for this user"
                                             id="gui.connectionsTab.claim"
+                                        />
+                                    )}
+                                </button>
+                            ) : null}
+                            {robot.claimState === 'paired' ? (
+                                <button
+                                    className={styles.releaseButton}
+                                    disabled={pendingBotUuid === robot.botUuid}
+                                    type="button"
+                                    onClick={() => releaseRobot(robot.botUuid)}
+                                >
+                                    {pendingBotUuid === robot.botUuid ? (
+                                        <FormattedMessage
+                                            defaultMessage="Releasing…"
+                                            description="Button label while a robot release is being processed"
+                                            id="gui.connectionsTab.releasing"
+                                        />
+                                    ) : (
+                                        <FormattedMessage
+                                            defaultMessage="Release"
+                                            description="Button to release a paired robot for other users"
+                                            id="gui.connectionsTab.release"
                                         />
                                     )}
                                 </button>

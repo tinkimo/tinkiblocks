@@ -76,7 +76,8 @@
     font-weight: 500;
 }
 
-.claim-button {
+.claim-button,
+.release-button {
     padding: 0.6rem 1.5rem;
     border: 0;
     border-radius: 1.25rem;
@@ -92,12 +93,24 @@
     background: $motion-tertiary;
 }
 
-.claim-button:focus-visible {
+.release-button {
+    border: 2px solid $motion-primary;
+    background: $ui-white;
+    color: $motion-tertiary;
+}
+
+.release-button:hover {
+    background: $ui-primary;
+}
+
+.claim-button:focus-visible,
+.release-button:focus-visible {
     outline: 3px solid $motion-primary;
     outline-offset: 2px;
 }
 
-.claim-button:disabled {
+.claim-button:disabled,
+.release-button:disabled {
     opacity: 0.65;
     cursor: wait;
 }
