@@ -37,8 +37,8 @@ test('Tinkibot is loaded when the virtual machine starts', t => {
 
 test('Tinkibot blocks are grouped into focused categories', t => {
     const extension = new TinkibotBlocks({});
-    const categories = Object.fromEntries(extension.getInfos().map(info => [info.name, info.blocks.map(block =>
-        block.opcode)]));
+    const infos = extension.getInfos();
+    const categories = Object.fromEntries(infos.map(info => [info.name, info.blocks.map(block => block.opcode)]));
 
     t.strictSame(categories, {
         Movement: ['measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake', 'move',
@@ -49,6 +49,11 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'clear']
     });
+    t.strictSame(infos.map(info => info.color1), ['#D1495B', '#00798C', '#3A7D44', '#7B2CBF', '#B86B00']);
+    for (const info of infos) {
+        t.equal(info.blockIconURI, info.menuIconURI);
+        t.match(decodeURIComponent(info.menuIconURI), new RegExp(info.color1, 'i'));
+    }
     t.end();
 });
 

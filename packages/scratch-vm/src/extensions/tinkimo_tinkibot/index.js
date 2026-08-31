@@ -4,7 +4,7 @@ const languageNames = require('scratch-translate-extension-languages');
 const ArgumentType = require('../../extension-support/argument-type');
 const BlockType = require('../../extension-support/block-type');
 
-const {blockIconURI, menuIconURI} = require('./common');
+const categoryStyles = require('./common');
 
 // has an websocket message already been received
 let alerted = false;
@@ -85,6 +85,7 @@ class TinkibotBlocks {
         return Object.assign({}, info, {
             id,
             name,
+            ...categoryStyles[id],
             blocks: info.blocks.filter(block => block !== '---' && opcodes.includes(block.opcode))
         });
     }
@@ -99,11 +100,6 @@ class TinkibotBlocks {
                 default: 'Tinkibots',
                 description: 'Name of the Tinkibot extension.'
             }),
-            blockIconURI: blockIconURI,
-            menuIconURI: menuIconURI,
-            color1: '#C2410C',
-            color2: '#EA580C',
-            color3: '#F97316',      
             blocks: [
                 {
                     opcode: 'volume',
