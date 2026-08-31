@@ -70,7 +70,7 @@ class TinkibotBlocks {
                 default: 'Sensors',
                 description: 'Name of the Tinkibot Sensors category.'
             }), [
-                'measure_line_sensor', 'measure_distance'
+                'measure_line_sensor', 'measure_distance', 'measure_voltage'
             ]),
             this._categoryInfo(info, 'tinkibotSounds', formatMessage({
                 id: 'tinkibot.category.sounds',

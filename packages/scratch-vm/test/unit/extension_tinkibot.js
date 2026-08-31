@@ -52,7 +52,7 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Movement: ['measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake', 'move',
             'rotate', 'arc', 'wiggle', 'moonwalk'],
         Interaction: ['read_button', 'when_button_event', 'button_led'],
-        Sensors: ['measure_line_sensor', 'measure_distance'],
+        Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
         Sounds: ['volume', 'play_sound'],
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'clear']
@@ -68,6 +68,20 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         t.not(info.menuIconURI, infos[(index + 1) % infos.length].menuIconURI);
         t.ok(1.05 / (luminance + 0.05) >= 4.5, `${info.name} remains legible with white text`);
     }
+    t.end();
+});
+
+test('Every Tinkibot block is assigned to exactly one category', t => {
+    const extension = new TinkibotBlocks({});
+    const allOpcodes = extension._getCombinedInfo().blocks
+        .filter(block => block !== '---')
+        .map(block => block.opcode)
+        .sort();
+    const categorizedOpcodes = extension.getInfos()
+        .flatMap(info => info.blocks.map(block => block.opcode))
+        .sort();
+
+    t.strictSame(categorizedOpcodes, allOpcodes);
     t.end();
 });
 
