@@ -22,6 +22,14 @@ class MockWebSocket {
     }
 }
 
+const makeRuntime = () => {
+    const events = [];
+    return {
+        events,
+        emit: (event, value) => events.push({event, value})
+    };
+};
+
 test('Tinkibot is loaded when the virtual machine starts', t => {
     const vm = new VirtualMachine();
 
@@ -106,6 +114,35 @@ test('Tinkibot reporters return the response for their own request', async t => 
 
     delete global.window;
     delete global.WebSocket;
+});
+
+test('Tinkibot tracks robot connection events', t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+    const alerts = [];
+    global.alert = message => alerts.push(message);
+    const runtime = makeRuntime();
+    const extension = new TinkibotBlocks(runtime);
+
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({event: 'connected_robots', nicknames: ['orange', 'blue', 'orange']})
+    });
+    t.strictSame(runtime.tinkibotConnectedRobots, ['orange', 'blue']);
+    t.strictSame(alerts, [], 'the initial list does not produce a series of pop-ups');
+
+    MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_connected', nickname: 'green'})});
+    t.strictSame(runtime.tinkibotConnectedRobots, ['orange', 'blue', 'green']);
+    t.strictSame(alerts, ['green is connected!']);
+
+    MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange'})});
+    t.strictSame(runtime.tinkibotConnectedRobots, ['blue', 'green']);
+    t.strictSame(alerts, ['green is connected!', 'orange has disconnected.']);
+    t.equal(runtime.events.length, 3);
+
+    delete global.alert;
+    delete global.window;
+    delete global.WebSocket;
+    t.end();
 });
 
 test('Tinkibot volume command accepts the proxy response and releases the queue', async t => {

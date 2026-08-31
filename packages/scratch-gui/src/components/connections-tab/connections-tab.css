@@ -1,0 +1,76 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+
+.connections {
+    height: 100%;
+    padding: 2.5rem;
+    overflow: auto;
+    color: $text-primary;
+    background: linear-gradient(180deg, #f1fbff 0%, $ui-white 55%);
+}
+
+.connections h2 {
+    margin: 0.5rem 0 2rem;
+    text-align: center;
+    font-size: 1.75rem;
+}
+
+.heading-icon {
+    text-align: center;
+    font-size: 3.5rem;
+}
+
+.robot-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+    max-width: 50rem;
+    margin: auto;
+}
+
+.robot-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    border: 2px solid #b7e4c7;
+    border-radius: 1rem;
+    background: $ui-white;
+    box-shadow: 0 0.25rem 0.75rem $ui-black-transparent;
+    font-size: 1.25rem;
+}
+
+.robot-icon {
+    font-size: 3rem;
+}
+
+.status-dot {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: #2f9e44;
+}
+
+.connected-label {
+    color: #237032;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.empty-state {
+    max-width: 28rem;
+    margin: auto;
+    padding: 2rem;
+    border: 2px dashed $motion-primary;
+    border-radius: 1rem;
+    text-align: center;
+    background: $ui-white;
+    color: $text-primary-transparent;
+    font-size: 1.1rem;
+    line-height: 1.5;
+}

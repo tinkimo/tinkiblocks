@@ -30,6 +30,7 @@ class TinkibotBlocks {
         this._commandQueue = Promise.resolve();
         this._pendingResponse = null;
         this._buttonEvent = null;
+        this._connectedRobots = [];
         if (typeof WebSocket !== 'undefined') this.connect();
     }
 
@@ -644,6 +645,27 @@ class TinkibotBlocks {
 
         window.socket.onmessage = message => {
             const response = JSON.parse(message.data);
+            if (response.event === 'connected_robots') {
+                this._setConnectedRobots(response.nicknames);
+            } else if (response.event === 'robot_connected') {
+                if (!this._connectedRobots.includes(response.nickname)) {
+                    this._setConnectedRobots([...this._connectedRobots, response.nickname]);
+                    alert(formatMessage({
+                        id: 'tinkibot.robotConnected',
+                        default: '{nickname} is connected!',
+                        description: 'Message shown when a Tinkibot robot connects.'
+                    }, {nickname: response.nickname}));
+                }
+            } else if (response.event === 'robot_disconnected') {
+                if (this._connectedRobots.includes(response.nickname)) {
+                    this._setConnectedRobots(this._connectedRobots.filter(nickname => nickname !== response.nickname));
+                    alert(formatMessage({
+                        id: 'tinkibot.robotDisconnected',
+                        default: '{nickname} has disconnected.',
+                        description: 'Message shown when a Tinkibot robot disconnects.'
+                    }, {nickname: response.nickname}));
+                }
+            }
             if (response.event === 'button') {
                 this._buttonEvent = response;
                 this.runtime.startHats('tinkibotInteraction_when_button_event');
@@ -675,6 +697,12 @@ class TinkibotBlocks {
         };
 
         return this._connectionPromise;
+    }
+
+    _setConnectedRobots (nicknames) {
+        this._connectedRobots = [...new Set(nicknames)];
+        this.runtime.tinkibotConnectedRobots = this._connectedRobots.slice();
+        this.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', this.runtime.tinkibotConnectedRobots);
     }
 
     _sendCommand (command, responseCommand = command.command) {

@@ -14,6 +14,7 @@ import Blocks from '../../containers/blocks.jsx';
 import CostumeTab from '../../containers/costume-tab.jsx';
 import TargetPane from '../../containers/target-pane.jsx';
 import SoundTab from '../../containers/sound-tab.jsx';
+import ConnectionsTab from '../connections-tab/connections-tab.jsx';
 import StageWrapper from '../../containers/stage-wrapper.jsx';
 import Loader from '../loader/loader.jsx';
 import Box from '../box/box.jsx';
@@ -460,6 +461,18 @@ const GUIComponent = props => {
                                                 id="gui.gui.soundsTab"
                                             />
                                         </Tab>
+                                        <Tab
+                                            className={tabClassNames.tab}
+                                            role="tab"
+                                            tabIndex="0"
+                                        >
+                                            <span aria-hidden className={styles.connectionsTabIcon}>🤖</span>
+                                            <FormattedMessage
+                                                defaultMessage="Connections"
+                                                description="Button to view connected Tinkibot robots"
+                                                id="gui.gui.connectionsTab"
+                                            />
+                                        </Tab>
                                     </TabList>
                                 </Box>
                                 <TabPanel
@@ -517,6 +530,12 @@ const GUIComponent = props => {
                                             ariaRole="region"
                                             vm={vm}
                                         /> : null}
+                                </TabPanel>
+                                <TabPanel
+                                    className={tabClassNames.tabPanel}
+                                    role="tabpanel"
+                                >
+                                    <ConnectionsTab vm={vm} />
                                 </TabPanel>
                             </Tabs>
                             {backpackVisible && backpackConfigured ? (

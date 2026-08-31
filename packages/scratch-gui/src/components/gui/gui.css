@@ -58,7 +58,7 @@
 
 .tab-list {
     height: $stage-menu-height;
-    width: 250px; /* Match width of the toolbox */
+    width: 390px;
     display: flex;
     align-items: flex-end;
     flex-shrink: 0;
@@ -120,6 +120,9 @@
 .tab:nth-of-type(3) {
     z-index: 1;
 }
+.tab:nth-of-type(4) {
+    z-index: 0;
+}
 
 .tab:hover {
   background-color: $ui-primary;
@@ -156,6 +159,16 @@
 
 .tab.is-selected img {
     filter: none;
+}
+
+.connections-tab-icon {
+    margin-right: 0.125rem;
+    font-size: 1.375rem;
+}
+
+[dir="rtl"] .connections-tab-icon {
+    margin-right: 0;
+    margin-left: 0.125rem;
 }
 
 /* Tab style overrides from react-tabs */
