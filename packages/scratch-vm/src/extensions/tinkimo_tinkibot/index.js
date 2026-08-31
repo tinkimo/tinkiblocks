@@ -795,7 +795,12 @@ class TinkibotBlocks {
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || robot.claimState !== 'paired') return;
         await this.connect();
-        window.socket.send(`{${robot.nickname}.claim_released ${robot.botUuid} ${this._blocksUuid}}`);
+        window.socket.send(JSON.stringify({
+            command: 'claim-released',
+            nickname: robot.nickname,
+            'bot-uuid': robot.botUuid,
+            'blocks-uuid': this._blocksUuid
+        }));
         this._updateRobotClaim(robot.botUuid, null);
     }
 

@@ -10,7 +10,7 @@ class MockWebSocket {
     }
 
     send (message) {
-        this.sent.push(message.includes('.claim_released ') ? message : JSON.parse(message));
+        this.sent.push(JSON.parse(message));
     }
 
     open () {
@@ -259,10 +259,12 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     }]);
 
     await runtime.releaseTinkibotRobot('orange-robot-uuid');
-    t.equal(
-        MockWebSocket.instance.sent[1],
-        `{orange.claim_released orange-robot-uuid ${blocksUuid}}`
-    );
+    t.strictSame(MockWebSocket.instance.sent[1], {
+        command: 'claim-released',
+        nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': blocksUuid
+    });
     t.strictSame(runtime.tinkibotConnectedRobots, [{
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
