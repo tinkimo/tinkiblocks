@@ -117,29 +117,92 @@ test('Tinkibot reporters return the response for their own request', async t => 
 });
 
 test('Tinkibot tracks robot connection events', t => {
-    global.window = {};
+    global.window = {
+        localStorage: {
+            getItem: () => 'student-environment-id',
+            setItem: () => {}
+        }
+    };
     global.WebSocket = MockWebSocket;
     const alerts = [];
     global.alert = message => alerts.push(message);
     const runtime = makeRuntime();
     const extension = new TinkibotBlocks(runtime);
+    t.equal(extension.runtime, runtime);
 
     MockWebSocket.instance.onmessage({
-        data: JSON.stringify({event: 'connected_robots', nicknames: ['orange', 'blue', 'orange']})
+        data: JSON.stringify({
+            event: 'connected_robots',
+            robots: [
+                {nickname: 'orange', claimed_by: null},
+                {nickname: 'blue', claimed_by: 'another-environment-id'},
+                {nickname: 'orange', claimed_by: null}
+            ]
+        })
     });
-    t.strictSame(runtime.tinkibotConnectedRobots, ['orange', 'blue']);
+    t.strictSame(runtime.tinkibotConnectedRobots, [
+        {nickname: 'orange', claimedBy: null, claimState: 'free'},
+        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'}
+    ]);
     t.strictSame(alerts, [], 'the initial list does not produce a series of pop-ups');
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_connected', nickname: 'green'})});
-    t.strictSame(runtime.tinkibotConnectedRobots, ['orange', 'blue', 'green']);
+    t.strictSame(runtime.tinkibotConnectedRobots, [
+        {nickname: 'orange', claimedBy: null, claimState: 'free'},
+        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'},
+        {nickname: 'green', claimedBy: null, claimState: 'free'}
+    ]);
     t.strictSame(alerts, ['green is connected!']);
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange'})});
-    t.strictSame(runtime.tinkibotConnectedRobots, ['blue', 'green']);
+    t.strictSame(runtime.tinkibotConnectedRobots, [
+        {nickname: 'blue', claimedBy: 'another-environment-id', claimState: 'claimed'},
+        {nickname: 'green', claimedBy: null, claimState: 'free'}
+    ]);
     t.strictSame(alerts, ['green is connected!', 'orange has disconnected.']);
     t.equal(runtime.events.length, 3);
 
     delete global.alert;
+    delete global.window;
+    delete global.WebSocket;
+    t.end();
+});
+
+test('Tinkibot claims a free robot with the persistent environment ID', async t => {
+    const storedValues = new Map();
+    global.window = {
+        localStorage: {
+            getItem: key => storedValues.get(key) || null,
+            setItem: (key, value) => storedValues.set(key, value)
+        }
+    };
+    global.WebSocket = MockWebSocket;
+    const runtime = makeRuntime();
+    const extension = new TinkibotBlocks(runtime);
+    t.equal(extension.runtime, runtime);
+    MockWebSocket.instance.open();
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({event: 'connected_robots', robots: [{nickname: 'orange', claimed_by: null}]})
+    });
+
+    await runtime.claimTinkibotRobot('orange');
+    const environmentId = storedValues.get('tinkiblocks.environmentId');
+    t.match(environmentId, /^[0-9a-f-]{36}$/);
+    t.strictSame(MockWebSocket.instance.sent, [{
+        command: 'claim',
+        nickname: 'orange',
+        uuid: environmentId
+    }]);
+
+    MockWebSocket.instance.onmessage({
+        data: JSON.stringify({event: 'robot_claimed', nickname: 'orange', uuid: environmentId})
+    });
+    t.strictSame(runtime.tinkibotConnectedRobots, [{
+        nickname: 'orange',
+        claimedBy: environmentId,
+        claimState: 'paired'
+    }]);
+
     delete global.window;
     delete global.WebSocket;
     t.end();

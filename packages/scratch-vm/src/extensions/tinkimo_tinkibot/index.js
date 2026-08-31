@@ -1,10 +1,13 @@
 const formatMessage = require('format-message');
 const languageNames = require('scratch-translate-extension-languages');
+const uuid = require('uuid');
 
 const ArgumentType = require('../../extension-support/argument-type');
 const BlockType = require('../../extension-support/block-type');
 
 const categoryStyles = require('./common');
+
+const ENVIRONMENT_ID_STORAGE_KEY = 'tinkiblocks.environmentId';
 
 // has an websocket message already been received
 let alerted = false;
@@ -31,6 +34,8 @@ class TinkibotBlocks {
         this._pendingResponse = null;
         this._buttonEvent = null;
         this._connectedRobots = [];
+        this._environmentId = this._getEnvironmentId();
+        this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         if (typeof WebSocket !== 'undefined') this.connect();
     }
 
@@ -646,10 +651,10 @@ class TinkibotBlocks {
         window.socket.onmessage = message => {
             const response = JSON.parse(message.data);
             if (response.event === 'connected_robots') {
-                this._setConnectedRobots(response.nicknames);
+                this._setConnectedRobots(response.robots || response.nicknames);
             } else if (response.event === 'robot_connected') {
-                if (!this._connectedRobots.includes(response.nickname)) {
-                    this._setConnectedRobots([...this._connectedRobots, response.nickname]);
+                if (!this._connectedRobots.some(robot => robot.nickname === response.nickname)) {
+                    this._setConnectedRobots([...this._connectedRobots, response]);
                     alert(formatMessage({
                         id: 'tinkibot.robotConnected',
                         default: '{nickname} is connected!',
@@ -657,14 +662,19 @@ class TinkibotBlocks {
                     }, {nickname: response.nickname}));
                 }
             } else if (response.event === 'robot_disconnected') {
-                if (this._connectedRobots.includes(response.nickname)) {
-                    this._setConnectedRobots(this._connectedRobots.filter(nickname => nickname !== response.nickname));
+                if (this._connectedRobots.some(robot => robot.nickname === response.nickname)) {
+                    this._setConnectedRobots(
+                        this._connectedRobots.filter(robot => robot.nickname !== response.nickname)
+                    );
                     alert(formatMessage({
                         id: 'tinkibot.robotDisconnected',
                         default: '{nickname} has disconnected.',
                         description: 'Message shown when a Tinkibot robot disconnects.'
                     }, {nickname: response.nickname}));
                 }
+            } else if (response.event === 'robot_claimed') {
+                this._setConnectedRobots(this._connectedRobots.map(robot => robot.nickname === response.nickname ?
+                    Object.assign({}, robot, {claimedBy: response.uuid || response.claimed_by}) : robot));
             }
             if (response.event === 'button') {
                 this._buttonEvent = response;
@@ -699,10 +709,47 @@ class TinkibotBlocks {
         return this._connectionPromise;
     }
 
-    _setConnectedRobots (nicknames) {
-        this._connectedRobots = [...new Set(nicknames)];
-        this.runtime.tinkibotConnectedRobots = this._connectedRobots.slice();
+    _setConnectedRobots (robots) {
+        this._connectedRobots = Array.from(new Map(robots.map(robot => {
+            const normalizedRobot = typeof robot === 'string' ? {nickname: robot, claimedBy: null} : {
+                nickname: robot.nickname,
+                claimedBy: robot.claimedBy || robot.claimed_by || null
+            };
+            return [normalizedRobot.nickname, normalizedRobot];
+        })).values()).map(robot => Object.assign({}, robot, {
+            claimState: !robot.claimedBy ? 'free' :
+                robot.claimedBy === this._environmentId ? 'paired' : 'claimed'
+        }));
+        this.runtime.tinkibotConnectedRobots = this._connectedRobots.map(robot => Object.assign({}, robot));
         this.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', this.runtime.tinkibotConnectedRobots);
+    }
+
+    _getEnvironmentId () {
+        const newId = () => uuid.v4();
+        if (typeof window === 'undefined') return newId();
+        try {
+            const storage = window.localStorage;
+            if (!storage) return newId();
+            const storedId = storage.getItem(ENVIRONMENT_ID_STORAGE_KEY);
+            if (storedId) return storedId;
+            const environmentId = newId();
+            storage.setItem(ENVIRONMENT_ID_STORAGE_KEY, environmentId);
+            return environmentId;
+        } catch (error) {
+            console.warn('TinkibotBlocks._getEnvironmentId: could not access local storage', error);
+            return newId();
+        }
+    }
+
+    async claimRobot (nickname) {
+        const robot = this._connectedRobots.find(connectedRobot => connectedRobot.nickname === nickname);
+        if (!robot || robot.claimState !== 'free') return;
+        await this.connect();
+        window.socket.send(JSON.stringify({
+            command: 'claim',
+            nickname,
+            uuid: this._environmentId
+        }));
     }
 
     _sendCommand (command, responseCommand = command.command) {

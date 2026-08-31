@@ -56,10 +56,50 @@
     background: #2f9e44;
 }
 
+.paired {
+    border-color: $motion-primary;
+    background: #f1f7ff;
+}
+
+.claimed {
+    border-color: $ui-black-transparent;
+    background: $ui-tertiary;
+}
+
+.claimed .status-dot {
+    background: $text-primary-transparent;
+}
+
 .connected-label {
     color: #237032;
     font-size: 0.85rem;
     font-weight: 500;
+}
+
+.claim-button {
+    padding: 0.6rem 1.5rem;
+    border: 0;
+    border-radius: 1.25rem;
+    background: $motion-primary;
+    color: $ui-white;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.claim-button:hover {
+    background: $motion-tertiary;
+}
+
+.claim-button:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+
+.claim-button:disabled {
+    opacity: 0.65;
+    cursor: wait;
 }
 
 .empty-state {
