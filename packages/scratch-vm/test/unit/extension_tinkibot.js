@@ -26,6 +26,40 @@ test('Tinkibot is loaded when the virtual machine starts', t => {
     const vm = new VirtualMachine();
 
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibot'), true);
+    const categoryBlocks = Object.fromEntries(vm.runtime.getBlocksXML().map(category => [category.id, category.xml]));
+    t.match(categoryBlocks.tinkibotMovement, /name="Movement"/);
+    t.match(categoryBlocks.tinkibotInteraction, /name="Interaction"/);
+    t.match(categoryBlocks.tinkibotSensors, /name="Sensors"/);
+    t.match(categoryBlocks.tinkibotSounds, /name="Sounds"/);
+    t.match(categoryBlocks.tinkibotDisplay, /name="Display"/);
+    t.end();
+});
+
+test('Tinkibot blocks are grouped into focused categories', t => {
+    const extension = new TinkibotBlocks({});
+    const infos = extension.getInfos();
+    const categories = Object.fromEntries(infos.map(info => [info.name, info.blocks.map(block => block.opcode)]));
+
+    t.strictSame(categories, {
+        Movement: ['measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake', 'move',
+            'rotate', 'arc', 'wiggle', 'moonwalk'],
+        Interaction: ['read_button', 'when_button_event', 'button_led'],
+        Sensors: ['measure_line_sensor', 'measure_distance'],
+        Sounds: ['volume', 'play_sound'],
+        Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+            'background_colour', 'clear']
+    });
+    t.strictSame(infos.map(info => info.color1), ['#B832D0', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
+    for (const [index, info] of infos.entries()) {
+        const channels = info.color1.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) / 255)
+            .map(channel => channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4));
+        const luminance = (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+        t.equal(info.blockIconURI, info.menuIconURI);
+        t.match(decodeURIComponent(info.menuIconURI), new RegExp(info.color1, 'i'));
+        t.match(decodeURIComponent(info.menuIconURI), new RegExp(`<title>${info.name}</title>`));
+        t.not(info.menuIconURI, infos[(index + 1) % infos.length].menuIconURI);
+        t.ok(1.05 / (luminance + 0.05) >= 4.5, `${info.name} remains legible with white text`);
+    }
     t.end();
 });
 
@@ -143,7 +177,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
             t.equal(extension.when_button_event({BUTTON: 'bottom-left', STATE: 'released'}), true);
         }
     });
-    const eventBlock = extension.getInfo().blocks.find(block => block.opcode === 'when_button_event');
+    const eventBlock = extension.getInfos()[1].blocks.find(block => block.opcode === 'when_button_event');
 
     t.equal(eventBlock.blockType, 'hat');
     t.equal(eventBlock.isEdgeActivated, false);
@@ -162,7 +196,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
     MockWebSocket.instance.onmessage({
         data: JSON.stringify({nickname: 'orange', event: 'button', button: 'bottom-left', state: 'released'})
     });
-    t.strictSame(startedHats, ['tinkibot_when_button_event']);
+    t.strictSame(startedHats, ['tinkibotInteraction_when_button_event']);
     t.equal(extension.when_button_event({BUTTON: 'bottom-left', STATE: 'released'}), false);
 
     delete global.window;
