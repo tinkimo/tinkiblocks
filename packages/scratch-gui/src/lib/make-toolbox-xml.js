@@ -1,4 +1,5 @@
 import * as ScratchBlocks from 'scratch-blocks';
+import categoryIconURI from './category-icon';
 import {defaultColors} from './settings/color-mode';
 
 const categorySeparator = '<sep gap="36"/>';
@@ -19,7 +20,7 @@ const motion = function (isInitialSetup, isStage, targetId, colors) {
         'Motion'
     )}" toolboxitemid="motion" colour="${
         colors.colourPrimary
-    }" secondaryColour="${colors.colourTertiary}">
+    }" secondaryColour="${colors.colourTertiary}" iconURI="${categoryIconURI('Motion', colors.colourPrimary)}">
         ${isStage ? `
         <label text="${stageSelected}"></label>
         ` : `
@@ -169,7 +170,7 @@ const looks = function (isInitialSetup, isStage, targetId, costumeName, backdrop
         'Looks'
     )}" toolboxitemid="looks" colour="${
         colors.colourPrimary
-    }" secondaryColour="${colors.colourTertiary}">
+    }" secondaryColour="${colors.colourTertiary}" iconURI="${categoryIconURI('Looks', colors.colourPrimary)}">
         ${isStage ? '' : `
         <block type="looks_sayforsecs">
             <value name="MESSAGE">
@@ -310,7 +311,7 @@ const sound = function (isInitialSetup, isStage, targetId, soundName, colors) {
         'Sound'
     )}" toolboxitemid="sound" colour="${
         colors.colourPrimary
-    }" secondaryColour="${colors.colourTertiary}">
+    }" secondaryColour="${colors.colourTertiary}" iconURI="${categoryIconURI('Sound', colors.colourPrimary)}">
         <block id="${targetId}_sound_playuntildone" type="sound_playuntildone">
             <value name="SOUND_MENU">
                 <shadow type="sound_sounds_menu">
@@ -371,7 +372,7 @@ const events = function (isInitialSetup, isStage, targetId, colors) {
         'Events'
     )}" toolboxitemid="events" colour="${
         colors.colourPrimary
-    }" secondaryColour="${colors.colourTertiary}">
+    }" secondaryColour="${colors.colourTertiary}" iconURI="${categoryIconURI('Events', colors.colourPrimary)}">
         <block type="event_whenflagclicked"/>
         <block type="event_whenkeypressed">
         </block>
@@ -418,7 +419,8 @@ const control = function (isInitialSetup, isStage, targetId, colors) {
         )}"
         toolboxitemid="control"
         colour="${colors.colourPrimary}"
-        secondaryColour="${colors.colourTertiary}">
+        secondaryColour="${colors.colourTertiary}"
+        iconURI="${categoryIconURI('Control', colors.colourPrimary)}">
         <block type="control_wait">
             <value name="DURATION">
                 <shadow type="math_positive_number">
@@ -474,7 +476,8 @@ const sensing = function (isInitialSetup, isStage, targetId, colors) {
         )}"
         toolboxitemid="sensing"
         colour="${colors.colourPrimary}"
-        secondaryColour="${colors.colourTertiary}">
+        secondaryColour="${colors.colourTertiary}"
+        iconURI="${categoryIconURI('Sensing', colors.colourPrimary)}">
         ${isStage ? '' : `
             <block type="sensing_touchingobject">
                 <value name="TOUCHINGOBJECTMENU">
@@ -560,7 +563,8 @@ const operators = function (isInitialSetup, isStage, targetId, colors) {
         )}"
         toolboxitemid="operators"
         colour="${colors.colourPrimary}"
-        secondaryColour="${colors.colourTertiary}">
+        secondaryColour="${colors.colourTertiary}"
+        iconURI="${categoryIconURI('Operators', colors.colourPrimary)}">
         <block type="operator_add">
             <value name="NUM1">
                 <shadow type="math_number">
@@ -753,6 +757,7 @@ const variables = function (isInitialSetup, isStage, targetId, colors) {
         toolboxitemid="variables"
         colour="${colors.colourPrimary}"
         secondaryColour="${colors.colourTertiary}"
+        iconURI="${categoryIconURI('Variables', colors.colourPrimary)}"
         custom="VARIABLE">
     </category>
     `;
@@ -769,6 +774,7 @@ const myBlocks = function (isInitialSetup, isStage, targetId, colors) {
         toolboxitemid="myBlocks"
         colour="${colors.colourPrimary}"
         secondaryColour="${colors.colourTertiary}"
+        iconURI="${categoryIconURI('My Blocks', colors.colourPrimary)}"
         custom="PROCEDURE">
     </category>
     `;
