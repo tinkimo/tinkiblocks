@@ -724,7 +724,7 @@ class TinkibotBlocks {
     }
 
     volume (args) {
-        return this._sendCommand({command: 'set', volume: args.VALUE}, 'volume');
+        return this._sendCommand({command: 'set', volume: args.VALUE});
     }
 
     drive (args) {

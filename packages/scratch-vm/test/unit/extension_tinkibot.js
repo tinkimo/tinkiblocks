@@ -74,6 +74,33 @@ test('Tinkibot reporters return the response for their own request', async t => 
     delete global.WebSocket;
 });
 
+test('Tinkibot volume command accepts the proxy response and releases the queue', async t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+
+    const extension = new TinkibotBlocks({});
+    const volume = extension.volume({VALUE: 5});
+    const distance = extension.measure_distance();
+
+    MockWebSocket.instance.open();
+    await Promise.resolve();
+    t.strictSame(MockWebSocket.instance.sent, [{command: 'set', volume: 5}]);
+
+    MockWebSocket.instance.respond('set', 'OK set volume 5');
+    t.equal(await volume, 'OK set volume 5');
+    await Promise.resolve();
+    t.strictSame(MockWebSocket.instance.sent, [
+        {command: 'set', volume: 5},
+        {command: 'measure_distance'}
+    ]);
+
+    MockWebSocket.instance.respond('measure_distance', 42);
+    t.equal(await distance, 42);
+
+    delete global.window;
+    delete global.WebSocket;
+});
+
 test('Tinkibot button events start event hats and filter by their menus', t => {
     global.window = {};
     global.WebSocket = MockWebSocket;
