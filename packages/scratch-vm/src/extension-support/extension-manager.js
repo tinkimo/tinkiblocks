@@ -171,10 +171,14 @@ class ExtensionManager {
      */
     refreshBlocks () {
         const allPromises = Array.from(this._loadedExtensions.values()).map(serviceName =>
-            dispatch.call(serviceName, 'getInfo')
-                .then(info => {
-                    info = this._prepareExtensionInfo(serviceName, info);
-                    dispatch.call('runtime', '_refreshExtensionPrimitives', info);
+            (dispatch.services[serviceName] && dispatch.services[serviceName].getInfos ?
+                dispatch.call(serviceName, 'getInfos') :
+                dispatch.call(serviceName, 'getInfo').then(info => [info]))
+                .then(infos => {
+                    for (const info of infos) {
+                        const preparedInfo = this._prepareExtensionInfo(serviceName, info);
+                        dispatch.call('runtime', '_refreshExtensionPrimitives', preparedInfo);
+                    }
                 })
                 .catch(e => {
                     log.error(`Failed to refresh built-in extension primitives: ${JSON.stringify(e)}`);
@@ -234,7 +238,13 @@ class ExtensionManager {
         const fakeWorkerId = this.nextExtensionWorker++;
         const serviceName = `extension_${fakeWorkerId}_${extensionInfo.id}`;
         dispatch.setServiceSync(serviceName, extensionObject);
-        dispatch.callSync('extensions', 'registerExtensionServiceSync', serviceName);
+        if (extensionObject.getInfos) {
+            for (const info of extensionObject.getInfos()) {
+                this._registerExtensionInfo(serviceName, info);
+            }
+        } else {
+            dispatch.callSync('extensions', 'registerExtensionServiceSync', serviceName);
+        }
         return serviceName;
     }
 

@@ -26,6 +26,29 @@ test('Tinkibot is loaded when the virtual machine starts', t => {
     const vm = new VirtualMachine();
 
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibot'), true);
+    const categoryBlocks = Object.fromEntries(vm.runtime.getBlocksXML().map(category => [category.id, category.xml]));
+    t.match(categoryBlocks.tinkibotMovement, /name="Movement"/);
+    t.match(categoryBlocks.tinkibotInteraction, /name="Interaction"/);
+    t.match(categoryBlocks.tinkibotSensors, /name="Sensors"/);
+    t.match(categoryBlocks.tinkibotSounds, /name="Sounds"/);
+    t.match(categoryBlocks.tinkibotDisplay, /name="Display"/);
+    t.end();
+});
+
+test('Tinkibot blocks are grouped into focused categories', t => {
+    const extension = new TinkibotBlocks({});
+    const categories = Object.fromEntries(extension.getInfos().map(info => [info.name, info.blocks.map(block =>
+        block.opcode)]));
+
+    t.strictSame(categories, {
+        Movement: ['measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake', 'move',
+            'rotate', 'arc', 'wiggle', 'moonwalk'],
+        Interaction: ['read_button', 'when_button_event', 'button_led'],
+        Sensors: ['measure_line_sensor', 'measure_distance'],
+        Sounds: ['volume', 'play_sound'],
+        Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+            'background_colour', 'clear']
+    });
     t.end();
 });
 
@@ -143,7 +166,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
             t.equal(extension.when_button_event({BUTTON: 'bottom-left', STATE: 'released'}), true);
         }
     });
-    const eventBlock = extension.getInfo().blocks.find(block => block.opcode === 'when_button_event');
+    const eventBlock = extension.getInfos()[1].blocks.find(block => block.opcode === 'when_button_event');
 
     t.equal(eventBlock.blockType, 'hat');
     t.equal(eventBlock.isEdgeActivated, false);
@@ -162,7 +185,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
     MockWebSocket.instance.onmessage({
         data: JSON.stringify({nickname: 'orange', event: 'button', button: 'bottom-left', state: 'released'})
     });
-    t.strictSame(startedHats, ['tinkibot_when_button_event']);
+    t.strictSame(startedHats, ['tinkibotInteraction_when_button_event']);
     t.equal(extension.when_button_event({BUTTON: 'bottom-left', STATE: 'released'}), false);
 
     delete global.window;
