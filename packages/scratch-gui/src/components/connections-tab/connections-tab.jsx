@@ -8,6 +8,7 @@ import styles from './connections-tab.css';
 const ConnectionsTab = ({vm}) => {
     const [robots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
     const [pendingBotUuid, setPendingBotUuid] = useState(null);
+    const hasClaimedRobot = robots.some(robot => robot.claimState === 'paired');
 
     useEffect(() => {
         const updateRobots = updatedRobots => {
@@ -72,7 +73,7 @@ const ConnectionsTab = ({vm}) => {
                             {robot.claimState === 'free' ? (
                                 <button
                                     className={styles.claimButton}
-                                    disabled={pendingBotUuid === robot.botUuid}
+                                    disabled={pendingBotUuid !== null || hasClaimedRobot}
                                     type="button"
                                     onClick={() => claimRobot(robot.botUuid)}
                                 >

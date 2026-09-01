@@ -777,7 +777,9 @@ class TinkibotBlocks {
 
     async claimRobot (botUuid) {
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
-        if (!robot || robot.claimState !== 'free') return;
+        const alreadyClaimingOrPaired = this._pendingClaims.size > 0 ||
+            this._connectedRobots.some(connectedRobot => connectedRobot.claimState === 'paired');
+        if (!robot || robot.claimState !== 'free' || alreadyClaimingOrPaired) return;
         await this.connect();
         this._pendingClaims.add(robot.botUuid);
         window.socket.send(JSON.stringify({
@@ -803,10 +805,24 @@ class TinkibotBlocks {
 
     _sendCommand (command, responseCommand = command.command) {
         const operation = this._commandQueue.then(async () => {
+            const robot = this._connectedRobots.find(connectedRobot => connectedRobot.claimState === 'paired');
+            if (!robot) {
+                const message = formatMessage({
+                    id: 'tinkibot.robotClaimRequired',
+                    default: 'Claim a robot from the Connections tab before using Tinkibot blocks.',
+                    description: 'Message shown when a Tinkibot block is used without a claimed robot.'
+                });
+                alert(message);
+                throw new Error('No Tinkibot robot is claimed');
+            }
             await this.connect();
             return new Promise((resolve, reject) => {
                 this._pendingResponse = {command: responseCommand, resolve, reject};
-                window.socket.send(JSON.stringify(command));
+                window.socket.send(JSON.stringify(Object.assign({}, command, {
+                    nickname: robot.nickname,
+                    'bot-uuid': robot.botUuid,
+                    'blocks-uuid': this._blocksUuid
+                })));
             });
         });
         this._commandQueue = operation.catch(() => {});
