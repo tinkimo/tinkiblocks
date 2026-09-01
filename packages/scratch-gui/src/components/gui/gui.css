@@ -58,7 +58,7 @@
 
 .tab-list {
     height: $stage-menu-height;
-    width: 250px; /* Match width of the toolbox */
+    width: 390px;
     display: flex;
     align-items: flex-end;
     flex-shrink: 0;
@@ -120,6 +120,9 @@
 .tab:nth-of-type(3) {
     z-index: 1;
 }
+.tab:nth-of-type(4) {
+    z-index: 0;
+}
 
 .tab:hover {
   background-color: $ui-primary;
@@ -156,6 +159,52 @@
 
 .tab.is-selected img {
     filter: none;
+}
+
+.connections-tab-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+    margin-right: 0.125rem;
+    flex-shrink: 0;
+}
+
+.tab-changed {
+    color: $ui-orange;
+    background-color: $ui-alert-orange;
+    box-shadow: inset 0 0 0 2px $ui-orange;
+    animation: connection-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.connection-change-message {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@keyframes connection-pulse {
+    from {
+        filter: brightness(1);
+    }
+
+    to {
+        filter: brightness(0.92);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tab-changed {
+        animation: none;
+    }
+}
+
+[dir="rtl"] .connections-tab-icon {
+    margin-right: 0;
+    margin-left: 0.125rem;
 }
 
 /* Tab style overrides from react-tabs */

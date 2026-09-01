@@ -1,0 +1,129 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+
+.connections {
+    height: 100%;
+    padding: 2.5rem;
+    overflow: auto;
+    color: $text-primary;
+    background: linear-gradient(180deg, #f1fbff 0%, $ui-white 55%);
+}
+
+.connections h2 {
+    margin: 0.5rem 0 2rem;
+    text-align: center;
+    font-size: 1.75rem;
+}
+
+.heading-icon {
+    text-align: center;
+    font-size: 3.5rem;
+}
+
+.robot-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+    max-width: 50rem;
+    margin: auto;
+}
+
+.robot-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    border: 2px solid #b7e4c7;
+    border-radius: 1rem;
+    background: $ui-white;
+    box-shadow: 0 0.25rem 0.75rem $ui-black-transparent;
+    font-size: 1.25rem;
+}
+
+.robot-icon {
+    font-size: 3rem;
+}
+
+.status-dot {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: #2f9e44;
+}
+
+.paired {
+    border-color: $motion-primary;
+    background: #f1f7ff;
+}
+
+.claimed {
+    border-color: $ui-black-transparent;
+    background: $ui-tertiary;
+}
+
+.claimed .status-dot {
+    background: $text-primary-transparent;
+}
+
+.connected-label {
+    color: #237032;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.claim-button,
+.release-button {
+    padding: 0.6rem 1.5rem;
+    border: 0;
+    border-radius: 1.25rem;
+    background: $motion-primary;
+    color: $ui-white;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.claim-button:hover {
+    background: $motion-tertiary;
+}
+
+.release-button {
+    border: 2px solid $motion-primary;
+    background: $ui-white;
+    color: $motion-tertiary;
+}
+
+.release-button:hover {
+    background: $ui-primary;
+}
+
+.claim-button:focus-visible,
+.release-button:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+
+.claim-button:disabled,
+.release-button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.empty-state {
+    max-width: 28rem;
+    margin: auto;
+    padding: 2rem;
+    border: 2px dashed $motion-primary;
+    border-radius: 1rem;
+    text-align: center;
+    background: $ui-white;
+    color: $text-primary-transparent;
+    font-size: 1.1rem;
+    line-height: 1.5;
+}

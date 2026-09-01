@@ -12,8 +12,8 @@ import {setProjectTitle} from '../reducers/project-title';
 
 const messages = defineMessages({
     defaultProjectTitle: {
-        id: 'gui.gui.defaultProjectTitle',
-        description: 'Default title for project',
+        id: 'gui.gui.defaultTinkiblocksProjectTitle',
+        description: 'Default title for a Tinkiblocks project',
         defaultMessage: 'Tinkiblocks Project'
     }
 });
