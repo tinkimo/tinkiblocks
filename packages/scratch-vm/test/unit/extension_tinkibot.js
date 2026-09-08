@@ -30,6 +30,10 @@ const makeRuntime = () => {
     };
 };
 
+const pairRobot = (extension, nickname = 'orange', botUuid = 'orange-robot-uuid') => {
+    extension._setConnectedRobots([{nickname, 'bot-uuid': botUuid, 'blocks-uuid': extension._blocksUuid}]);
+};
+
 test('Tinkibot is loaded when the virtual machine starts', t => {
     const vm = new VirtualMachine();
 
@@ -90,21 +94,25 @@ test('Tinkibot commands wait for each response before sending the next command',
     global.WebSocket = MockWebSocket;
 
     const extension = new TinkibotBlocks({});
+    pairRobot(extension);
     const first = extension.move({DIRECTION: 'forward', DISTANCE: 10});
     const second = extension.rotate({ROTATION: 'left', DEGREES: 90});
 
     MockWebSocket.instance.open();
     await Promise.resolve();
     t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'move', direction: 'forward', distance: 10}
+        {command: 'move', direction: 'forward', distance: 10, nickname: 'orange',
+            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}
     ]);
 
     MockWebSocket.instance.respond('move', 'moved');
     t.equal(await first, 'moved');
     await Promise.resolve();
     t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'move', direction: 'forward', distance: 10},
-        {command: 'rotate', rotation: 'left', degrees: 90}
+        {command: 'move', direction: 'forward', distance: 10, nickname: 'orange',
+            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid},
+        {command: 'rotate', rotation: 'left', degrees: 90, nickname: 'orange',
+            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}
     ]);
 
     MockWebSocket.instance.respond('rotate', 'rotated');
@@ -119,6 +127,7 @@ test('Tinkibot reporters return the response for their own request', async t => 
     global.WebSocket = MockWebSocket;
 
     const extension = new TinkibotBlocks({});
+    pairRobot(extension);
     const distance = extension.measure_distance();
     MockWebSocket.instance.open();
     await Promise.resolve();
@@ -304,24 +313,69 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     t.end();
 });
 
+test('Tinkibot allows only one robot claim at a time', async t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+    const runtime = makeRuntime();
+    const extension = new TinkibotBlocks(runtime);
+    MockWebSocket.instance.open();
+    extension._setConnectedRobots([
+        {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {nickname: 'blue', 'bot-uuid': 'blue-robot-uuid'}
+    ]);
+
+    await runtime.claimTinkibotRobot('orange-robot-uuid');
+    await runtime.claimTinkibotRobot('blue-robot-uuid');
+    t.equal(MockWebSocket.instance.sent.length, 1, 'a pending claim prevents another claim');
+
+    MockWebSocket.instance.onmessage({data: JSON.stringify({
+        event: 'claim_accepted', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid',
+        'blocks-uuid': extension._blocksUuid
+    })});
+    await runtime.claimTinkibotRobot('blue-robot-uuid');
+    t.equal(MockWebSocket.instance.sent.length, 1, 'a paired robot prevents another claim');
+
+    delete global.window;
+    delete global.WebSocket;
+    t.end();
+});
+
+test('Tinkibot blocks require a claimed robot', async t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+    const alerts = [];
+    global.alert = message => alerts.push(message);
+    const extension = new TinkibotBlocks({});
+
+    await t.rejects(extension.measure_voltage(), {message: 'No Tinkibot robot is claimed'});
+    t.strictSame(MockWebSocket.instance.sent, []);
+    t.strictSame(alerts, ['Claim a robot from the Connections tab before using Tinkibot blocks.']);
+
+    delete global.alert;
+    delete global.window;
+    delete global.WebSocket;
+});
+
 test('Tinkibot volume command accepts the proxy response and releases the queue', async t => {
     global.window = {};
     global.WebSocket = MockWebSocket;
 
     const extension = new TinkibotBlocks({});
+    pairRobot(extension);
     const volume = extension.volume({VALUE: 5});
     const distance = extension.measure_distance();
 
     MockWebSocket.instance.open();
     await Promise.resolve();
-    t.strictSame(MockWebSocket.instance.sent, [{command: 'set', volume: 5}]);
+    t.match(MockWebSocket.instance.sent, [{command: 'set', volume: 5, nickname: 'orange',
+        'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}]);
 
     MockWebSocket.instance.respond('set', 'OK set volume 5');
     t.equal(await volume, 'OK set volume 5');
     await Promise.resolve();
-    t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'set', volume: 5},
-        {command: 'measure_distance'}
+    t.match(MockWebSocket.instance.sent, [
+        {command: 'set', volume: 5, nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {command: 'measure_distance', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
     ]);
 
     MockWebSocket.instance.respond('measure_distance', 42);
@@ -340,6 +394,7 @@ test('Tinkibot command errors warn the user and release the queue', async t => {
     );
 
     const extension = new TinkibotBlocks({});
+    pairRobot(extension);
     const sound = extension.play_sound({SOUND: 'startup'});
     const distance = extension.measure_distance();
 
@@ -348,9 +403,9 @@ test('Tinkibot command errors warn the user and release the queue', async t => {
     MockWebSocket.instance.respond('error', 'command_failed:no_robots_connected');
     await t.rejects(sound, {message: 'command_failed:no_robots_connected'});
     await Promise.resolve();
-    t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'play_sound', sound: 'startup'},
-        {command: 'measure_distance'}
+    t.match(MockWebSocket.instance.sent, [
+        {command: 'play_sound', sound: 'startup', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {command: 'measure_distance', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
     ]);
 
     MockWebSocket.instance.respond('measure_distance', 42);
