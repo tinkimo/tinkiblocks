@@ -38,6 +38,11 @@ test('Tinkibot is loaded when the virtual machine starts', t => {
     const vm = new VirtualMachine();
 
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibot'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotMovement'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotInteraction'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotSensors'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotSounds'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotDisplay'), true);
     const categoryBlocks = Object.fromEntries(vm.runtime.getBlocksXML().map(category => [category.id, category.xml]));
     t.match(categoryBlocks.tinkibotMovement, /name="Movement"/);
     t.match(categoryBlocks.tinkibotInteraction, /name="Interaction"/);
