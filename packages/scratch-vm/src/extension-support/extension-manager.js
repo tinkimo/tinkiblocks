@@ -241,6 +241,7 @@ class ExtensionManager {
         if (extensionObject.getInfos) {
             for (const info of extensionObject.getInfos()) {
                 this._registerExtensionInfo(serviceName, info);
+                this._loadedExtensions.set(info.id, serviceName);
             }
         } else {
             dispatch.callSync('extensions', 'registerExtensionServiceSync', serviceName);
