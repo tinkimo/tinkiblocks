@@ -837,6 +837,9 @@ const deserializeBlocks = function (blocks) {
             deserializeInputDesc(block, null, false, blocks);
             continue;
         }
+        // Keep saved robot dances attached to their current toolbox category.
+        if (block.opcode === 'tinkibotMovement_wiggle') block.opcode = 'tinkibotDance_wiggle';
+        if (block.opcode === 'tinkibotMovement_moonwalk') block.opcode = 'tinkibotDance_moonwalk';
         block.id = blockId; // add id back to block since it wasn't serialized
         block.inputs = deserializeInputs(block.inputs, blockId, blocks);
         block.fields = deserializeFields(block.fields);
