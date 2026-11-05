@@ -122,10 +122,13 @@ We provide [Scratch](https://scratch.mit.edu) free of charge, and want to keep i
 ### Tinkibot Dance
 
 The **Dance** category contains **wiggle**, **moonwalk**, and
-**fade [LEDs/display] [in/out]**. Fade in increases brightness from off to fully
+**fade [LEDs/display] [in/out] [speed]**. Fade in increases brightness from off to fully
 on; fade out decreases brightness from fully on to off. The block waits for the
 robot's completion reply. It sends `{command: 'fade', target: 'LEDs' | 'display',
-direction: 'in' | 'out'}` with the standard claimed robot identity fields.
-The matching proxy translates it to `<robot>.fade:<target> <direction>`.
-Firmware config controls the LED and display durations separately (one second
-by default); display fades also save the resulting backlight setting.
+direction: 'in' | 'out', speed: 'slow' | 'medium' | 'fast' | number}` with the standard claimed robot identity fields.
+The matching proxy translates it to `<robot>.fade:<target> <direction> <speed>`.
+The speed dropdown accepts number and variable reporters. Presets are slow
+(1.5 s), medium (1 s, the default), and fast (0.5 s); numeric values are durations
+in seconds. Firmware `FADE_SPEEDS_MS` controls these values for both targets
+and can be extended with custom names supplied through a variable. Display
+fades also save the resulting backlight setting.

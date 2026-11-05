@@ -591,7 +591,9 @@ test('Dance fade uses dropdowns and the standard correlated command payload', as
     const dance = extension.getInfos().find(info => info.id === 'tinkibotDance');
     t.ok(dance);
     const block = dance.blocks.find(info => info.opcode === 'fade');
-    t.equal(block.text, 'fade [TARGET] [DIRECTION]');
+    t.equal(block.text, 'fade [TARGET] [DIRECTION] [SPEED]');
+    t.strictSame(dance.menus.fade_speed, {acceptReporters: true, items: ['slow', 'medium', 'fast']});
+    t.equal(block.arguments.SPEED.defaultValue, 'medium');
     t.strictSame(dance.menus.fade_target.items, ['LEDs', 'display']);
     t.strictSame(dance.menus.fade_direction.items, ['in', 'out']);
     for (const target of ['LEDs', 'display']) {
@@ -600,6 +602,7 @@ test('Dance fade uses dropdowns and the standard correlated command payload', as
             await new Promise(resolve => setImmediate(resolve));
             t.strictSame(MockWebSocket.instance.sent.at(-1), {
                 'command': 'fade',
+                'speed': 'medium',
                 target,
                 direction,
                 'nickname': 'orange',
@@ -609,5 +612,19 @@ test('Dance fade uses dropdowns and the standard correlated command payload', as
             MockWebSocket.instance.respond('fade', 'OK fade');
             t.equal(await result, 'OK fade');
         }
+    }
+});
+
+
+test('Fade forwards preset and numeric reporter values without losing the input', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    MockWebSocket.instance.open();
+    for (const speed of ['slow', 'medium', 'fast', 0.75, '2', 'custom']) {
+        const result = extension.fade({TARGET: 'LEDs', DIRECTION: 'in', SPEED: speed});
+        await new Promise(resolve => setImmediate(resolve));
+        t.equal(MockWebSocket.instance.sent.at(-1).speed, speed);
+        MockWebSocket.instance.respond('fade', 'OK fade');
+        t.equal(await result, 'OK fade');
     }
 });

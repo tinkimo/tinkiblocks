@@ -603,16 +603,18 @@ class TinkibotBlocks {
                     blockType: BlockType.COMMAND,
                     text: formatMessage({
                         id: 'tinkibot.fade',
-                        default: 'fade [TARGET] [DIRECTION]',
+                        default: 'fade [TARGET] [DIRECTION] [SPEED]',
                         description: 'Fade the LEDs or display in or out.'
                     }),
                     arguments: {
                         TARGET: {type: ArgumentType.STRING, defaultValue: 'LEDs', menu: 'fade_target'},
-                        DIRECTION: {type: ArgumentType.STRING, defaultValue: 'in', menu: 'fade_direction'}
+                        DIRECTION: {type: ArgumentType.STRING, defaultValue: 'in', menu: 'fade_direction'},
+                        SPEED: {type: ArgumentType.STRING, defaultValue: 'medium', menu: 'fade_speed'}
                     }
                 }
             ],
             menus: {
+                fade_speed: {acceptReporters: true, items: ['slow', 'medium', 'fast']},
                 fade_target: {acceptReporters: false, items: ['LEDs', 'display']},
                 fade_direction: {acceptReporters: false, items: ['in', 'out']},
                 sound_options: {
@@ -1026,7 +1028,12 @@ class TinkibotBlocks {
     }
 
     fade (args) {
-        return this._sendCommand({command: 'fade', target: args.TARGET, direction: args.DIRECTION});
+        return this._sendCommand({
+            command: 'fade',
+            target: args.TARGET,
+            direction: args.DIRECTION,
+            speed: typeof args.SPEED === 'undefined' ? 'medium' : args.SPEED
+        });
     }
 
     wiggle (args) {
