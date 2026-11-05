@@ -3,6 +3,7 @@ const iconPaths = {
     Interaction: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><circle cx="8" cy="16" r="3"/><circle cx="16" cy="16" r="3"/>',
     Sensors: '<circle cx="12" cy="15" r="2"/><path fill="none" stroke="white" stroke-width="2" stroke-linecap="round" d="M7.8 10.8a6 6 0 0 1 8.4 0M4.3 7.3a11 11 0 0 1 15.4 0"/>',
     Sounds: '<path d="M10 18a3 3 0 1 1-2-2.8V6l11-2v11a3 3 0 1 1-2-2.8V8l-7 1.3z"/>',
+    Dance: '<path d="M12 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4M9 7h6l4 4-2 2-3-3v5l4 5-3 2-4-6-3 6-3-2 4-6V9l-4 3-2-2z"/>',
     Display: '<path d="M3 4h18v14h-7v2h3v2H7v-2h3v-2H3zm3 3v8h12V7z"/>'
 };
 
@@ -25,6 +26,7 @@ const createCategoryStyle = (name, color1, color2, color3) => {
 
 const categoryStyles = {
     tinkibotMovement: createCategoryStyle('Movement', '#B832D0', '#D34BE8', '#E667F5'),
+    tinkibotDance: createCategoryStyle('Dance', '#A52A50', '#C83D67', '#E9638A'),
     tinkibotInteraction: createCategoryStyle('Interaction', '#007F96', '#009DB8', '#18BDD5'),
     tinkibotSensors: createCategoryStyle('Sensors', '#12833A', '#20A64E', '#3AC865'),
     tinkibotSounds: createCategoryStyle('Sounds', '#7950E8', '#956CF2', '#B18BFA'),

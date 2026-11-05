@@ -1,4 +1,4 @@
-const test = require('tap').test;
+const {test, beforeEach} = require('tap');
 
 const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
 const VirtualMachine = require('../../src/virtual-machine');
@@ -22,6 +22,16 @@ class MockWebSocket {
     }
 }
 
+// The extension opens a browser WebSocket on construction, including metadata tests.
+beforeEach(t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+    t.teardown(() => {
+        delete global.window;
+        delete global.WebSocket;
+    });
+});
+
 const makeRuntime = () => {
     const events = [];
     return {
@@ -43,8 +53,10 @@ test('Tinkibot is loaded when the virtual machine starts', t => {
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibotSensors'), true);
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibotSounds'), true);
     t.equal(vm.extensionManager.isExtensionLoaded('tinkibotDisplay'), true);
+    t.equal(vm.extensionManager.isExtensionLoaded('tinkibotDance'), true);
     const categoryBlocks = Object.fromEntries(vm.runtime.getBlocksXML().map(category => [category.id, category.xml]));
     t.match(categoryBlocks.tinkibotMovement, /name="Movement"/);
+    t.match(categoryBlocks.tinkibotDance, /name="Dance"/);
     t.match(categoryBlocks.tinkibotInteraction, /name="Interaction"/);
     t.match(categoryBlocks.tinkibotSensors, /name="Sensors"/);
     t.match(categoryBlocks.tinkibotSounds, /name="Sounds"/);
@@ -59,14 +71,15 @@ test('Tinkibot blocks are grouped into focused categories', t => {
 
     t.strictSame(categories, {
         Movement: ['measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake', 'move',
-            'rotate', 'arc', 'wiggle', 'moonwalk'],
+            'rotate', 'arc'],
+        Dance: ['wiggle', 'moonwalk', 'fade'],
         Interaction: ['read_button', 'when_button_event', 'button_led'],
         Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
         Sounds: ['volume', 'play_sound', 'preload_audio'],
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'backlight', 'preload_image', 'clear']
     });
-    t.strictSame(infos.map(info => info.color1), ['#B832D0', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
+    t.strictSame(infos.map(info => info.color1), ['#B832D0', '#A52A50', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
     for (const [index, info] of infos.entries()) {
         const channels = info.color1.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) / 255)
             .map(channel => channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4));
@@ -477,7 +490,8 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
             t.equal(extension.when_button_event({BUTTON: 'bottom-left', STATE: 'released'}), true);
         }
     });
-    const eventBlock = extension.getInfos()[1].blocks.find(block => block.opcode === 'when_button_event');
+    const interaction = extension.getInfos().find(info => info.id === 'tinkibotInteraction');
+    const eventBlock = interaction.blocks.find(block => block.opcode === 'when_button_event');
 
     t.equal(eventBlock.blockType, 'hat');
     t.equal(eventBlock.isEdgeActivated, false);
@@ -560,5 +574,40 @@ test('Tinkibot preloads media through the proxy and waits for its response', asy
         t.equal(extension._pendingResponse.command, command);
         MockWebSocket.instance.respond(command, 'OK');
         t.equal(await result, 'OK');
+    }
+});
+
+
+test('Dance fade uses dropdowns and the standard correlated command payload', async t => {
+    global.window = {};
+    global.WebSocket = MockWebSocket;
+    t.teardown(() => {
+        delete global.window;
+        delete global.WebSocket;
+    });
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    MockWebSocket.instance.open();
+    const dance = extension.getInfos().find(info => info.id === 'tinkibotDance');
+    t.ok(dance);
+    const block = dance.blocks.find(info => info.opcode === 'fade');
+    t.equal(block.text, 'fade [TARGET] [DIRECTION]');
+    t.strictSame(dance.menus.fade_target.items, ['LEDs', 'display']);
+    t.strictSame(dance.menus.fade_direction.items, ['in', 'out']);
+    for (const target of ['LEDs', 'display']) {
+        for (const direction of ['in', 'out']) {
+            const result = extension.fade({TARGET: target, DIRECTION: direction});
+            await new Promise(resolve => setImmediate(resolve));
+            t.strictSame(MockWebSocket.instance.sent.at(-1), {
+                'command': 'fade',
+                target,
+                direction,
+                'nickname': 'orange',
+                'bot-uuid': 'orange-robot-uuid',
+                'blocks-uuid': extension._blocksUuid
+            });
+            MockWebSocket.instance.respond('fade', 'OK fade');
+            t.equal(await result, 'OK fade');
+        }
     }
 });

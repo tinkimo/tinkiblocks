@@ -59,8 +59,13 @@ class TinkibotBlocks {
                 description: 'Name of the Tinkibot Movement category.'
             }), [
                 'measure_left_encoder_count', 'measure_right_encoder_count', 'drive', 'stop', 'brake',
-                'move', 'rotate', 'arc', 'wiggle', 'moonwalk'
+                'move', 'rotate', 'arc'
             ]),
+            this._categoryInfo(info, 'tinkibotDance', formatMessage({
+                id: 'tinkibot.category.dance',
+                default: 'Dance',
+                description: 'Robot dances and playful effects.'
+            }), ['wiggle', 'moonwalk', 'fade']),
             this._categoryInfo(info, 'tinkibotInteraction', formatMessage({
                 id: 'tinkibot.category.interaction',
                 default: 'Interaction',
@@ -593,8 +598,23 @@ class TinkibotBlocks {
                         }                        
                     }
                 },                                                                   
+                {
+                    opcode: 'fade',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.fade',
+                        default: 'fade [TARGET] [DIRECTION]',
+                        description: 'Fade the LEDs or display in or out.'
+                    }),
+                    arguments: {
+                        TARGET: {type: ArgumentType.STRING, defaultValue: 'LEDs', menu: 'fade_target'},
+                        DIRECTION: {type: ArgumentType.STRING, defaultValue: 'in', menu: 'fade_direction'}
+                    }
+                }
             ],
             menus: {
+                fade_target: {acceptReporters: false, items: ['LEDs', 'display']},
+                fade_direction: {acceptReporters: false, items: ['in', 'out']},
                 sound_options: {
                     acceptReporters: true,
                     items: ['startup', 'shutdown',"ugggh","growl","haha","sad",'charger','chicken',
@@ -1003,6 +1023,10 @@ class TinkibotBlocks {
 
     brake (args) {
         return this._sendCommand({command: 'brake', motor: args.MOTOR});
+    }
+
+    fade (args) {
+        return this._sendCommand({command: 'fade', target: args.TARGET, direction: args.DIRECTION});
     }
 
     wiggle (args) {
