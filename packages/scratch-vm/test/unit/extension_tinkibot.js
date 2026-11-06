@@ -2,6 +2,9 @@ const {test, beforeEach} = require('tap');
 
 const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
 const VirtualMachine = require('../../src/virtual-machine');
+const Runtime = require('../../src/engine/runtime');
+const RenderedTarget = require('../../src/sprites/rendered-target');
+const Sprite = require('../../src/sprites/sprite');
 
 class MockWebSocket {
     constructor () {
@@ -36,6 +39,7 @@ const makeRuntime = () => {
     const events = [];
     return {
         events,
+        getTargetForStage: () => ({tempo: 60}),
         emit: (event, value) => events.push({event, value})
     };
 };
@@ -200,6 +204,111 @@ test('Tinkibot reporters return the response for their own request', async t => 
 
     delete global.window;
     delete global.WebSocket;
+});
+
+test('consecutive notes ignore delayed completions from another request', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    const first = extension.playNoteForBeats({NOTE: 69, BEATS: 0.1});
+    const second = extension.playNoteForBeats({NOTE: 69, BEATS: 0.1});
+    const socket = MockWebSocket.instance;
+    socket.open();
+    await new Promise(resolve => setImmediate(resolve));
+    const firstId = socket.sent[0].requestId;
+    t.type(firstId, 'string');
+    const reply = (requestId, value = 'OK play') => socket.onmessage({
+        data: JSON.stringify({report: 'play_note', requestId, value})
+    });
+    reply('old-request');
+    await new Promise(resolve => setImmediate(resolve));
+    t.equal(socket.sent.length, 1, 'a stale completion does not release the command queue');
+    reply(firstId);
+    t.equal(typeof (await first), 'undefined', 'commands do not open reporter bubbles on the canvas');
+    await new Promise(resolve => setImmediate(resolve));
+    const secondId = socket.sent[1].requestId;
+    t.not(firstId, secondId);
+    let finished = false;
+    second.then(() => {
+        finished = true;
+    });
+    reply(firstId);
+    await new Promise(resolve => setImmediate(resolve));
+    t.equal(finished, false, 'a duplicate completion cannot finish the next identical note');
+    reply(secondId);
+    await second;
+});
+
+test('a busy note fails and stops the originating script instead of skipping notes', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    const alerts = [];
+    global.alert = message => alerts.push(message);
+    t.teardown(() => {
+        delete global.alert;
+    });
+    let stopped = false;
+    const thread = {};
+    const sequencer = {retireThread: target => {
+        stopped = target === thread;
+    }};
+    const note = extension.playNoteForBeats({NOTE: 67, BEATS: 0.4}, {thread, sequencer});
+    const rejected = t.rejects(note, {message: 'ERR busy'});
+    const socket = MockWebSocket.instance;
+    socket.open();
+    await new Promise(resolve => setImmediate(resolve));
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_note', value: 'ERR busy', requestId: socket.sent[0].requestId
+    })});
+    await rejected;
+    t.equal(stopped, true);
+    t.match(alerts, ['Tinkibot command failed: ERR busy']);
+});
+
+test('VM redraw steps wait for note completion and retire a tune after a robot error', async t => {
+    const runtime = new Runtime();
+    runtime.currentStepTime = 1000 / 30;
+    const target = new RenderedTarget(new Sprite(null, runtime), runtime);
+    runtime.targets.push(target);
+    const extension = new TinkibotBlocks(runtime);
+    pairRobot(extension);
+    const socket = MockWebSocket.instance;
+    socket.open();
+    global.alert = () => {};
+    t.teardown(() => {
+        delete global.alert;
+    });
+    let finished = false;
+    runtime._primitives.test_note = (args, util) => extension.playNoteForBeats({NOTE: 69, BEATS: 0.1}, util);
+    runtime._primitives.test_finished = () => {
+        finished = true;
+    };
+    for (const [id, opcode, next] of [
+        ['first', 'test_note', 'second'], ['second', 'test_note', 'finished'],
+        ['finished', 'test_finished', null]
+    ]) {
+        target.blocks.createBlock({id, opcode, next, parent: null, inputs: {}, fields: {}, topLevel: id === 'first'});
+    }
+    runtime._pushThread('first', target);
+    for (let frame = 0; frame < 20; frame++) {
+        target.blocks.resetCache();
+        runtime.sequencer.stepThreads();
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    t.equal(socket.sent.length, 1, 'canvas/cache refreshes cannot enqueue another note');
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_note', value: 'OK play', requestId: socket.sent[0].requestId
+    })});
+    await new Promise(resolve => setImmediate(resolve));
+    runtime.sequencer.stepThreads();
+    await new Promise(resolve => setImmediate(resolve));
+    t.equal(socket.sent.length, 2, 'the next note starts after playback completion');
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_note', value: 'ERR busy', requestId: socket.sent[1].requestId
+    })});
+    await new Promise(resolve => setImmediate(resolve));
+    runtime.sequencer.stepThreads();
+    t.equal(finished, false, 'a failed note cannot advance the tune');
+    t.equal(runtime.threads.length, 0);
 });
 
 test('Tinkibot tracks robot connection events', t => {

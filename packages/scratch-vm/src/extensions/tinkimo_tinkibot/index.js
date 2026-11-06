@@ -827,7 +827,14 @@ class TinkibotBlocks {
                 this.runtime.startHats('tinkibotInteraction_when_button_event');
                 this._buttonEvent = null;
             }
-            if (this._pendingResponse && response.report === 'error') {
+            if (this._pendingResponse && this._pendingResponse.requestId &&
+                response.requestId !== this._pendingResponse.requestId) return;
+            const matchesCommand = this._pendingResponse && response.report === this._pendingResponse.command;
+            const commandFailed = matchesCommand && typeof response.value === 'string' &&
+                /^ERR(?: |$)/.test(response.value);
+            const incompleteNote = matchesCommand && this._pendingResponse.command === 'play_note' &&
+                response.value !== 'OK play';
+            if (this._pendingResponse && (response.report === 'error' || commandFailed || incompleteNote)) {
                 const {reject} = this._pendingResponse;
                 this._pendingResponse = null;
                 const errorMessage = response.value === 'command_failed:no_robots_connected' ?
@@ -845,7 +852,7 @@ class TinkibotBlocks {
                 reject(new Error(response.value));
                 return;
             }
-            if (this._pendingResponse && response.report === this._pendingResponse.command) {
+            if (matchesCommand) {
                 const {resolve} = this._pendingResponse;
                 this._pendingResponse = null;
                 resolve(response.value);
@@ -943,8 +950,11 @@ class TinkibotBlocks {
             }
             await this.connect();
             return new Promise((resolve, reject) => {
-                this._pendingResponse = {command: responseCommand, resolve, reject};
+                let requestId;
+                if (command.command === 'play_note') requestId = uuid.v4();
+                this._pendingResponse = {command: responseCommand, requestId, resolve, reject};
                 window.socket.send(JSON.stringify(Object.assign({}, command, {
+                    requestId,
                     nickname: robot.nickname,
                     'bot-uuid': robot.botUuid,
                     'blocks-uuid': this._blocksUuid
@@ -991,10 +1001,17 @@ class TinkibotBlocks {
         return this._sendCommand({command: 'play_sound', sound: args.SOUND});
     }
 
-    playNoteForBeats (args) {
+    playNoteForBeats (args, util) {
         const duration = this._music.duration(args.BEATS);
         if (duration === 0) return;
-        return this._sendCommand({command: 'play_note', note: this._music.note(args.NOTE), duration});
+        const thread = util && util.thread;
+        const sequencer = util && util.sequencer;
+        return Promise.resolve(this._sendCommand({
+            command: 'play_note', note: this._music.note(args.NOTE), duration
+        })).then(() => {}, error => {
+            if (thread) sequencer.retireThread(thread);
+            throw error;
+        });
     }
 
     restForBeats (args, util) {

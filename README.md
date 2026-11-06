@@ -29,6 +29,10 @@ Tempo shares the Scratch project tempo (default 60 BPM, clamped to 20–500 BPM)
 durations are clamped to 0–100 beats. Rest and tempo work locally. Play sends
 `play_note` with numeric `note` and `duration` in seconds to the claimed robot
 and waits for its completion reply. Zero beats is silent and sends no command.
+Each note has a request ID echoed by the proxy, and only its matching `OK play`
+reply advances the script. Robot errors such as `ERR busy` stop the originating
+script and display an error. Note commands complete without reporter bubbles on
+the canvas. Update the proxy alongside Tinkiblocks for reliable note sequencing.
 Timing helpers live in `packages/scratch-vm/src/extensions/tinkimo_tinkibot/music/`.
 The proxy and robot firmware must include music support to play generated notes.
 
