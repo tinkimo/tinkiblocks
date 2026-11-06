@@ -7,6 +7,7 @@ const BlockType = require('../../extension-support/block-type');
 const Cast = require('../../util/cast');
 
 const categoryStyles = require('./common');
+const Music = require('./music');
 
 const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
@@ -30,6 +31,7 @@ class TinkibotBlocks {
          * @type {Runtime}
          */
         this.runtime = runtime;
+        this._music = new Music(runtime);
         this._connected = false;
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
@@ -84,7 +86,8 @@ class TinkibotBlocks {
                 id: 'tinkibot.category.sounds',
                 default: 'Sounds',
                 description: 'Name of the Tinkibot Sounds category.'
-            }), ['volume', 'play_sound', 'preload_audio']),
+            }), ['volume', 'play_sound', 'preload_audio', 'playNoteForBeats', 'playDrumForBeats', 'restForBeats',
+                'setTempo', 'changeTempo']),
             this._categoryInfo(info, 'tinkibotDisplay', formatMessage({
                 id: 'tinkibot.category.display',
                 default: 'Display',
@@ -116,6 +119,62 @@ class TinkibotBlocks {
                 description: 'Name of the Tinkibot extension.'
             }),
             blocks: [
+                {
+                    opcode: 'playNoteForBeats',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.playNoteForBeats',
+                        default: 'play [NOTE] for [BEATS] beats',
+                        description: 'Play a musical note through the robot speaker'
+                    }),
+                    arguments: {
+                        NOTE: {type: ArgumentType.NOTE, defaultValue: 60},
+                        BEATS: {type: ArgumentType.NUMBER, defaultValue: 0.25}
+                    }
+                },
+                {
+                    opcode: 'playDrumForBeats',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.playDrumForBeats',
+                        default: 'play drum [DRUM] for [BEATS] beats',
+                        description: 'Play a synthesized drum hit and wait a number of beats'
+                    }),
+                    arguments: {
+                        DRUM: {type: ArgumentType.NUMBER, defaultValue: 1, menu: 'drum_options'},
+                        BEATS: {type: ArgumentType.NUMBER, defaultValue: 0.25}
+                    }
+                },
+                {
+                    opcode: 'restForBeats',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.restForBeats',
+                        default: 'rest for [BEATS] beats',
+                        description: 'Pause for a number of musical beats'
+                    }),
+                    arguments: {BEATS: {type: ArgumentType.NUMBER, defaultValue: 0.25}}
+                },
+                {
+                    opcode: 'setTempo',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.setTempo',
+                        default: 'set tempo to [TEMPO]',
+                        description: 'Set the musical tempo in beats per minute'
+                    }),
+                    arguments: {TEMPO: {type: ArgumentType.NUMBER, defaultValue: 60}}
+                },
+                {
+                    opcode: 'changeTempo',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.changeTempo',
+                        default: 'change tempo by [TEMPO]',
+                        description: 'Change the musical tempo in beats per minute'
+                    }),
+                    arguments: {TEMPO: {type: ArgumentType.NUMBER, defaultValue: 20}}
+                },
                 {
                     opcode: 'volume',
                     blockType: BlockType.COMMAND,
@@ -614,6 +673,75 @@ class TinkibotBlocks {
                 }
             ],
             menus: {
+                drum_options: {
+                    acceptReporters: false,
+                    items: [
+                        {
+                            value: '1',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.snare',
+                                default: 'Snare Drum',
+                                description: 'Synthesized snare drum'
+                            })
+                        },
+                        {
+                            value: '2',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.bass',
+                                default: 'Bass Drum',
+                                description: 'Synthesized bass drum'
+                            })
+                        },
+                        {
+                            value: '3',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.sideStick',
+                                default: 'Side Stick',
+                                description: 'Synthesized side stick'
+                            })
+                        },
+                        {
+                            value: '5',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.openHat',
+                                default: 'Open Hi-Hat',
+                                description: 'Synthesized open hi-hat'
+                            })
+                        },
+                        {
+                            value: '6',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.closedHat',
+                                default: 'Closed Hi-Hat',
+                                description: 'Synthesized closed hi-hat'
+                            })
+                        },
+                        {
+                            value: '8',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.clap',
+                                default: 'Hand Clap',
+                                description: 'Synthesized hand clap'
+                            })
+                        },
+                        {
+                            value: '11',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.cowbell',
+                                default: 'Cowbell',
+                                description: 'Synthesized cowbell'
+                            })
+                        },
+                        {
+                            value: '12',
+                            text: formatMessage({
+                                id: 'tinkibot.drum.triangle',
+                                default: 'Triangle',
+                                description: 'Synthesized triangle'
+                            })
+                        }
+                    ]
+                },
                 fade_speed: {acceptReporters: true, items: ['slow', 'medium', 'fast']},
                 fade_target: {acceptReporters: false, items: ['LEDs', 'display']},
                 fade_direction: {acceptReporters: false, items: ['in', 'out']},
@@ -781,7 +909,16 @@ class TinkibotBlocks {
                 this.runtime.startHats('tinkibotInteraction_when_button_event');
                 this._buttonEvent = null;
             }
-            if (this._pendingResponse && response.report === 'error') {
+            if (this._pendingResponse && this._pendingResponse.requestId &&
+                response.requestId !== this._pendingResponse.requestId) return;
+            const matchesCommand = this._pendingResponse && response.report === this._pendingResponse.command;
+            const commandFailed = matchesCommand && typeof response.value === 'string' &&
+                /^ERR(?: |$)/.test(response.value);
+            const expectedPlayback = this._pendingResponse && {
+                play_note: 'OK play', play_drum: 'OK drum'
+            }[this._pendingResponse.command];
+            const incompletePlayback = matchesCommand && expectedPlayback && response.value !== expectedPlayback;
+            if (this._pendingResponse && (response.report === 'error' || commandFailed || incompletePlayback)) {
                 const {reject} = this._pendingResponse;
                 this._pendingResponse = null;
                 const errorMessage = response.value === 'command_failed:no_robots_connected' ?
@@ -799,7 +936,7 @@ class TinkibotBlocks {
                 reject(new Error(response.value));
                 return;
             }
-            if (this._pendingResponse && response.report === this._pendingResponse.command) {
+            if (matchesCommand) {
                 const {resolve} = this._pendingResponse;
                 this._pendingResponse = null;
                 resolve(response.value);
@@ -897,8 +1034,11 @@ class TinkibotBlocks {
             }
             await this.connect();
             return new Promise((resolve, reject) => {
-                this._pendingResponse = {command: responseCommand, resolve, reject};
+                let requestId;
+                if (['play_note', 'play_drum'].includes(command.command)) requestId = uuid.v4();
+                this._pendingResponse = {command: responseCommand, requestId, resolve, reject};
                 window.socket.send(JSON.stringify(Object.assign({}, command, {
+                    requestId,
                     nickname: robot.nickname,
                     'bot-uuid': robot.botUuid,
                     'blocks-uuid': this._blocksUuid
@@ -943,6 +1083,39 @@ class TinkibotBlocks {
 
     play_sound (args) {
         return this._sendCommand({command: 'play_sound', sound: args.SOUND});
+    }
+
+    playNoteForBeats (args, util) {
+        const duration = this._music.duration(args.BEATS);
+        if (duration === 0) return;
+        return this._playMusic({command: 'play_note', note: this._music.note(args.NOTE), duration}, util);
+    }
+
+    playDrumForBeats (args, util) {
+        return this._playMusic({
+            command: 'play_drum', drum: Cast.toNumber(args.DRUM), duration: this._music.duration(args.BEATS)
+        }, util);
+    }
+
+    _playMusic (command, util) {
+        const thread = util && util.thread;
+        const sequencer = util && util.sequencer;
+        return Promise.resolve(this._sendCommand(command)).then(() => {}, error => {
+            if (thread) sequencer.retireThread(thread);
+            throw error;
+        });
+    }
+
+    restForBeats (args, util) {
+        this._music.rest(args.BEATS, util);
+    }
+
+    setTempo (args) {
+        this._music.setTempo(args.TEMPO);
+    }
+
+    changeTempo (args) {
+        this._music.setTempo(this._music.getTempo() + Cast.toNumber(args.TEMPO));
     }
 
     preload_audio (args) {

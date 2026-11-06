@@ -20,6 +20,30 @@ _Please add to this list as more packages are migrated to the monorepo._
 
 Each package has its own `README.md` file with more information about that package.
 
+## Tinkibot music
+
+The Sounds category includes `play [NOTE] for [BEATS] beats`,
+`rest for [BEATS] beats`, `set tempo to [TEMPO]`, and `change tempo by [TEMPO]`.
+Notes use Scratch's piano picker and MIDI numbering (60 is middle C, 69 is A440).
+Tempo shares the Scratch project tempo (default 60 BPM, clamped to 20–500 BPM);
+durations are clamped to 0–100 beats. Rest and tempo work locally. Play sends
+`play_note` with numeric `note` and `duration` in seconds to the claimed robot
+and waits for its completion reply. Zero beats is silent and sends no command.
+Each note has a request ID echoed by the proxy, and only its matching `OK play`
+reply advances the script. Robot errors such as `ERR busy` stop the originating
+script and display an error. Note commands complete without reporter bubbles on
+the canvas. Update the proxy alongside Tinkiblocks for reliable note sequencing.
+Timing helpers live in `packages/scratch-vm/src/extensions/tinkimo_tinkibot/music/`.
+The proxy and robot firmware must include music support to play generated notes.
+
+`play drum [DRUM] for [BEATS] beats` offers synthesized Snare Drum (1), Bass Drum
+(2), Side Stick (3), Open Hi-Hat (5), Closed Hi-Hat (6), Hand Clap (8), Cowbell
+(11) and Triangle (12), using Scratch's drum numbers. Beats use the same project
+tempo and 0–100 beat limits as notes. Each hit has its own decay; beats control
+the wait before the next block. Zero beats still triggers a drum hit. The robot
+is monophonic: the next sound replaces any remaining drum tail. Drum requests use
+the same request correlation and error handling as notes, with `OK drum` replies.
+
 ## Monorepo migration
 
 ### What's going on?
