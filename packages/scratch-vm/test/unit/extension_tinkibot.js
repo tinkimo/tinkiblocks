@@ -75,7 +75,8 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Dance: ['wiggle', 'moonwalk', 'fade'],
         Interaction: ['read_button', 'when_button_event', 'button_led'],
         Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
-        Sounds: ['volume', 'play_sound', 'preload_audio'],
+        Sounds: ['playNoteForBeats', 'restForBeats', 'setTempo', 'changeTempo',
+            'volume', 'play_sound', 'preload_audio'],
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'backlight', 'preload_image', 'clear']
     });

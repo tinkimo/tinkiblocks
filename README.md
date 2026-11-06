@@ -20,6 +20,18 @@ _Please add to this list as more packages are migrated to the monorepo._
 
 Each package has its own `README.md` file with more information about that package.
 
+## Tinkibot music
+
+The Sounds category includes `play [NOTE] for [BEATS] beats`,
+`rest for [BEATS] beats`, `set tempo to [TEMPO]`, and `change tempo by [TEMPO]`.
+Notes use Scratch's piano picker and MIDI numbering (60 is middle C, 69 is A440).
+Tempo shares the Scratch project tempo (default 60 BPM, clamped to 20–500 BPM);
+durations are clamped to 0–100 beats. Rest and tempo work locally. Play sends
+`play_note` with numeric `note` and `duration` in seconds to the claimed robot
+and waits for its completion reply. Zero beats is silent and sends no command.
+Timing helpers live in `packages/scratch-vm/src/extensions/tinkimo_tinkibot/music/`.
+The proxy and robot firmware must include music support to play generated notes.
+
 ## Monorepo migration
 
 ### What's going on?

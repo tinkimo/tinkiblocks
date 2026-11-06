@@ -7,6 +7,7 @@ const BlockType = require('../../extension-support/block-type');
 const Cast = require('../../util/cast');
 
 const categoryStyles = require('./common');
+const Music = require('./music');
 
 const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
@@ -30,6 +31,7 @@ class TinkibotBlocks {
          * @type {Runtime}
          */
         this.runtime = runtime;
+        this._music = new Music(runtime);
         this._connected = false;
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
@@ -84,7 +86,8 @@ class TinkibotBlocks {
                 id: 'tinkibot.category.sounds',
                 default: 'Sounds',
                 description: 'Name of the Tinkibot Sounds category.'
-            }), ['volume', 'play_sound', 'preload_audio']),
+            }), ['volume', 'play_sound', 'preload_audio', 'playNoteForBeats', 'restForBeats',
+                'setTempo', 'changeTempo']),
             this._categoryInfo(info, 'tinkibotDisplay', formatMessage({
                 id: 'tinkibot.category.display',
                 default: 'Display',
@@ -116,6 +119,49 @@ class TinkibotBlocks {
                 description: 'Name of the Tinkibot extension.'
             }),
             blocks: [
+                {
+                    opcode: 'playNoteForBeats',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.playNoteForBeats',
+                        default: 'play [NOTE] for [BEATS] beats',
+                        description: 'Play a musical note through the robot speaker'
+                    }),
+                    arguments: {
+                        NOTE: {type: ArgumentType.NOTE, defaultValue: 60},
+                        BEATS: {type: ArgumentType.NUMBER, defaultValue: 0.25}
+                    }
+                },
+                {
+                    opcode: 'restForBeats',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.restForBeats',
+                        default: 'rest for [BEATS] beats',
+                        description: 'Pause for a number of musical beats'
+                    }),
+                    arguments: {BEATS: {type: ArgumentType.NUMBER, defaultValue: 0.25}}
+                },
+                {
+                    opcode: 'setTempo',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.setTempo',
+                        default: 'set tempo to [TEMPO]',
+                        description: 'Set the musical tempo in beats per minute'
+                    }),
+                    arguments: {TEMPO: {type: ArgumentType.NUMBER, defaultValue: 60}}
+                },
+                {
+                    opcode: 'changeTempo',
+                    blockType: BlockType.COMMAND,
+                    text: formatMessage({
+                        id: 'tinkibot.changeTempo',
+                        default: 'change tempo by [TEMPO]',
+                        description: 'Change the musical tempo in beats per minute'
+                    }),
+                    arguments: {TEMPO: {type: ArgumentType.NUMBER, defaultValue: 20}}
+                },
                 {
                     opcode: 'volume',
                     blockType: BlockType.COMMAND,
@@ -943,6 +989,24 @@ class TinkibotBlocks {
 
     play_sound (args) {
         return this._sendCommand({command: 'play_sound', sound: args.SOUND});
+    }
+
+    playNoteForBeats (args) {
+        const duration = this._music.duration(args.BEATS);
+        if (duration === 0) return;
+        return this._sendCommand({command: 'play_note', note: this._music.note(args.NOTE), duration});
+    }
+
+    restForBeats (args, util) {
+        this._music.rest(args.BEATS, util);
+    }
+
+    setTempo (args) {
+        this._music.setTempo(args.TEMPO);
+    }
+
+    changeTempo (args) {
+        this._music.setTempo(this._music.getTempo() + Cast.toNumber(args.TEMPO));
     }
 
     preload_audio (args) {
