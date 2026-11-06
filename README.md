@@ -36,6 +36,14 @@ the canvas. Update the proxy alongside Tinkiblocks for reliable note sequencing.
 Timing helpers live in `packages/scratch-vm/src/extensions/tinkimo_tinkibot/music/`.
 The proxy and robot firmware must include music support to play generated notes.
 
+`play drum [DRUM] for [BEATS] beats` offers synthesized Snare Drum (1), Bass Drum
+(2), Side Stick (3), Open Hi-Hat (5), Closed Hi-Hat (6), Hand Clap (8), Cowbell
+(11) and Triangle (12), using Scratch's drum numbers. Beats use the same project
+tempo and 0–100 beat limits as notes. Each hit has its own decay; beats control
+the wait before the next block. Zero beats still triggers a drum hit. The robot
+is monophonic: the next sound replaces any remaining drum tail. Drum requests use
+the same request correlation and error handling as notes, with `OK drum` replies.
+
 ## Monorepo migration
 
 ### What's going on?

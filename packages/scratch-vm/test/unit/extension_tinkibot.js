@@ -79,7 +79,7 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Dance: ['wiggle', 'moonwalk', 'fade'],
         Interaction: ['read_button', 'when_button_event', 'button_led'],
         Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
-        Sounds: ['playNoteForBeats', 'restForBeats', 'setTempo', 'changeTempo',
+        Sounds: ['playNoteForBeats', 'playDrumForBeats', 'restForBeats', 'setTempo', 'changeTempo',
             'volume', 'play_sound', 'preload_audio'],
         Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'backlight', 'preload_image', 'clear']
@@ -236,6 +236,33 @@ test('consecutive notes ignore delayed completions from another request', async 
     t.equal(finished, false, 'a duplicate completion cannot finish the next identical note');
     reply(secondId);
     await second;
+});
+
+test('drums and notes share the correlated playback queue, including zero-beat hits', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    const drum = extension.playDrumForBeats({DRUM: 1, BEATS: 0});
+    const note = extension.playNoteForBeats({NOTE: 60, BEATS: 0.25});
+    const socket = MockWebSocket.instance;
+    socket.open();
+    await new Promise(resolve => setImmediate(resolve));
+    t.equal(socket.sent.length, 1);
+    t.match(socket.sent[0], {command: 'play_drum', drum: 1, duration: 0, requestId: String});
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_note', value: 'OK play', requestId: socket.sent[0].requestId
+    })});
+    await new Promise(resolve => setImmediate(resolve));
+    t.equal(socket.sent.length, 1, 'a note reply cannot finish a drum wait');
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_drum', value: 'OK drum', requestId: socket.sent[0].requestId
+    })});
+    await drum;
+    await new Promise(resolve => setImmediate(resolve));
+    t.match(socket.sent[1], {command: 'play_note', note: 60});
+    socket.onmessage({data: JSON.stringify({
+        report: 'play_note', value: 'OK play', requestId: socket.sent[1].requestId
+    })});
+    await note;
 });
 
 test('a busy note fails and stops the originating script instead of skipping notes', async t => {

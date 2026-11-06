@@ -15,6 +15,26 @@ const makeExtension = () => {
     return new TinkibotBlocks({getTargetForStage: () => stage});
 };
 
+test('drum dropdown uses supported Scratch instruments and beats set the wait', t => {
+    const extension = makeExtension();
+    const sounds = extension.getInfos().find(info => info.id === 'tinkibotSounds');
+    const block = sounds.blocks.find(info => info.opcode === 'playDrumForBeats');
+    t.equal(block.text, 'play drum [DRUM] for [BEATS] beats');
+    t.same(block.arguments.DRUM, {type: ArgumentType.NUMBER, defaultValue: 1, menu: 'drum_options'});
+    t.same(sounds.menus.drum_options.items.map(item => item.value), ['1', '2', '3', '5', '6', '8', '11', '12']);
+    t.equal(sounds.menus.drum_options.acceptReporters, false);
+    const commands = [];
+    extension._sendCommand = command => commands.push(command);
+    extension.setTempo({TEMPO: 120});
+    extension.playDrumForBeats({DRUM: '2', BEATS: 0.5});
+    extension.playDrumForBeats({DRUM: '1', BEATS: 0});
+    t.same(commands, [
+        {command: 'play_drum', drum: 2, duration: 0.25},
+        {command: 'play_drum', drum: 1, duration: 0}
+    ]);
+    t.end();
+});
+
 test('music uses Scratch note input and project tempo', t => {
     const extension = makeExtension();
     const sounds = extension.getInfos().find(info => info.id === 'tinkibotSounds');
