@@ -3,6 +3,9 @@ const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
 const Runtime = require('../../src/engine/runtime');
 const RenderedTarget = require('../../src/sprites/rendered-target');
 const Sprite = require('../../src/sprites/sprite');
+const VirtualMachine = require('../../src/virtual-machine');
+const adapter = require('../../src/engine/adapter');
+const dispatch = require('../../src/dispatch/central-dispatch');
 
 class Socket {
     constructor () {
@@ -287,20 +290,19 @@ test('simultaneous scripts keep their individual queue ordering and are never co
     t.equal(h.runtime.threads.length, 0);
 });
 
-test('an inactive second hat prevents eager bundling across future script events', async t => {
+test('an unrelated inactive hat does not prevent robot action bundling', async t => {
     const h = setup();
     pair(h, 'a');
     h.action('other', 'event_whenflagclicked');
     h.runtime._pushThread('amove', h.target);
     await h.step();
-    t.equal(h.socket.sent[0].command, 'move');
-    respondLegacy(h, 'move');
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.forward:10'}, {cmd: 'lime.rotate:90'}]);
+    if (h.socket.sent[0].cmds) h.socket.respond(succeed(h.socket.sent[0]));
+    else respondLegacy(h, 'move');
     await tick();
     await h.step();
-    t.equal(h.socket.sent[1].command, 'rotate');
-    respondLegacy(h, 'rotate');
-    await tick();
-    await h.step();
+    if (h.socket.sent.length > 1) respondLegacy(h, 'rotate');
+    t.equal(h.socket.sent.length, 1);
 });
 
 const protocol = require('../../src/extensions/tinkimo_tinkibot/bundles/protocol');
@@ -587,7 +589,10 @@ test('failed bundles do not leave skip markers for a later loop iteration', asyn
             {cmd: request.cmds[1].cmd, status: 'OK', msg: 'OK rotate'}
         ]});
     await tick();
-    h.action('other-hat', 'event_whenflagclicked');
+    h.action('other-script', 'test_yield', {}, 'potential-robot');
+    h.action('potential-robot', 'tinkibotDisplay_clear', {}, null, 'other-script');
+    h.runtime._primitives.test_yield = (args, util) => util.yield();
+    const other = h.runtime._pushThread('other-script', h.target);
     await h.step();
     t.match(h.socket.sent[1], {command: 'move'});
     respondLegacy(h, 'move');
@@ -596,6 +601,7 @@ test('failed bundles do not leave skip markers for a later loop iteration', asyn
     t.match(h.socket.sent[2], {command: 'rotate'});
     respondLegacy(h, 'rotate');
     await tick();
+    h.runtime.sequencer.retireThread(other);
     await h.step();
     t.equal(h.runtime.threads.length, 0);
 });
@@ -612,4 +618,178 @@ test('response timeout includes sequential music duration rather than expiring a
     h.socket.respond(succeed(h.socket.sent[0]));
     t.equal((await promise).length, 32);
     t.ok(timers[0].cleared);
+});
+
+test('editor-created startup and shutdown dropdown blocks batch through registered extension primitives', async t => {
+    const vm = new VirtualMachine();
+    const runtime = vm.runtime;
+    runtime.currentStepTime = 1000 / 30;
+    const target = new RenderedTarget(new Sprite(null, runtime), runtime);
+    target.isStage = true;
+    runtime.targets.push(target);
+    const extension = dispatch.services[vm.extensionManager._loadedExtensions.get('tinkibotSounds')];
+    extension._setConnectedRobots([{'nickname': 'lime',
+        'bot-uuid': 'robot-lime',
+        'blocks-uuid': extension._blocksUuid}]);
+    const socket = Socket.instance;
+    socket.onopen();
+    const xml = '<block type="tinkibotSounds_play_sound" id="startup">' +
+        '<value name="SOUND"><shadow type="tinkibotSounds_menu_sound_options" id="startup-menu">' +
+        '<field name="sound_options">startup</field></shadow></value>' +
+        '<next><block type="tinkibotSounds_play_sound" id="shutdown">' +
+        '<value name="SOUND"><shadow type="tinkibotSounds_menu_sound_options" id="shutdown-menu">' +
+        '<field name="sound_options">shutdown</field></shadow></value></block></next></block>';
+    for (const block of adapter({xml: {outerHTML: xml}})) target.blocks.createBlock(block);
+    for (const block of adapter({xml: {outerHTML: '<block type="event_whenflagclicked" id="other-hat"/>'}})) {
+        target.blocks.createBlock(block);
+    }
+    runtime._pushThread('startup', target, {stackClick: true});
+    runtime.redrawRequested = false;
+    runtime.sequencer.stepThreads();
+    await tick();
+    t.same(socket.sent[0].cmds, [{cmd: 'lime.play:startup'}, {cmd: 'lime.play:shutdown'}]);
+    if (socket.sent[0].cmds) socket.respond(succeed(socket.sent[0]));
+    else socket.respond({report: 'play_sound', value: 'OK play'});
+    await tick();
+    runtime.redrawRequested = false;
+    runtime.sequencer.stepThreads();
+    await tick();
+    if (socket.sent.length > 1) socket.respond({report: 'play_sound', value: 'OK play'});
+    t.equal(socket.sent.length, 1);
+});
+
+test('startup and shutdown bundle while an unrelated Scratch script is running', async t => {
+    const h = setup();
+    h.action('startup', 'tinkibotSounds_play_sound', {SOUND: 'startup'}, 'shutdown');
+    h.action('shutdown', 'tinkibotSounds_play_sound', {SOUND: 'shutdown'}, null, 'startup');
+    h.action('unrelated', 'test_yield');
+    h.runtime._primitives.test_yield = (args, util) => util.yield();
+    const other = h.runtime._pushThread('unrelated', h.target);
+    h.runtime._pushThread('startup', h.target, {stackClick: true});
+    await h.step();
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.play:startup'}, {cmd: 'lime.play:shutdown'}]);
+    if (h.socket.sent[0].cmds) h.socket.respond(succeed(h.socket.sent[0]));
+    else respondLegacy(h, 'play_sound', 'OK play');
+    await tick();
+    h.runtime.sequencer.retireThread(other);
+    await h.step();
+    if (h.socket.sent.length > 1) respondLegacy(h, 'play_sound', 'OK play');
+    t.equal(h.socket.sent.length, 1);
+});
+
+test('visible monitors do not split a contiguous robot action stack', async t => {
+    const h = setup();
+    pair(h, 'a');
+    h.runtime.monitorBlocks.createBlock({id: 'monitor',
+        opcode: 'test_monitor',
+        next: null,
+        parent: null,
+        inputs: {},
+        fields: {},
+        topLevel: true,
+        shadow: false});
+    h.runtime._primitives.test_monitor = (args, util) => util.yield();
+    const monitor = h.runtime._pushThread('monitor', h.target, {updateMonitor: true});
+    h.runtime._pushThread('amove', h.target);
+    await h.step();
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.forward:10'}, {cmd: 'lime.rotate:90'}]);
+    if (h.socket.sent[0].cmds) h.socket.respond(succeed(h.socket.sent[0]));
+    else respondLegacy(h, 'move');
+    await tick();
+    h.runtime.sequencer.retireThread(monitor);
+    await h.step();
+    if (h.socket.sent.length > 1) respondLegacy(h, 'rotate');
+    t.equal(h.socket.sent.length, 1);
+});
+
+test('clicking a robot stack within its own hat still batches the connected actions', async t => {
+    const h = setup();
+    h.action('own-hat', 'event_whenflagclicked', {}, 'startup');
+    h.action('startup', 'tinkibotSounds_play_sound', {SOUND: 'startup'}, 'shutdown', 'own-hat');
+    h.action('shutdown', 'tinkibotSounds_play_sound', {SOUND: 'shutdown'}, null, 'startup');
+    h.runtime._pushThread('startup', h.target, {stackClick: true});
+    await h.step();
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.play:startup'}, {cmd: 'lime.play:shutdown'}]);
+    h.socket.respond(succeed(h.socket.sent[0]));
+    await tick();
+    await h.step();
+    t.equal(h.socket.sent.length, 1);
+    t.equal(h.runtime.threads.length, 0);
+});
+
+test('an inactive robot hat does not prevent batching the stack which is actually running', async t => {
+    const h = setup();
+    pair(h, 'a');
+    h.action('other', 'event_whenflagclicked', {}, 'other-robot');
+    h.action('other-robot', 'tinkibotSensors_measure_distance', {}, null, 'other');
+    h.runtime._pushThread('amove', h.target);
+    await h.step();
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.forward:10'}, {cmd: 'lime.rotate:90'}]);
+    h.socket.respond(succeed(h.socket.sent[0]));
+    await tick();
+    await h.step();
+    t.equal(h.socket.sent.length, 1);
+});
+
+test('timed music retains the tempo safety boundary when unrelated scripts can run', async t => {
+    const h = setup();
+    h.action('first', 'tinkibotSounds_playNoteForBeats', {NOTE: 60, BEATS: 1}, 'second');
+    h.action('second', 'tinkibotSounds_playNoteForBeats', {NOTE: 62, BEATS: 1}, null, 'first');
+    h.action('other', 'event_whenflagclicked');
+    h.runtime._pushThread('first', h.target);
+    await h.step();
+    t.equal(h.socket.sent[0].command, 'play_note');
+    h.socket.respond({report: 'play_note', value: 'OK play', requestId: h.socket.sent[0].requestId});
+    await tick();
+    await h.step();
+    t.equal(h.socket.sent[1].command, 'play_note');
+    h.socket.respond({report: 'play_note', value: 'OK play', requestId: h.socket.sent[1].requestId});
+    await tick();
+    await h.step();
+});
+
+test('robot operations behind another script custom-block call retain the ordering boundary', async t => {
+    const h = setup();
+    pair(h, 'a');
+    h.action('other-script', 'test_yield', {}, 'call');
+    h.runtime._primitives.test_yield = (args, util) => util.yield();
+    h.action('call', 'procedures_call', {}, null, 'other-script');
+    h.target.blocks.getBlock('call').mutation = {proccode: 'robot routine'};
+    h.action('definition', 'procedures_definition', {}, 'body');
+    h.action('prototype', 'procedures_prototype', {}, null, 'definition');
+    h.target.blocks.getBlock('prototype').mutation = {proccode: 'robot routine'};
+    h.target.blocks.getBlock('definition').inputs.custom_block = {
+        name: 'custom_block', block: 'prototype', shadow: null
+    };
+    h.action('body', 'tinkibotDisplay_clear', {}, null, 'definition');
+    const other = h.runtime._pushThread('other-script', h.target);
+    h.runtime._pushThread('amove', h.target);
+    await h.step();
+    t.equal(h.socket.sent[0].command, 'move');
+    respondLegacy(h, 'move');
+    await tick();
+    await h.step();
+    t.equal(h.socket.sent[1].command, 'rotate');
+    respondLegacy(h, 'rotate');
+    await tick();
+    h.runtime.sequencer.retireThread(other);
+    await h.step();
+});
+
+test('local tempo updates do not split named sound-file actions', async t => {
+    const h = setup();
+    h.action('startup', 'tinkibotSounds_play_sound', {SOUND: 'startup'}, 'shutdown');
+    h.action('shutdown', 'tinkibotSounds_play_sound', {SOUND: 'shutdown'}, null, 'startup');
+    h.action('loop', 'control_forever');
+    h.action('tempo', 'tinkibotSounds_setTempo', {TEMPO: 120}, null, 'loop');
+    h.target.blocks.getBlock('loop').inputs.SUBSTACK = {name: 'SUBSTACK', block: 'tempo', shadow: null};
+    const other = h.runtime._pushThread('loop', h.target);
+    h.runtime._pushThread('startup', h.target);
+    await h.step();
+    t.same(h.socket.sent[0].cmds, [{cmd: 'lime.play:startup'}, {cmd: 'lime.play:shutdown'}]);
+    h.socket.respond(succeed(h.socket.sent[0]));
+    await tick();
+    h.runtime.sequencer.retireThread(other);
+    await h.step();
+    t.equal(h.socket.sent.length, 1);
 });

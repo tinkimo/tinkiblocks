@@ -1,4 +1,5 @@
 const Thread = require('../../../engine/thread');
+const BlockType = require('../../../extension-support/block-type');
 const actions = require('./actions');
 const protocol = require('./protocol');
 
@@ -8,6 +9,7 @@ class ActionBundles {
         this.extension = extension;
         this.consumed = new WeakMap();
         this.metadata = null;
+        this.robotOpcodes = new Set();
     }
 
     run (opcode, args, util) {
@@ -48,6 +50,9 @@ class ActionBundles {
             this.metadata = new Map();
             for (const info of this.extension.getInfos()) {
                 for (const block of info.blocks) {
+                    if (block.supportsBundling || [BlockType.REPORTER, BlockType.BOOLEAN].includes(block.blockType)) {
+                        this.robotOpcodes.add(`${info.id}_${block.opcode}`);
+                    }
                     if (block.supportsBundling) {
                         this.metadata.set(`${info.id}_${block.opcode}`, block);
                     }
@@ -57,15 +62,36 @@ class ActionBundles {
         return this.metadata;
     }
 
-    _canCollect (thread) {
-        const runtime = this.extension.runtime;
-        if (!thread || !thread.target ||
-            runtime.threads.some(other => other !== thread && other.status !== Thread.STATUS_DONE)) {
-            return false;
+    _hasRobotOperation (blocks, roots) {
+        const pending = roots.slice();
+        const visited = new Set();
+        while (pending.length) {
+            const id = pending.pop();
+            if (!id || visited.has(id)) continue;
+            visited.add(id);
+            const block = blocks.getBlock(id);
+            if (!block) continue;
+            if (this.robotOpcodes.has(block.opcode)) return true;
+            pending.push(block.next);
+            for (const input of Object.values(block.inputs)) pending.push(input.block);
+            if (block.opcode === 'procedures_call' && block.mutation) {
+                pending.push(blocks.getProcedureDefinition(block.mutation.proccode));
+            }
         }
-        // Other hats may start during a long robot command, changing inter-script ordering.
+        return false;
+    }
+
+    _canCollect (thread, plan) {
+        const runtime = this.extension.runtime;
+        const timedMusic = plan.some(item => actions[item.opcode].music);
+        if (runtime.threads.some(other => other !== thread && !other.updateMonitor &&
+            other.status !== Thread.STATUS_DONE && (timedMusic ||
+                this._hasRobotOperation(other.blockContainer, other.stack)))) return false;
+        if (!timedMusic) return true;
+        const currentRoot = thread.target.blocks.getTopLevelScript(thread.topBlock);
+        // Timed music depends on tempo changes that another hat can trigger.
         return !runtime.targets.some(target => target.blocks.getScripts().some(id =>
-            (target !== thread.target || id !== thread.topBlock) &&
+            (target !== thread.target || id !== currentRoot) &&
             runtime.getIsHat(target.blocks.getBlock(id).opcode)));
     }
 
@@ -87,7 +113,7 @@ class ActionBundles {
     }
 
     collect (opcode, payload, thread) {
-        if (!this._canCollect(thread)) return [];
+        if (!thread || !thread.target) return [];
         const robot = this.extension._connectedRobots.find(item => item.claimState === 'paired');
         if (!robot) return [];
         const blocks = thread.target.blocks;
@@ -117,7 +143,8 @@ class ActionBundles {
             plan.push({id, opcode: info.opcode, payload: command, wire});
             id = blocks.getNextBlock(id);
         }
-        return plan;
+        if (plan.length < 2) return plan;
+        return this._canCollect(thread, plan) ? plan : [];
     }
 }
 

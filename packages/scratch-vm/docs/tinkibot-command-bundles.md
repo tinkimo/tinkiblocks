@@ -42,10 +42,18 @@ These situations retain normal individual execution:
   but never traverses that control structure or flattens its iterations.
 - Local music operations: rests, tempo changes and tempo reporters. Zero-duration
   notes keep their existing no-op behavior and form a collection boundary.
-- Another active VM thread, including a monitor. Bundling is also disabled if
-  another hat script exists anywhere in the project, because it could start
-  during a long robot command. This deliberately favors scheduling equivalence
-  over large bundles in projects with multiple event stacks.
+- Another active non-monitor thread whose reachable blocks can interact with
+  the robot. The check follows control branches, reporter inputs and custom-block
+  calls to preserve ordering among actively competing robot scripts. Unrelated
+  Scratch scripts, inactive hats (including other robot scripts) and visible
+  monitors do not disable a contiguous robot-action bundle. A newly triggered
+  script queues its requests after an already-dispatched bundle; dormant scripts
+  do not reserve a position in the command queue. A stack clicked inside its own
+  hat is recognized as belonging to that script, rather than a competitor.
+- Timed notes and drums retain a stricter boundary around other non-monitor
+  threads and hats, because those scripts can change the shared stage tempo.
+  Named sound files such as startup/shutdown have literal inputs and do not need
+  that tempo boundary.
 - Direct extension/API calls without an executing VM thread, and individual
   commands too large for an envelope. Their original transport behavior and
   limits remain applicable.
@@ -63,10 +71,10 @@ whitespace, are retained inside the JSON wrapper.
 
 ## Proxy WebSocket interface required
 
-The proxy's existing console/script bundling API does **not** yet implement this
-WebSocket entry point. A separate proxy change is required before automatically
-collected Tinkiblocks sequences can operate end to end. This task changes no
-proxy or firmware repository files.
+The matching proxy WebSocket entry point is implemented in
+[tinkiblocks-proxy PR #23](https://github.com/tinkimo/tinkiblocks-proxy/pull/23).
+Deploy it with the editor update before running automatically collected sequences.
+The editor changes do not modify proxy or firmware repository files.
 
 A collected request is a JSON object with the firmware's command wrapper and the
 existing claim/routing metadata plus a unique correlation ID:
