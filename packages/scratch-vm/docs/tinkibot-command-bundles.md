@@ -145,9 +145,13 @@ do not leave skip markers for a later loop iteration.
 
 Malformed JSON, incomplete/mismatched responses, socket failure/close and selected
 robot disconnection reject the pending operation and free the command queue.
-Connection establishment and bundled-response waits each have a 30-minute limit
-in `bundles/protocol.js`; those timers prevent permanent suspension and do not
-control bundle formation. Successful/error completion clears the response timer.
+Connection establishment has a 30-minute limit in `bundles/protocol.js`.
+The bundled-response wait adds all declared note/drum durations to that 30-minute
+transport margin, so a valid sequence of long musical actions is not timed out
+merely because their durations add up. The separate proxy handler must also
+allow sequential music duration rather than reusing its short individual-command
+timeout. These timers prevent permanent suspension and do not control bundle
+formation. Successful/error completion clears the response timer.
 Correlation IDs prevent a delayed response from satisfying a later request.
 Movement and other non-idempotent commands are never retried or automatically
 resent individually after a protocol failure. A queued bundle whose script was

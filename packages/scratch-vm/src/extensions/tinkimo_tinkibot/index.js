@@ -1127,7 +1127,7 @@ class TinkibotBlocks {
                         if (this._pendingResponse === pending) {
                             this._rejectPending(new Error('Tinkibot bundle response timed out'));
                         }
-                    }, bundleProtocol.TIMEOUT_MS);
+                    }, bundleProtocol.responseTimeout(bundlePlan));
                 }
                 this._pendingResponse = pending;
                 try {

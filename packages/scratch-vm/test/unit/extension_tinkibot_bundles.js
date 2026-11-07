@@ -395,8 +395,8 @@ const fakeBundleTimers = t => {
     const set = global.setTimeout;
     const clear = global.clearTimeout;
     global.setTimeout = (callback, delay, ...args) => {
-        if (delay !== protocol.TIMEOUT_MS) return set(callback, delay, ...args);
-        const timer = {callback, cleared: false};
+        if (delay < protocol.TIMEOUT_MS) return set(callback, delay, ...args);
+        const timer = {callback, delay, cleared: false};
         timers.push(timer);
         return timer;
     };
@@ -598,4 +598,18 @@ test('failed bundles do not leave skip markers for a later loop iteration', asyn
     await tick();
     await h.step();
     t.equal(h.runtime.threads.length, 0);
+});
+
+test('response timeout includes sequential music duration rather than expiring a valid long tune', async t => {
+    const timers = fakeBundleTimers(t);
+    const h = setup();
+    const plan = Array.from({length: 32}, () => ({
+        opcode: 'playNoteForBeats', payload: {command: 'play_note', note: 60, duration: 300}
+    }));
+    const promise = h.extension._sendBundle(plan);
+    await tick();
+    t.equal(timers[0].delay, protocol.TIMEOUT_MS + (32 * 300 * 1000));
+    h.socket.respond(succeed(h.socket.sent[0]));
+    t.equal((await promise).length, 32);
+    t.ok(timers[0].cleared);
 });

@@ -53,4 +53,14 @@ const response = (value, commands) => {
     return value.rsp;
 };
 
-module.exports = {MAX_COMMANDS, MAX_BYTES, TIMEOUT_MS, request, response};
+/**
+ * Keep declared music time outside the transport's response margin.
+ * @param {Array<object>} plan collected action declarations and payloads
+ * @returns {number} bounded response wait in milliseconds
+ */
+const responseTimeout = plan => TIMEOUT_MS + (plan.reduce((seconds, item) => {
+    const duration = item.payload.duration;
+    return seconds + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+}, 0) * 1000);
+
+module.exports = {MAX_COMMANDS, MAX_BYTES, TIMEOUT_MS, request, response, responseTimeout};
