@@ -58,9 +58,14 @@ const response = (value, commands) => {
  * @param {Array<object>} plan collected action declarations and payloads
  * @returns {number} bounded response wait in milliseconds
  */
-const responseTimeout = plan => TIMEOUT_MS + (plan.reduce((seconds, item) => {
-    const duration = item.payload.duration;
-    return seconds + (Number.isFinite(duration) && duration > 0 ? duration : 0);
-}, 0) * 1000);
+const responseTimeout = plan => {
+    if (plan.length && plan.every(item => ['play_note', 'play_drum'].includes(item.payload.command))) {
+        return 10000 + plan.reduce((ms, item) => ms + ((item.payload.duration + 5) * 1000), 0);
+    }
+    return TIMEOUT_MS + (plan.reduce((seconds, item) => {
+        const duration = item.payload.duration;
+        return seconds + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+    }, 0) * 1000);
+};
 
 module.exports = {MAX_COMMANDS, MAX_BYTES, TIMEOUT_MS, request, response, responseTimeout};

@@ -397,7 +397,7 @@ const fakeBundleTimers = t => {
     const set = global.setTimeout;
     const clear = global.clearTimeout;
     global.setTimeout = (callback, delay, ...args) => {
-        if (delay < protocol.TIMEOUT_MS) return set(callback, delay, ...args);
+        if (delay < 10000) return set(callback, delay, ...args);
         const timer = {callback, delay, cleared: false};
         timers.push(timer);
         return timer;
@@ -429,6 +429,26 @@ test('a bundle timeout rejects, clears pending state and never retries movement'
     respondLegacy(h, 'measure_voltage', 4);
     await following;
     t.equal(h.socket.sent.length, 2);
+});
+
+test('a missing melody reply releases the thread and permits another request', async t => {
+    const timers = fakeBundleTimers(t);
+    const h = setup();
+    h.action('first', 'tinkibotSounds_playNoteForBeats', {NOTE: 60, BEATS: 1}, 'second');
+    h.action('second', 'tinkibotSounds_playNoteForBeats', {NOTE: 67, BEATS: 2}, null, 'first');
+    h.runtime._pushThread('first', h.target);
+    await h.step();
+    t.equal(timers[0].delay, 23000);
+    timers[0].callback();
+    await tick();
+    await h.step();
+    t.equal(h.extension._pendingResponse, null);
+    t.equal(h.runtime.threads.length, 0);
+    const following = h.extension.measure_voltage();
+    await tick();
+    respondLegacy(h, 'measure_voltage', 4);
+    await following;
+    t.equal(h.socket.sent.length, 2, 'the melody is not retried and the queue is usable');
 });
 
 test('connection establishment has a bounded wait and late opening cannot dispatch a timed-out bundle', async t => {
@@ -614,7 +634,7 @@ test('response timeout includes sequential music duration rather than expiring a
     }));
     const promise = h.extension._sendBundle(plan);
     await tick();
-    t.equal(timers[0].delay, protocol.TIMEOUT_MS + (32 * 300 * 1000));
+    t.equal(timers[0].delay, (32 * (300 + 5) * 1000) + 10000);
     h.socket.respond(succeed(h.socket.sent[0]));
     t.equal((await promise).length, 32);
     t.ok(timers[0].cleared);
