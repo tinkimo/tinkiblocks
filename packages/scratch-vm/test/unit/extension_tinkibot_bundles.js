@@ -751,12 +751,15 @@ test('an inactive robot hat does not prevent batching the stack which is actuall
     t.equal(h.socket.sent.length, 1);
 });
 
-test('timed music retains the tempo safety boundary when another hat can change tempo', async t => {
+test('timed music retains the tempo safety boundary when another active script can change tempo', async t => {
     const h = setup();
     h.action('first', 'tinkibotSounds_playNoteForBeats', {NOTE: 60, BEATS: 1}, 'second');
     h.action('second', 'tinkibotSounds_playNoteForBeats', {NOTE: 62, BEATS: 1}, null, 'first');
     h.action('other', 'event_whenflagclicked', {}, 'tempo');
     h.action('tempo', 'tinkibotSounds_setTempo', {TEMPO: 120}, null, 'other');
+    h.action('hold', 'test_hold', {}, 'tempo');
+    h.runtime._primitives.test_hold = (args, util) => util.yield();
+    const other = h.runtime._pushThread('hold', h.target);
     h.runtime._pushThread('first', h.target);
     await h.step();
     t.equal(h.socket.sent[0].command, 'play_note');
@@ -766,6 +769,7 @@ test('timed music retains the tempo safety boundary when another hat can change 
     t.equal(h.socket.sent[1].command, 'play_note');
     h.socket.respond({report: 'play_note', value: 'OK play', requestId: h.socket.sent[1].requestId});
     await tick();
+    h.runtime.sequencer.retireThread(other);
     await h.step();
 });
 
@@ -844,4 +848,71 @@ test('button melody bundles all nine notes despite other button hats', async t =
     await tick();
     await h.step();
     t.equal(h.socket.sent.length, 1, 'notes are not replayed individually');
+});
+
+
+test('drum dropdown repeat batches adjacent hits and preserves rests despite a dormant melody hat', async t => {
+    const vm = new VirtualMachine();
+    const runtime = vm.runtime;
+    runtime.currentStepTime = 1000 / 30;
+    const target = new RenderedTarget(new Sprite(null, runtime), runtime);
+    target.isStage = true;
+    target.tempo = 100;
+    runtime.targets.push(target);
+    const extension = dispatch.services[vm.extensionManager._loadedExtensions.get('tinkibotSounds')];
+    extension._setConnectedRobots([{'nickname': 'lime',
+        'bot-uuid': 'robot-lime',
+        'blocks-uuid': extension._blocksUuid}]);
+    const socket = Socket.instance;
+    socket.onopen();
+    const drum = (id, value, next = '') => `<block type="tinkibotSounds_playDrumForBeats" id="${id}">` +
+        `<field name="DRUM">${value}</field><value name="BEATS"><shadow type="math_number" id="${id}-beats">` +
+        '<field name="NUM">0.25</field></shadow></value>' + next + '</block>';
+    const rest = (id, next = '') => `<block type="tinkibotSounds_restForBeats" id="${id}">` +
+        `<value name="BEATS"><shadow type="math_number" id="${id}-beats">` +
+        '<field name="NUM">0.25</field></shadow></value>' + next + '</block>';
+    const xml = '<block type="control_repeat" id="repeat">' +
+        '<value name="TIMES"><shadow type="math_whole_number" id="times">' +
+        '<field name="NUM">10</field></shadow></value><statement name="SUBSTACK">' +
+        drum('snare', 1, `<next>${drum('bass', 2, `<next>${rest('rest1',
+            `<next>${drum('hat', 5, `<next>${rest('rest2')}</next>`)}</next>`)}</next>`)}</next>`) +
+        '</statement></block>';
+    const other = '<block type="event_whenflagclicked" id="melody-hat"><next>' +
+        '<block type="tinkibotSounds_setTempo" id="tempo"><value name="TEMPO">' +
+        '<shadow type="math_number" id="tempo-value"><field name="NUM">100</field>' +
+        '</shadow></value></block></next></block>';
+    for (const source of [xml, other]) {
+        for (const block of adapter({xml: {outerHTML: source}})) target.blocks.createBlock(block);
+    }
+    let now = 0;
+    runtime.updateCurrentMSecs = () => {
+        runtime.currentMSecs = now;
+    };
+    const thread = runtime._pushThread('repeat', target);
+    const receivedAt = [];
+    let handled = 0;
+    for (let step = 0; step < 200 && runtime.threads.includes(thread); step++) {
+        now += 50;
+        runtime.redrawRequested = false;
+        runtime.sequencer.stepThreads();
+        await tick();
+        while (handled < socket.sent.length) {
+            const request = socket.sent[handled++];
+            receivedAt.push(now);
+            if (request.cmds) socket.respond(succeed(request));
+            else socket.respond({report: 'play_drum', value: 'OK drum', requestId: request.requestId});
+            await tick();
+        }
+    }
+    t.equal(socket.sent.length, 20, 'each iteration sends one snare/bass bundle and one hi-hat');
+    for (let i = 0; i < 10; i++) {
+        t.same(socket.sent[i * 2].cmds, [{cmd: 'lime.drum:1 0.15'}, {cmd: 'lime.drum:2 0.15'}]);
+        t.match(socket.sent[(i * 2) + 1], {command: 'play_drum', drum: 5, duration: 0.15});
+        t.ok(receivedAt[(i * 2) + 1] - receivedAt[i * 2] >= 150, 'rest before hi-hat is preserved');
+        if (i < 9) {
+            t.ok(receivedAt[(i + 1) * 2] - receivedAt[(i * 2) + 1] >= 150,
+                'rest before the next iteration is preserved');
+        }
+    }
+    t.equal(runtime.threads.length, 0, 'repeat completes without duplicate execution');
 });

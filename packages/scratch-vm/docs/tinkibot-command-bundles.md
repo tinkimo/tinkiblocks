@@ -50,9 +50,10 @@ These situations retain normal individual execution:
   script queues its requests after an already-dispatched bundle; dormant scripts
   do not reserve a position in the command queue. A stack clicked inside its own
   hat is recognized as belonging to that script, rather than a competitor.
-- Timed notes and drums retain a stricter boundary around other non-monitor
-  threads and hats that can change the shared stage tempo. Unrelated button
-  handlers do not split melodies.
+- Timed notes and drums retain a stricter boundary around other active non-monitor
+  threads that can change the shared stage tempo. Inactive hats, including melody
+  handlers containing a tempo setter, do not disable bundling. Each bundle captures
+  tempo at dispatch; a later tempo change affects the next bundle.
   Named sound files such as startup/shutdown have literal inputs and do not need
   that tempo boundary.
 - Direct extension/API calls without an executing VM thread, and individual
@@ -173,7 +174,7 @@ on existing robot stop behavior.
 `test/unit/extension_tinkibot_bundles.js` exercises real VM threads and block
 containers for contiguous actions, exactly-once traversal, reports and nested
 robot reporters, variables/operators, waits, repeat iterations, if/else selection,
-concurrent scripts and future hats, cache refreshes, music errors, command-count
+concurrent scripts and inactive tempo hats, cache refreshes, music errors, command-count
 limits, malformed responses, disconnects, stale correlation and deterministic
 timeouts. Existing extension and general VM tests remain applicable.
 
@@ -189,3 +190,7 @@ npm run build
 Hardware end-to-end testing requires the separately updated proxy WebSocket
 handler, matching robot/modem firmware, and physical devices. The host tests do
 not establish wireless delivery or motor timing.
+
+For a repeat body containing snare, bass, rest, hi-hat, rest, the snare and bass
+form one two-command bundle per iteration. Each rest remains a local Scratch wait;
+the isolated hi-hat uses an individual request. Iterations are never flattened.

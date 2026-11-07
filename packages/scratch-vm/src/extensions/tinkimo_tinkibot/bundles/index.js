@@ -93,13 +93,7 @@ class ActionBundles {
             other.status !== Thread.STATUS_DONE &&
             (this._hasOperation(other.blockContainer, other.stack, this.robotOpcodes) ||
                 (timedMusic && this._hasOperation(other.blockContainer, other.stack, tempoOpcodes))))) return false;
-        if (!timedMusic) return true;
-        const currentRoot = thread.target.blocks.getTopLevelScript(thread.topBlock);
-        // Only hats which can change the shared tempo affect precomputed note durations.
-        return !runtime.targets.some(target => target.blocks.getScripts().some(id =>
-            (target !== thread.target || id !== currentRoot) &&
-            runtime.getIsHat(target.blocks.getBlock(id).opcode) &&
-            this._hasOperation(target.blocks, [id], tempoOpcodes)));
+        return true;
     }
 
     _literalArgs (block, blocks, metadata) {
