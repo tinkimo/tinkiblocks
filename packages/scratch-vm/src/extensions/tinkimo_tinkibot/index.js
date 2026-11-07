@@ -8,6 +8,9 @@ const Cast = require('../../util/cast');
 
 const categoryStyles = require('./common');
 const Music = require('./music');
+const ActionBundles = require('./bundles');
+const robotActions = require('./bundles/actions');
+const bundleProtocol = require('./bundles/protocol');
 
 const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
@@ -32,6 +35,7 @@ class TinkibotBlocks {
          */
         this.runtime = runtime;
         this._music = new Music(runtime);
+        this._bundler = new ActionBundles(this);
         this._connected = false;
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
@@ -811,6 +815,12 @@ class TinkibotBlocks {
                 ...info.menus.mosaic_options.items
             ])]
         };
+        info.blocks = info.blocks.map(block => {
+            if (block === '---') return block;
+            return Object.assign({}, block, {
+                supportsBundling: block.blockType === BlockType.COMMAND && Boolean(robotActions[block.opcode])
+            });
+        });
         return info;
     }
 
@@ -853,14 +863,29 @@ class TinkibotBlocks {
             }
             this._connected = false;
             this._connectionPromise = null;
-            if (this._pendingResponse) {
-                this._pendingResponse.reject(new Error('Tinkibot disconnected while waiting for a response'));
-                this._pendingResponse = null;
-            }
+            this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
         };
 
+        window.socket.onerror = () => {
+            if (this._pendingResponse && this._pendingResponse.bundleCommands) {
+                this._rejectPending(new Error('Tinkibot connection failed'));
+            }
+        };
         window.socket.onmessage = message => {
-            const response = JSON.parse(message.data);
+            let response;
+            try {
+                response = JSON.parse(message.data);
+                if (!response || typeof response !== 'object' || Array.isArray(response)) {
+                    throw new Error('Expected a Tinkibot response object');
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console -- A corrupt external frame must not strand a script.
+                console.warn('TinkibotBlocks.connect: invalid WebSocket response', error);
+                if (this._pendingResponse && this._pendingResponse.bundleCommands) {
+                    this._rejectPending(new Error('Invalid Tinkibot JSON response'));
+                }
+                return;
+            }
             if (response.event === 'connected_robots') {
                 this._setConnectedRobots(response.robots || response.nicknames);
             } else if (response.event === 'robot_connected') {
@@ -909,6 +934,24 @@ class TinkibotBlocks {
                 this.runtime.startHats('tinkibotInteraction_when_button_event');
                 this._buttonEvent = null;
             }
+            const pending = this._pendingResponse;
+            if (pending && pending.bundleCommands) {
+                if (response.event === 'robot_disconnected' && response['bot-uuid'] === pending.botUuid) {
+                    this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
+                    return;
+                }
+                if (response.event || response.requestId !== pending.requestId) return;
+                try {
+                    if (response.report === 'error') throw new Error(response.value);
+                    const results = bundleProtocol.response(response, pending.bundleCommands);
+                    clearTimeout(pending.timeout);
+                    this._pendingResponse = null;
+                    pending.resolve(results);
+                } catch (error) {
+                    this._rejectPending(error);
+                }
+                return;
+            }
             if (this._pendingResponse && this._pendingResponse.requestId &&
                 response.requestId !== this._pendingResponse.requestId) return;
             const matchesCommand = this._pendingResponse && response.report === this._pendingResponse.command;
@@ -919,21 +962,7 @@ class TinkibotBlocks {
             }[this._pendingResponse.command];
             const incompletePlayback = matchesCommand && expectedPlayback && response.value !== expectedPlayback;
             if (this._pendingResponse && (response.report === 'error' || commandFailed || incompletePlayback)) {
-                const {reject} = this._pendingResponse;
-                this._pendingResponse = null;
-                const errorMessage = response.value === 'command_failed:no_robots_connected' ?
-                    formatMessage({
-                        id: 'tinkibot.noRobotsConnected',
-                        default: 'No Tinkibot robots are connected.',
-                        description: 'Message shown when a command needs a connected Tinkibot.'
-                    }) :
-                    formatMessage({
-                        id: 'tinkibot.commandError',
-                        default: 'Tinkibot command failed: {error}',
-                        description: 'Message shown when a Tinkibot command cannot be completed.'
-                    }, {error: response.value});
-                alert(errorMessage);
-                reject(new Error(response.value));
+                this._rejectPending(new Error(response.value));
                 return;
             }
             if (matchesCommand) {
@@ -1020,8 +1049,55 @@ class TinkibotBlocks {
         this._updateRobotClaim(robot.botUuid, null);
     }
 
-    _sendCommand (command, responseCommand = command.command) {
+    _sendBundle (plan, thread) {
+        return this._sendCommand({}, 'bundle', plan, thread);
+    }
+
+    _notifyCommandError (error) {
+        const message = error.message === 'command_failed:no_robots_connected' ?
+            formatMessage({
+                id: 'tinkibot.noRobotsConnected',
+                default: 'No Tinkibot robots are connected.',
+                description: 'Message shown when a command needs a connected Tinkibot.'
+            }) : formatMessage({
+                id: 'tinkibot.commandError',
+                default: 'Tinkibot command failed: {error}',
+                description: 'Message shown when a Tinkibot command cannot be completed.'
+            }, {error: error.message});
+        alert(message);
+    }
+
+    _rejectPending (error, notify = true) {
+        const pending = this._pendingResponse;
+        if (!pending) return;
+        this._pendingResponse = null;
+        if (pending.timeout) clearTimeout(pending.timeout);
+        if (notify) this._notifyCommandError(error);
+        pending.reject(error);
+    }
+
+    _bundleConnection () {
+        const connection = this.connect();
+        if (this._connected) return connection;
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                const error = new Error('Tinkibot bundle connection timed out');
+                this._notifyCommandError(error);
+                reject(error);
+            }, bundleProtocol.TIMEOUT_MS);
+            connection.then(() => {
+                clearTimeout(timeout);
+                resolve();
+            }, error => {
+                clearTimeout(timeout);
+                reject(error);
+            });
+        });
+    }
+
+    _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null) {
         const operation = this._commandQueue.then(async () => {
+            if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
             const robot = this._connectedRobots.find(connectedRobot => connectedRobot.claimState === 'paired');
             if (!robot) {
                 const message = formatMessage({
@@ -1032,17 +1108,38 @@ class TinkibotBlocks {
                 alert(message);
                 throw new Error('No Tinkibot robot is claimed');
             }
-            await this.connect();
+            let payload = command;
+            if (bundlePlan) {
+                payload = bundleProtocol.request(bundlePlan.map(item =>
+                    `${robot.nickname}.${robotActions[item.opcode].encode(item.payload)}`));
+                await this._bundleConnection();
+            } else {
+                await this.connect();
+            }
+            if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
             return new Promise((resolve, reject) => {
                 let requestId;
-                if (['play_note', 'play_drum'].includes(command.command)) requestId = uuid.v4();
-                this._pendingResponse = {command: responseCommand, requestId, resolve, reject};
-                window.socket.send(JSON.stringify(Object.assign({}, command, {
-                    requestId,
-                    nickname: robot.nickname,
-                    'bot-uuid': robot.botUuid,
-                    'blocks-uuid': this._blocksUuid
-                })));
+                if (bundlePlan || ['play_note', 'play_drum'].includes(command.command)) requestId = uuid.v4();
+                const pending = {command: responseCommand, requestId, resolve, reject, botUuid: robot.botUuid};
+                if (bundlePlan) {
+                    pending.bundleCommands = payload.cmds.map(item => item.cmd);
+                    pending.timeout = setTimeout(() => {
+                        if (this._pendingResponse === pending) {
+                            this._rejectPending(new Error('Tinkibot bundle response timed out'));
+                        }
+                    }, bundleProtocol.TIMEOUT_MS);
+                }
+                this._pendingResponse = pending;
+                try {
+                    window.socket.send(JSON.stringify(Object.assign({}, payload, {
+                        requestId,
+                        'nickname': robot.nickname,
+                        'bot-uuid': robot.botUuid,
+                        'blocks-uuid': this._blocksUuid
+                    })));
+                } catch (error) {
+                    this._rejectPending(error);
+                }
             });
         });
         this._commandQueue = operation.catch(() => {});
@@ -1077,34 +1174,22 @@ class TinkibotBlocks {
             this._buttonEvent.state === args.STATE);
     }
 
-    button_led (args) {
-        return this._sendCommand({command: 'button_led', button: args.BUTTON, state: args.STATE});
+    button_led (args, util) {
+        return this._bundler.run('button_led', args, util);
     }
 
-    play_sound (args) {
-        return this._sendCommand({command: 'play_sound', sound: args.SOUND});
+    play_sound (args, util) {
+        return this._bundler.run('play_sound', args, util);
     }
 
     playNoteForBeats (args, util) {
-        const duration = this._music.duration(args.BEATS);
-        if (duration === 0) return;
-        return this._playMusic({command: 'play_note', note: this._music.note(args.NOTE), duration}, util);
+        return this._bundler.run('playNoteForBeats', args, util);
     }
 
     playDrumForBeats (args, util) {
-        return this._playMusic({
-            command: 'play_drum', drum: Cast.toNumber(args.DRUM), duration: this._music.duration(args.BEATS)
-        }, util);
+        return this._bundler.run('playDrumForBeats', args, util);
     }
 
-    _playMusic (command, util) {
-        const thread = util && util.thread;
-        const sequencer = util && util.sequencer;
-        return Promise.resolve(this._sendCommand(command)).then(() => {}, error => {
-            if (thread) sequencer.retireThread(thread);
-            throw error;
-        });
-    }
 
     restForBeats (args, util) {
         this._music.rest(args.BEATS, util);
@@ -1118,103 +1203,92 @@ class TinkibotBlocks {
         this._music.setTempo(this._music.getTempo() + Cast.toNumber(args.TEMPO));
     }
 
-    preload_audio (args) {
-        return this._sendCommand({command: 'preload:audio', file: args.AUDIO});
+    preload_audio (args, util) {
+        return this._bundler.run('preload_audio', args, util);
     }
 
-    preload_image (args) {
-        return this._sendCommand({command: 'preload:image', file: args.IMAGE});
+    preload_image (args, util) {
+        return this._bundler.run('preload_image', args, util);
     }
 
-    display_image (args) {
-        return this._sendCommand({command: 'display_image', image: args.IMAGE});
+    display_image (args, util) {
+        return this._bundler.run('display_image', args, util);
     }
 
     measure_line_sensor (args) {
         return this._sendCommand({command: 'measure_line_sensor', sensor: args.SENSOR});
     }
 
-    display_letter (args) {
-        return this._sendCommand({command: 'display_image', image: args.IMAGE});
+    display_letter (args, util) {
+        return this._bundler.run('display_letter', args, util);
     }
 
-    display_number (args) {
-        return this._sendCommand({command: 'display_image', image: args.IMAGE});
+    display_number (args, util) {
+        return this._bundler.run('display_number', args, util);
     }
 
-    write_text (args) {
-        return this._sendCommand({command: 'write_text', x: args.X, y: args.Y, message: args.MESSAGE});
+    write_text (args, util) {
+        return this._bundler.run('write_text', args, util);
     }
 
-    text_colour (args) {
-        return this._sendCommand({command: 'text_colour', colour: args.COLOUR});
+    text_colour (args, util) {
+        return this._bundler.run('text_colour', args, util);
     }
 
-    background_colour (args) {
-        return this._sendCommand({command: 'background_colour', colour: args.COLOUR});
+    background_colour (args, util) {
+        return this._bundler.run('background_colour', args, util);
     }
 
-    clear () {
-        return this._sendCommand({command: 'clear'});
+    clear (args, util) {
+        return this._bundler.run('clear', args, util);
     }
 
-    backlight (args) {
-        const intensity = Math.max(0, Math.min(100, Cast.toNumber(args.INTENSITY)));
-        return this._sendCommand({command: 'set', backlight: intensity});
+    backlight (args, util) {
+        return this._bundler.run('backlight', args, util);
     }
 
-    mosaic (args) {
-        return this._sendCommand({command: 'mosaic', image: args.IMAGE});
+    mosaic (args, util) {
+        return this._bundler.run('mosaic', args, util);
     }
 
-    move (args) {
-        return this._sendCommand({command: 'move', direction: args.DIRECTION, distance: args.DISTANCE});
+    move (args, util) {
+        return this._bundler.run('move', args, util);
     }
 
-    rotate (args) {
-        return this._sendCommand({command: 'rotate', rotation: args.ROTATION, degrees: args.DEGREES});
+    rotate (args, util) {
+        return this._bundler.run('rotate', args, util);
     }
 
-    arc (args) {
-        return this._sendCommand({
-            command: 'arc',
-            direction: args.DIRECTION,
-            degrees: args.DEGREES,
-            radius: args.RADIUS
-        });
+    arc (args, util) {
+        return this._bundler.run('arc', args, util);
     }
 
-    volume (args) {
-        return this._sendCommand({command: 'set', volume: args.VALUE});
+    volume (args, util) {
+        return this._bundler.run('volume', args, util);
     }
 
-    drive (args) {
-        return this._sendCommand({command: 'drive', motor: args.MOTOR, speed: args.SPEED});
+    drive (args, util) {
+        return this._bundler.run('drive', args, util);
     }
 
-    stop (args) {
-        return this._sendCommand({command: 'stop', motor: args.MOTOR});
+    stop (args, util) {
+        return this._bundler.run('stop', args, util);
     }
 
-    brake (args) {
-        return this._sendCommand({command: 'brake', motor: args.MOTOR});
+    brake (args, util) {
+        return this._bundler.run('brake', args, util);
     }
 
-    fade (args) {
-        return this._sendCommand({
-            command: 'fade',
-            target: args.TARGET,
-            direction: args.DIRECTION,
-            speed: typeof args.SPEED === 'undefined' ? 'medium' : args.SPEED
-        });
+    fade (args, util) {
+        return this._bundler.run('fade', args, util);
     }
 
-    wiggle (args) {
-        return this._sendCommand({command: 'wiggle', time: args.TIMES});
+    wiggle (args, util) {
+        return this._bundler.run('wiggle', args, util);
     }
 
-    moonwalk (args) {
-        return this._sendCommand({command: 'moonwalk', steps: args.STEPS});
+    moonwalk (args, util) {
+        return this._bundler.run('moonwalk', args, util);
     }
 
     _setLocale () {
