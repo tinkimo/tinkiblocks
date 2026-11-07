@@ -731,11 +731,12 @@ test('an inactive robot hat does not prevent batching the stack which is actuall
     t.equal(h.socket.sent.length, 1);
 });
 
-test('timed music retains the tempo safety boundary when unrelated scripts can run', async t => {
+test('timed music retains the tempo safety boundary when another hat can change tempo', async t => {
     const h = setup();
     h.action('first', 'tinkibotSounds_playNoteForBeats', {NOTE: 60, BEATS: 1}, 'second');
     h.action('second', 'tinkibotSounds_playNoteForBeats', {NOTE: 62, BEATS: 1}, null, 'first');
-    h.action('other', 'event_whenflagclicked');
+    h.action('other', 'event_whenflagclicked', {}, 'tempo');
+    h.action('tempo', 'tinkibotSounds_setTempo', {TEMPO: 120}, null, 'other');
     h.runtime._pushThread('first', h.target);
     await h.step();
     t.equal(h.socket.sent[0].command, 'play_note');
@@ -792,4 +793,35 @@ test('local tempo updates do not split named sound-file actions', async t => {
     h.runtime.sequencer.retireThread(other);
     await h.step();
     t.equal(h.socket.sent.length, 1);
+});
+
+
+test('button melody bundles all nine notes despite other button hats', async t => {
+    const h = setup();
+    h.target.tempo = 100;
+    const notes = [[60, 1], [60, 1], [67, 1], [67, 1], [69, 0.5],
+        [69, 0.5], [69, 0.5], [69, 0.2], [67, 2]];
+    h.action('button', 'event_whenflagclicked', {}, 'set-tempo');
+    h.action('set-tempo', 'tinkibotSounds_setTempo', {TEMPO: 100}, 'note0', 'button');
+    notes.forEach(([note, beats], i) => {
+        h.action(`note${i}`, 'tinkibotSounds_playNoteForBeats', {NOTE: note, BEATS: beats},
+            i + 1 < notes.length ? `note${i + 1}` : null, i ? `note${i - 1}` : 'set-tempo');
+    });
+    h.action('led-button', 'event_whenflagclicked', {}, 'led');
+    h.action('led', 'tinkibotDisplay_clear', {}, null, 'led-button');
+    h.runtime._pushThread('set-tempo', h.target);
+    await h.step();
+    t.same(h.socket.sent[0].cmds, notes.map(([note, beats]) =>
+        ({cmd: `lime.play:${note} ${beats * 0.6}`})));
+    if (!h.socket.sent[0].cmds) {
+        h.socket.respond({report: 'play_note',
+            value: 'ERROR test cleanup',
+            requestId: h.socket.sent[0].requestId});
+        await tick();
+        return;
+    }
+    h.socket.respond(succeed(h.socket.sent[0]));
+    await tick();
+    await h.step();
+    t.equal(h.socket.sent.length, 1, 'notes are not replayed individually');
 });

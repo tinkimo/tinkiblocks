@@ -3,6 +3,11 @@ const BlockType = require('../../../extension-support/block-type');
 const actions = require('./actions');
 const protocol = require('./protocol');
 
+const tempoOpcodes = new Set([
+    'tinkibotSounds_setTempo', 'tinkibotSounds_changeTempo',
+    'music_setTempo', 'music_changeTempo'
+]);
+
 /** Collect literal action stacks while leaving scheduling and reporters to Scratch. */
 class ActionBundles {
     constructor (extension) {
@@ -62,7 +67,7 @@ class ActionBundles {
         return this.metadata;
     }
 
-    _hasRobotOperation (blocks, roots) {
+    _hasOperation (blocks, roots, opcodes) {
         const pending = roots.slice();
         const visited = new Set();
         while (pending.length) {
@@ -71,7 +76,7 @@ class ActionBundles {
             visited.add(id);
             const block = blocks.getBlock(id);
             if (!block) continue;
-            if (this.robotOpcodes.has(block.opcode)) return true;
+            if (opcodes.has(block.opcode)) return true;
             pending.push(block.next);
             for (const input of Object.values(block.inputs)) pending.push(input.block);
             if (block.opcode === 'procedures_call' && block.mutation) {
@@ -85,14 +90,16 @@ class ActionBundles {
         const runtime = this.extension.runtime;
         const timedMusic = plan.some(item => actions[item.opcode].music);
         if (runtime.threads.some(other => other !== thread && !other.updateMonitor &&
-            other.status !== Thread.STATUS_DONE && (timedMusic ||
-                this._hasRobotOperation(other.blockContainer, other.stack)))) return false;
+            other.status !== Thread.STATUS_DONE &&
+            (this._hasOperation(other.blockContainer, other.stack, this.robotOpcodes) ||
+                (timedMusic && this._hasOperation(other.blockContainer, other.stack, tempoOpcodes))))) return false;
         if (!timedMusic) return true;
         const currentRoot = thread.target.blocks.getTopLevelScript(thread.topBlock);
-        // Timed music depends on tempo changes that another hat can trigger.
+        // Only hats which can change the shared tempo affect precomputed note durations.
         return !runtime.targets.some(target => target.blocks.getScripts().some(id =>
             (target !== thread.target || id !== currentRoot) &&
-            runtime.getIsHat(target.blocks.getBlock(id).opcode)));
+            runtime.getIsHat(target.blocks.getBlock(id).opcode) &&
+            this._hasOperation(target.blocks, [id], tempoOpcodes)));
     }
 
     _literalArgs (block, blocks, metadata) {

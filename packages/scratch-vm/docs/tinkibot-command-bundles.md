@@ -51,7 +51,8 @@ These situations retain normal individual execution:
   do not reserve a position in the command queue. A stack clicked inside its own
   hat is recognized as belonging to that script, rather than a competitor.
 - Timed notes and drums retain a stricter boundary around other non-monitor
-  threads and hats, because those scripts can change the shared stage tempo.
+  threads and hats that can change the shared stage tempo. Unrelated button
+  handlers do not split melodies.
   Named sound files such as startup/shutdown have literal inputs and do not need
   that tempo boundary.
 - Direct extension/API calls without an executing VM thread, and individual
