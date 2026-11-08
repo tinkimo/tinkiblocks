@@ -38,7 +38,7 @@ test('real editor frames use UUIDs and correlate both single and bundle replies'
     t.match(frames[0]['request-id'], /^[a-f0-9-]{36}$/);
     t.notOk('requestId' in frames[0]);
     t.notOk('blocks-uuid' in frames[0]);
-    const reply = {...frames[0], status: 'OK', message: '4.2'};
+    const reply = {...frames[0], status: 'OK', result: '4.2'};
     global.window.socket.onmessage({data: JSON.stringify({...reply, 'request-id': 'stale'})});
     t.ok(extension._pendingResponse, 'stale request is ignored');
     global.window.socket.onmessage({data: JSON.stringify(reply)});
@@ -55,7 +55,7 @@ test('real editor frames use UUIDs and correlate both single and bundle replies'
         'client-uuid': extension._clientUuid,
         'bot-uuid': bot,
         'status': 'OK',
-        'rsp': frames[1].cmds.map(item => ({...item, status: 'OK', message: 'OK motion'}))
+        'rsp': frames[1].cmds.map(item => ({...item, status: 'OK'}))
     })});
     t.equal((await bundle).length, 2);
     t.equal(extension._pendingResponse, null);
@@ -81,5 +81,15 @@ test('bundle byte limit reserves the proxy transaction envelope overhead', t => 
     const command = prefix + 'x'.repeat(protocol.MAX_BYTES - overhead - 52);
     t.doesNotThrow(() => protocol.request([command]));
     t.throws(() => protocol.request([`${command}x`]), /4096/);
+    t.end();
+});
+
+
+test('successful music needs no message and successful reporters use result', t => {
+    const value = {'client-uuid': 'client', 'bot-uuid': bot, status: 'OK', command: 'play_drum'};
+    const pending = {botUuid: bot, publicCommands: [{command: 'play_drum'}]};
+    t.equal(api.response(value, pending, 'client'), '');
+    t.equal(api.response({...value, command: 'measure_voltage', result: '4.2'},
+        {botUuid: bot, publicCommands: [{command: 'measure_voltage'}]}, 'client'), '4.2');
     t.end();
 });

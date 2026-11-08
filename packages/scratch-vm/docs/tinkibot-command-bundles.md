@@ -84,8 +84,9 @@ The previous local-storage UUID entry is retained during migration.
 ```
 
 The proxy resolves UUIDs, sends one compact robot request and returns ordered
-`rsp` objects containing the original public command/parameters, `status`,
-`message`. Single responses carry these fields at
+`rsp` objects containing public command details and `status`. Successful actions
+omit `message`; sensor readings use `result`. Unsuccessful commands include an
+explanatory `message`. Single responses carry these fields at
 the top level. Public responses must match request, robot and client identities.
 Internal command strings never leave the editor over WebSocket. See
 [the public API guide](https://github.com/tinkimo/tinkiblocks-proxy/blob/feat/unified-json-api/docs/websocket-api.md)

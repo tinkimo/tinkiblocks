@@ -36,10 +36,11 @@ const response = (value, pending, clientUuid) => {
         if (value.rsp.length !== pending.publicCommands.length) throw new Error('Incomplete Tinkibot bundle response');
         const rsp = value.rsp.map((item, i) => {
             const expected = pending.publicCommands[i];
-            if (!item || Object.keys(expected).some(key => item[key] !== expected[key])) {
+            if (!item || Object.keys(expected).some(key => key !== 'message' && item[key] !== expected[key])) {
                 throw new Error(`Invalid Tinkibot result at command ${i + 1}`);
             }
-            return {cmd: pending.bundleCommands[i], status: item.status, msg: item.message};
+            return {cmd: pending.bundleCommands[i], status: item.status,
+                msg: item.status === 'OK' ? (item.message || '') : item.message};
         });
         const results = protocol.response({rsp}, pending.bundleCommands);
         if (value.status !== 'OK') throw new Error(value.message || 'Tinkibot bundle failed');
@@ -47,10 +48,12 @@ const response = (value, pending, clientUuid) => {
     }
     if (value.status === 'ERROR') throw new Error(value.message || 'Tinkibot command failed');
     if (value.command !== pending.publicCommands[0].command) throw new Error('Invalid Tinkibot command response');
-    const result = value.message;
+    const result = typeof value.result === 'undefined' ? value.message : value.result;
     const expected = {play_note: 'OK play', play_drum: 'OK drum'}[value.command];
-    if (expected && result !== expected) throw new Error(result || 'Incomplete music response');
-    return result;
+    if (expected && typeof value.message !== 'undefined' && result !== expected) {
+        throw new Error(result || 'Incomplete music response');
+    }
+    return typeof result === 'undefined' ? '' : result;
 };
 
 module.exports = {command, response};
