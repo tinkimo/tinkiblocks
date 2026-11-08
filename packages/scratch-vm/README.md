@@ -132,3 +132,10 @@ The speed dropdown accepts number and variable reporters. Presets are slow
 in seconds. Firmware `FADE_SPEEDS_MS` controls these values for both targets
 and can be extended with custom names supplied through a variable. Display
 fades also save the resulting backlight setting.
+
+### Tinkibot command bundles
+
+Contiguous literal robot actions can share one ordered request while reporters,
+dynamic expressions and control flow retain their VM execution behavior. See
+[Tinkibot command bundles](docs/tinkibot-command-bundles.md) for safe boundaries,
+protocol limits, error handling, and the separate proxy WebSocket update required.

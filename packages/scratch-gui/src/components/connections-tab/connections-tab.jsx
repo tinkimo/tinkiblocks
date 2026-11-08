@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {FormattedMessage} from 'react-intl';
 import VM from '@scratch/scratch-vm';
 
@@ -19,19 +19,30 @@ const ConnectionsTab = ({vm}) => {
         return () => vm.runtime.removeListener('TINKIBOT_CONNECTED_ROBOTS_CHANGED', updateRobots);
     }, [vm]);
 
-    const claimRobot = botUuid => {
+    const claimRobot = useCallback(event => {
+        const botUuid = event.currentTarget.dataset.botUuid;
         setPendingBotUuid(botUuid);
         vm.runtime.claimTinkibotRobot(botUuid);
-    };
+    }, [vm]);
 
-    const releaseRobot = botUuid => {
+    const releaseRobot = useCallback(event => {
+        const botUuid = event.currentTarget.dataset.botUuid;
         setPendingBotUuid(botUuid);
         vm.runtime.releaseTinkibotRobot(botUuid);
-    };
+    }, [vm]);
+
+    const removeRobot = useCallback(event => {
+        const botUuid = event.currentTarget.dataset.botUuid;
+        setPendingBotUuid(botUuid);
+        vm.runtime.removeTinkibotRobot(botUuid);
+    }, [vm]);
 
     return (
         <section className={styles.connections}>
-            <div aria-hidden className={styles.headingIcon}>🤖</div>
+            <div
+                aria-hidden
+                className={styles.headingIcon}
+            >🤖</div>
             <h2>
                 <FormattedMessage
                     defaultMessage="My robots"
@@ -43,14 +54,27 @@ const ConnectionsTab = ({vm}) => {
                 <div className={styles.robotList}>
                     {robots.map(robot => (
                         <div
-                            className={`${styles.robotCard} ${styles[robot.claimState]}`}
+                            className={[styles.robotCard, styles[robot.claimState],
+                                robot.connected === false ? styles.disconnected : ''].join(' ')}
                             key={robot.botUuid}
                         >
-                            <span aria-hidden className={styles.statusDot} />
-                            <span aria-hidden className={styles.robotIcon}>🤖</span>
+                            <span
+                                aria-hidden
+                                className={styles.statusDot}
+                            />
+                            <span
+                                aria-hidden
+                                className={styles.robotIcon}
+                            >🤖</span>
                             <strong>{robot.nickname}</strong>
                             <span className={styles.connectedLabel}>
-                                {robot.claimState === 'free' ? (
+                                {robot.connected === false ? (
+                                    <FormattedMessage
+                                        defaultMessage="Disconnected"
+                                        description="Status label for a robot whose connection has been lost"
+                                        id="gui.connectionsTab.disconnected"
+                                    />
+                                ) : robot.claimState === 'free' ? (
                                     <FormattedMessage
                                         defaultMessage="Ready to claim"
                                         description="Status label for a robot which is available to claim"
@@ -70,12 +94,13 @@ const ConnectionsTab = ({vm}) => {
                                     />
                                 )}
                             </span>
-                            {robot.claimState === 'free' ? (
+                            {robot.connected !== false && robot.claimState === 'free' ? (
                                 <button
                                     className={styles.claimButton}
                                     disabled={pendingBotUuid !== null || hasClaimedRobot}
                                     type="button"
-                                    onClick={() => claimRobot(robot.botUuid)}
+                                    data-bot-uuid={robot.botUuid}
+                                    onClick={claimRobot}
                                 >
                                     {pendingBotUuid === robot.botUuid ? (
                                         <FormattedMessage
@@ -92,12 +117,13 @@ const ConnectionsTab = ({vm}) => {
                                     )}
                                 </button>
                             ) : null}
-                            {robot.claimState === 'paired' ? (
+                            {robot.connected !== false && robot.claimState === 'paired' ? (
                                 <button
                                     className={styles.releaseButton}
                                     disabled={pendingBotUuid === robot.botUuid}
                                     type="button"
-                                    onClick={() => releaseRobot(robot.botUuid)}
+                                    data-bot-uuid={robot.botUuid}
+                                    onClick={releaseRobot}
                                 >
                                     {pendingBotUuid === robot.botUuid ? (
                                         <FormattedMessage
@@ -112,6 +138,21 @@ const ConnectionsTab = ({vm}) => {
                                             id="gui.connectionsTab.release"
                                         />
                                     )}
+                                </button>
+                            ) : null}
+                            {robot.connected === false && robot.claimState !== 'claimed' ? (
+                                <button
+                                    className={styles.releaseButton}
+                                    disabled={pendingBotUuid !== null}
+                                    type="button"
+                                    data-bot-uuid={robot.botUuid}
+                                    onClick={removeRobot}
+                                >
+                                    <FormattedMessage
+                                        defaultMessage="Remove"
+                                        description="Remove a robot from the pool and release its proxy connection"
+                                        id="gui.connectionsTab.remove"
+                                    />
                                 </button>
                             ) : null}
                         </div>

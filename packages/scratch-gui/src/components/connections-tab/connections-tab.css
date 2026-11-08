@@ -127,3 +127,16 @@
     font-size: 1.1rem;
     line-height: 1.5;
 }
+
+.disconnected {
+    opacity: 0.75;
+    border-style: dashed;
+}
+
+.disconnected .status-dot {
+    background: #d32f2f;
+}
+
+.disconnected .connected-label {
+    color: #666;
+}
