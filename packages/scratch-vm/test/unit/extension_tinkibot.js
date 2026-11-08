@@ -429,6 +429,7 @@ test('Tinkibot tracks robot connection events', t => {
         data: JSON.stringify({'event': 'robot_disconnected', 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'})
     });
     t.strictSame(runtime.tinkibotConnectedRobots, [
+        {nickname: 'orange', botUuid: 'orange-robot-uuid', claimedBy: null, claimState: 'free', connected: false},
         {
             nickname: 'blue',
             botUuid: 'blue-robot-uuid',
@@ -437,7 +438,7 @@ test('Tinkibot tracks robot connection events', t => {
         },
         {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
-    t.strictSame(alerts, ['orange has disconnected.']);
+    t.strictSame(alerts, []);
     t.equal(
         runtime.events.filter(({event}) => event === 'TINKIBOT_ROBOT_CONNECTION_CHANGED').length,
         2
@@ -800,4 +801,41 @@ test('Fade forwards preset and numeric reporter values without losing the input'
         MockWebSocket.instance.respond('fade', 'OK fade');
         t.equal(await result, 'OK fade');
     }
+});
+
+test('disconnected paired robot survives reconnect and Remove frees the next claim', async t => {
+    global.alert = () => {};
+    t.teardown(() => delete global.alert);
+    const extension = new TinkibotBlocks(makeRuntime());
+    const socket = MockWebSocket.instance;
+    socket.open();
+    pairRobot(extension, 'lime', 'lime-uuid');
+    extension._setConnectedRobots([...extension._connectedRobots, {'nickname': 'blue', 'bot-uuid': 'blue-uuid'}]);
+    socket.onmessage({data: JSON.stringify({'event': 'robot_disconnected',
+        'nickname': 'lime',
+        'bot-uuid': 'lime-uuid'})});
+    t.equal(extension._connectedRobots[0].connected, false);
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    await t.rejects(extension.measure_voltage(), /disconnected/);
+    await extension.claimRobot('blue-uuid');
+    t.equal(socket.publicSent.length, 0, 'retained reservation blocks a second claim');
+    socket.onmessage({data: JSON.stringify({'event': 'robot_connected', 'nickname': 'lime', 'bot-uuid': 'lime-uuid'})});
+    t.not(extension._connectedRobots[0].connected, false);
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    const reading = extension.measure_voltage();
+    await new Promise(resolve => setImmediate(resolve));
+    socket.respond('measure_voltage', 4.2);
+    t.equal(await reading, 4.2, 'reconnected robot can immediately be used');
+    socket.onmessage({data: JSON.stringify({'event': 'robot_disconnected',
+        'nickname': 'lime',
+        'bot-uuid': 'lime-uuid'})});
+    await extension.removeRobot('lime-uuid');
+    const removal = socket.publicSent.at(-1);
+    t.equal(removal.command, 'remove');
+    t.equal(extension._connectedRobots.length, 2, 'wait for proxy acknowledgement before removing');
+    socket.onmessage({data: JSON.stringify({...removal, status: 'OK'})});
+    t.equal(extension._connectedRobots.length, 1);
+    await extension.claimRobot('blue-uuid');
+    t.equal(socket.publicSent.at(-1).command, 'claim');
+    t.equal(socket.publicSent.at(-1)['bot-uuid'], 'blue-uuid');
 });

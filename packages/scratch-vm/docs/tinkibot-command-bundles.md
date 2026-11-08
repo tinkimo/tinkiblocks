@@ -133,3 +133,15 @@ not establish wireless delivery or motor timing.
 For a repeat body containing snare, bass, rest, hi-hat, rest, the snare and bass
 form one two-command bundle per iteration. Each rest remains a local Scratch wait;
 the isolated hi-hat uses an individual request. Iterations are never flattened.
+
+## Connection pool lifecycle
+
+`robot_disconnected` marks an existing card with `connected: false` and preserves
+its claim. New action/report requests fail locally while disconnected. A later
+`robot_connected` updates that same UUID and restores use without a new claim.
+Disconnected paired cards continue reserving the user's selection until Remove.
+`runtime.removeTinkibotRobot` sends a correlated public `remove` request; only a
+successful response or `robot_removed` event deletes the card and clears pending
+claim/removal state. The Connections tab exposes Disconnected and Remove labels.
+The proxy handles physical link cleanup and rejects removing another client's
+reserved robot. An unreachable physical claim cannot be confirmed as released.

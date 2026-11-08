@@ -113,6 +113,8 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 ### scratch-vm specifics
 
+- The Connections tab retains disconnected robot reservations until explicit Remove.
+  VM lifecycle events must preserve claim ownership across reconnects.
 - Extension entry points live in `src/extensions/`. Each extension exports a class with `getInfo()` and block
   implementation methods.
 - Tinkibot music timing helpers live in `src/extensions/tinkimo_tinkibot/music/`; Sounds uses Scratch's NOTE field.

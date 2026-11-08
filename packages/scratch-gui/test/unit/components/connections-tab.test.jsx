@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react';
+import {act, fireEvent, render, within} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import {IntlProvider} from 'react-intl';
 import EventEmitter from 'events';
@@ -11,11 +11,13 @@ const renderConnections = robots => {
     runtime.tinkibotConnectedRobots = robots;
     runtime.claimTinkibotRobot = jest.fn();
     runtime.releaseTinkibotRobot = jest.fn();
-    return render(
-        <IntlProvider locale="en">
-            <ConnectionsTab vm={{runtime}} />
-        </IntlProvider>
-    );
+    runtime.removeTinkibotRobot = jest.fn();
+    return {runtime,
+        ...render(
+            <IntlProvider locale="en">
+                <ConnectionsTab vm={{runtime}} />
+            </IntlProvider>
+        )};
 };
 
 describe('ConnectionsTab', () => {
@@ -28,4 +30,29 @@ describe('ConnectionsTab', () => {
         expect(getByRole('button', {name: 'Claim'})).toBeDisabled();
         expect(getByRole('button', {name: 'Release'})).toBeEnabled();
     });
+    test('disconnected reservation stays visible and Remove frees the selection', () => {
+        const robots = [
+            {nickname: 'lime', botUuid: 'lime-uuid', claimState: 'paired', connected: false},
+            {nickname: 'blue', botUuid: 'blue-uuid', claimState: 'free'}
+        ];
+        const {getByText, getByRole, runtime} = renderConnections(robots);
+        expect(getByText('Disconnected')).toBeVisible();
+        expect(getByRole('button', {name: 'Claim'})).toBeDisabled();
+        const card = getByText('lime').closest('div');
+        fireEvent.click(within(card).getByRole('button', {name: 'Remove'}));
+        expect(runtime.removeTinkibotRobot).toHaveBeenCalledWith('lime-uuid');
+        act(() => runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', [robots[1]]));
+        expect(getByRole('button', {name: 'Claim'})).toBeEnabled();
+    });
+
+    test('reconnection restores the paired card without claiming again', () => {
+        const robot = {nickname: 'lime', botUuid: 'lime-uuid', claimState: 'paired', connected: false};
+        const {getByText, getByRole, queryByText, runtime} = renderConnections([robot]);
+        expect(getByText('Disconnected')).toBeVisible();
+        act(() => runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', [{...robot, connected: true}]));
+        expect(queryByText('Disconnected')).toBeNull();
+        expect(getByRole('button', {name: 'Release'})).toBeEnabled();
+        expect(runtime.claimTinkibotRobot).not.toHaveBeenCalled();
+    });
+
 });
