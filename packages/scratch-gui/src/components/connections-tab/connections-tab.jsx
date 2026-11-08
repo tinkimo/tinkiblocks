@@ -140,7 +140,7 @@ const ConnectionsTab = ({vm}) => {
                                     )}
                                 </button>
                             ) : null}
-                            {robot.claimState === 'claimed' ? null : (
+                            {robot.connected === false && robot.claimState !== 'claimed' ? (
                                 <button
                                     className={styles.releaseButton}
                                     disabled={pendingBotUuid !== null}
@@ -154,7 +154,7 @@ const ConnectionsTab = ({vm}) => {
                                         id="gui.connectionsTab.remove"
                                     />
                                 </button>
-                            )}
+                            ) : null}
                         </div>
                     ))}
                 </div>

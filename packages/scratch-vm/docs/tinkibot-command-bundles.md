@@ -142,6 +142,7 @@ its claim. New action/report requests fail locally while disconnected. A later
 Disconnected paired cards continue reserving the user's selection until Remove.
 `runtime.removeTinkibotRobot` sends a correlated public `remove` request; only a
 successful response or `robot_removed` event deletes the card and clears pending
-claim/removal state. The Connections tab exposes Disconnected and Remove labels.
+claim/removal state. The Connections tab shows a red offline status dot and replaces Claim/Release
+with Remove only while disconnected. Connected cards retain Claim/Release.
 The proxy handles physical link cleanup and rejects removing another client's
 reserved robot. An unreachable physical claim cannot be confirmed as released.

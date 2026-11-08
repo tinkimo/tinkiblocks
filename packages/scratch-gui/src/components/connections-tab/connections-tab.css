@@ -134,7 +134,7 @@
 }
 
 .disconnected .status-dot {
-    background: #777;
+    background: #d32f2f;
 }
 
 .disconnected .connected-label {
