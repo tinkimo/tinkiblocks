@@ -11,8 +11,9 @@ const Music = require('./music');
 const ActionBundles = require('./bundles');
 const robotActions = require('./bundles/actions');
 const bundleProtocol = require('./bundles/protocol');
+const publicAPI = require('./api');
 
-const BLOCKS_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
+const CLIENT_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
 
 // has an websocket message already been received
@@ -42,8 +43,8 @@ class TinkibotBlocks {
         this._pendingResponse = null;
         this._buttonEvent = null;
         this._connectedRobots = [];
-        this._pendingClaims = new Set();
-        this._blocksUuid = this._getBlocksUuid();
+        this._pendingClaims = new Map();
+        this._clientUuid = this._getClientUuid();
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         if (typeof WebSocket !== 'undefined') this.connect();
@@ -863,11 +864,12 @@ class TinkibotBlocks {
             }
             this._connected = false;
             this._connectionPromise = null;
+            this._pendingClaims.clear();
             this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
         };
 
         window.socket.onerror = () => {
-            if (this._pendingResponse && this._pendingResponse.bundleCommands) {
+            if (this._pendingResponse) {
                 this._rejectPending(new Error('Tinkibot connection failed'));
             }
         };
@@ -881,7 +883,7 @@ class TinkibotBlocks {
             } catch (error) {
                 // eslint-disable-next-line no-console -- A corrupt external frame must not strand a script.
                 console.warn('TinkibotBlocks.connect: invalid WebSocket response', error);
-                if (this._pendingResponse && this._pendingResponse.bundleCommands) {
+                if (this._pendingResponse) {
                     this._rejectPending(new Error('Invalid Tinkibot JSON response'));
                 }
                 return;
@@ -908,7 +910,7 @@ class TinkibotBlocks {
             } else if (response.event === 'claim_accepted') {
                 if (this._claimResponseMatches(response)) {
                     this._pendingClaims.delete(response['bot-uuid']);
-                    this._updateRobotClaim(response['bot-uuid'], response['blocks-uuid']);
+                    this._updateRobotClaim(response['bot-uuid'], response['client-uuid']);
                 }
             } else if (response.event === 'claim_rejected') {
                 if (this._claimResponseMatches(response)) {
@@ -918,16 +920,21 @@ class TinkibotBlocks {
             } else if (response.event === 'robot_released') {
                 this._updateRobotClaim(response['bot-uuid'], null);
             }
-            if (response.report === 'claim' &&
-                response.value === 'The robot has been claimed by another user' &&
-                this._claimResponseMatches(response)) {
+            if (response.command === 'claim' && response.status === 'ERROR' &&
+                response['client-uuid'] === this._clientUuid &&
+                this._pendingClaims.get(response['bot-uuid']) === response['request-id']) {
                 this._pendingClaims.delete(response['bot-uuid']);
-                this._updateRobotClaim(response['bot-uuid'], CLAIMED_BY_OTHER_USER);
-                alert(formatMessage({
-                    id: 'tinkibot.robotAlreadyClaimed',
-                    default: '{nickname} could not be claimed because another user has already claimed it.',
-                    description: 'Message shown when another user has already claimed a Tinkibot robot.'
-                }, {nickname: response.nickname}));
+                if (response.message === 'The robot has been claimed by another user') {
+                    this._updateRobotClaim(response['bot-uuid'], CLAIMED_BY_OTHER_USER);
+                    const robot = this._connectedRobots.find(item => item.botUuid === response['bot-uuid']);
+                    alert(formatMessage({
+                        id: 'tinkibot.robotAlreadyClaimed',
+                        default: '{nickname} could not be claimed because another user has already claimed it.',
+                        description: 'Message shown when another user has already claimed a Tinkibot robot.'
+                    }, {nickname: robot.nickname}));
+                } else {
+                    this._notifyCommandError(new Error(response.message));
+                }
             }
             if (response.event === 'button') {
                 this._buttonEvent = response;
@@ -935,40 +942,18 @@ class TinkibotBlocks {
                 this._buttonEvent = null;
             }
             const pending = this._pendingResponse;
-            if (pending && pending.bundleCommands) {
-                if (response.event === 'robot_disconnected' && response['bot-uuid'] === pending.botUuid) {
-                    this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
-                    return;
-                }
-                if (response.event || response.requestId !== pending.requestId) return;
-                try {
-                    if (response.report === 'error') throw new Error(response.value);
-                    const results = bundleProtocol.response(response, pending.bundleCommands);
-                    clearTimeout(pending.timeout);
-                    this._pendingResponse = null;
-                    pending.resolve(results);
-                } catch (error) {
-                    this._rejectPending(error);
-                }
+            if (pending && response.event === 'robot_disconnected' && response['bot-uuid'] === pending.botUuid) {
+                this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
                 return;
             }
-            if (this._pendingResponse && this._pendingResponse.requestId &&
-                response.requestId !== this._pendingResponse.requestId) return;
-            const matchesCommand = this._pendingResponse && response.report === this._pendingResponse.command;
-            const commandFailed = matchesCommand && typeof response.value === 'string' &&
-                /^ERR(?: |$)/.test(response.value);
-            const expectedPlayback = this._pendingResponse && {
-                play_note: 'OK play', play_drum: 'OK drum'
-            }[this._pendingResponse.command];
-            const incompletePlayback = matchesCommand && expectedPlayback && response.value !== expectedPlayback;
-            if (this._pendingResponse && (response.report === 'error' || commandFailed || incompletePlayback)) {
-                this._rejectPending(new Error(response.value));
-                return;
-            }
-            if (matchesCommand) {
-                const {resolve} = this._pendingResponse;
+            if (!pending || response.event || response['request-id'] !== pending.requestId) return;
+            try {
+                const result = publicAPI.response(response, pending, this._clientUuid);
+                if (pending.timeout) clearTimeout(pending.timeout);
                 this._pendingResponse = null;
-                resolve(response.value);
+                pending.resolve(result);
+            } catch (error) {
+                this._rejectPending(error);
             }
         };
 
@@ -980,43 +965,43 @@ class TinkibotBlocks {
             const normalizedRobot = typeof robot === 'string' ? {nickname: robot, botUuid: null, claimedBy: null} : {
                 nickname: robot.nickname,
                 botUuid: robot.botUuid || robot['bot-uuid'] || null,
-                claimedBy: robot.claimedBy || robot['blocks-uuid'] || robot.claimed_by || null
+                claimedBy: robot.claimedBy || robot['client-uuid'] || robot.claimed_by || null
             };
             return [normalizedRobot.botUuid || normalizedRobot.nickname, normalizedRobot];
         })).values()).map(robot => Object.assign({}, robot, {
             claimState: !robot.claimedBy ? 'free' :
-                robot.claimedBy === this._blocksUuid ? 'paired' : 'claimed'
+                robot.claimedBy === this._clientUuid ? 'paired' : 'claimed'
         }));
         this.runtime.tinkibotConnectedRobots = this._connectedRobots.map(robot => Object.assign({}, robot));
         this.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', this.runtime.tinkibotConnectedRobots);
     }
 
-    _updateRobotClaim (botUuid, blocksUuid) {
+    _updateRobotClaim (botUuid, clientUuid) {
         this._setConnectedRobots(this._connectedRobots.map(robot => robot.botUuid === botUuid ?
-            Object.assign({}, robot, {claimedBy: blocksUuid}) : robot));
+            Object.assign({}, robot, {claimedBy: clientUuid}) : robot));
     }
 
     _claimResponseMatches (response) {
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === response['bot-uuid']);
         return Boolean(robot &&
             robot.nickname === response.nickname &&
-            response['blocks-uuid'] === this._blocksUuid &&
+            response['client-uuid'] === this._clientUuid &&
             this._pendingClaims.has(response['bot-uuid']));
     }
 
-    _getBlocksUuid () {
+    _getClientUuid () {
         const newId = () => uuid.v4();
         if (typeof window === 'undefined') return newId();
         try {
             const storage = window.localStorage;
             if (!storage) return newId();
-            const storedId = storage.getItem(BLOCKS_UUID_STORAGE_KEY);
+            const storedId = storage.getItem(CLIENT_UUID_STORAGE_KEY);
             if (storedId) return storedId;
-            const blocksUuid = newId();
-            storage.setItem(BLOCKS_UUID_STORAGE_KEY, blocksUuid);
-            return blocksUuid;
+            const clientUuid = newId();
+            storage.setItem(CLIENT_UUID_STORAGE_KEY, clientUuid);
+            return clientUuid;
         } catch (error) {
-            console.warn('TinkibotBlocks._getBlocksUuid: could not access local storage', error);
+            console.warn('TinkibotBlocks._getClientUuid: could not access local storage', error);
             return newId();
         }
     }
@@ -1027,12 +1012,14 @@ class TinkibotBlocks {
             this._connectedRobots.some(connectedRobot => connectedRobot.claimState === 'paired');
         if (!robot || robot.claimState !== 'free' || alreadyClaimingOrPaired) return;
         await this.connect();
-        this._pendingClaims.add(robot.botUuid);
+        const requestId = uuid.v4();
+        this._pendingClaims.set(robot.botUuid, requestId);
         window.socket.send(JSON.stringify({
             command: 'claim',
+            'request-id': requestId,
             nickname: robot.nickname,
             'bot-uuid': robot.botUuid,
-            'blocks-uuid': this._blocksUuid
+            'client-uuid': this._clientUuid
         }));
     }
 
@@ -1042,9 +1029,10 @@ class TinkibotBlocks {
         await this.connect();
         window.socket.send(JSON.stringify({
             command: 'unclaim',
+            'request-id': uuid.v4(),
             nickname: robot.nickname,
             'bot-uuid': robot.botUuid,
-            'blocks-uuid': this._blocksUuid
+            'client-uuid': this._clientUuid
         }));
         this._updateRobotClaim(robot.botUuid, null);
     }
@@ -1108,34 +1096,41 @@ class TinkibotBlocks {
                 alert(message);
                 throw new Error('No Tinkibot robot is claimed');
             }
-            let payload = command;
+            let payload = publicAPI.command(command);
             if (bundlePlan) {
-                payload = bundleProtocol.request(bundlePlan.map(item =>
-                    `${robot.nickname}.${robotActions[item.opcode].encode(item.payload)}`));
+                payload = {cmds: bundlePlan.map(item => publicAPI.command(item.payload))};
                 await this._bundleConnection();
             } else {
                 await this.connect();
             }
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
             return new Promise((resolve, reject) => {
-                let requestId;
-                if (bundlePlan || ['play_note', 'play_drum'].includes(command.command)) requestId = uuid.v4();
-                const pending = {command: responseCommand, requestId, resolve, reject, botUuid: robot.botUuid};
+                const requestId = uuid.v4();
+                const pending = {command: responseCommand, requestId, resolve, reject, botUuid: robot.botUuid,
+                    publicCommands: bundlePlan ? payload.cmds : [payload]};
                 if (bundlePlan) {
-                    pending.bundleCommands = payload.cmds.map(item => item.cmd);
+                    pending.bundleCommands = bundlePlan.map(item =>
+                        `${robot.nickname}.${robotActions[item.opcode].encode(item.payload)}`);
                     pending.timeout = setTimeout(() => {
                         if (this._pendingResponse === pending) {
                             this._rejectPending(new Error('Tinkibot bundle response timed out'));
                         }
                     }, bundleProtocol.responseTimeout(bundlePlan));
                 }
+                if (!bundlePlan) {
+                    pending.timeout = setTimeout(() => {
+                        if (this._pendingResponse === pending) {
+                            this._rejectPending(new Error('Tinkibot response timed out'));
+                        }
+                    }, bundleProtocol.TIMEOUT_MS + ((Number(command.duration) || 0) * 1000));
+                }
                 this._pendingResponse = pending;
                 try {
                     window.socket.send(JSON.stringify(Object.assign({}, payload, {
-                        requestId,
+                        'request-id': requestId,
                         'nickname': robot.nickname,
                         'bot-uuid': robot.botUuid,
-                        'blocks-uuid': this._blocksUuid
+                        'client-uuid': this._clientUuid
                     })));
                 } catch (error) {
                     this._rejectPending(error);

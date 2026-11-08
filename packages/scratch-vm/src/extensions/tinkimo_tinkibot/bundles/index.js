@@ -33,7 +33,7 @@ class ActionBundles {
                 this.consumed.set(thread, new Set(plan.slice(1).map(item => item.id)));
             });
         } else {
-            operation = this.extension._sendCommand(payload);
+            operation = this.extension._sendCommand(payload, payload.command, null, thread);
         }
         if (plan.length > 1) {
             return operation.catch(error => {
