@@ -47,7 +47,7 @@ const response = (value, pending, clientUuid) => {
     }
     if (value.status === 'ERROR') throw new Error(value.message || 'Tinkibot command failed');
     if (value.command !== pending.publicCommands[0].command) throw new Error('Invalid Tinkibot command response');
-    const result = typeof value.value === 'undefined' ? value.message : value.value;
+    const result = value.message;
     const expected = {play_note: 'OK play', play_drum: 'OK drum'}[value.command];
     if (expected && result !== expected) throw new Error(result || 'Incomplete music response');
     return result;

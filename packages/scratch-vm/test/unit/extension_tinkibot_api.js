@@ -38,7 +38,7 @@ test('real editor frames use UUIDs and correlate both single and bundle replies'
     t.match(frames[0]['request-id'], /^[a-f0-9-]{36}$/);
     t.notOk('requestId' in frames[0]);
     t.notOk('blocks-uuid' in frames[0]);
-    const reply = {...frames[0], status: 'OK', message: '4.2', value: '4.2'};
+    const reply = {...frames[0], status: 'OK', message: '4.2'};
     global.window.socket.onmessage({data: JSON.stringify({...reply, 'request-id': 'stale'})});
     t.ok(extension._pendingResponse, 'stale request is ignored');
     global.window.socket.onmessage({data: JSON.stringify(reply)});
