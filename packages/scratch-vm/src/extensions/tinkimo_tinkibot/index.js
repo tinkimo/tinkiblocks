@@ -12,6 +12,7 @@ const ActionBundles = require('./bundles');
 const robotActions = require('./bundles/actions');
 const bundleProtocol = require('./bundles/protocol');
 const publicAPI = require('./api');
+const ConnectionDiagnostics = require('./connection-diagnostics');
 
 const CLIENT_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
@@ -37,6 +38,7 @@ class TinkibotBlocks {
         this.runtime = runtime;
         this._music = new Music(runtime);
         this._bundler = new ActionBundles(this);
+        this._connectionDiagnostics = new ConnectionDiagnostics();
         this._connected = false;
         this._connectionPromise = null;
         this._commandQueue = Promise.resolve();
@@ -849,17 +851,39 @@ class TinkibotBlocks {
     // helpers
     connect () {
         if (this._connected) return Promise.resolve();
-        if (this._connectionPromise) return this._connectionPromise;
+        if (this._connectionPromise) {
+            this._connectionDiagnostics.currentAttempt.duplicate();
+            return this._connectionPromise;
+        }
 
-        window.socket = new WebSocket('ws://127.0.0.1:9006');
+        const diagnostics = this._connectionDiagnostics.createAttempt();
+        const previousSocket = window.socket;
+        let socket;
+        try {
+            socket = new WebSocket('ws://127.0.0.1:9006');
+        } catch (error) {
+            diagnostics.start(null, previousSocket);
+            diagnostics.log('failed', null, {phase: 'constructor', errorName: error.name});
+            throw error;
+        }
+        window.socket = socket;
+        diagnostics.start(socket, previousSocket);
         this._connectionPromise = new Promise(resolve => {
-            window.socket.onopen = () => {
+            socket.onopen = () => {
+                diagnostics.opened = true;
+                diagnostics.log('opened', socket);
                 this._connected = true;
                 resolve();
             };
         });
 
-        window.socket.onclose = () => {
+        socket.onclose = (event = {}) => {
+            diagnostics.log('closed', socket, {
+                code: event.code,
+                reason: event.reason,
+                wasClean: event.wasClean,
+                opened: diagnostics.opened
+            });
             if (!alerted) {
                 alerted = true;
                 alert('Tinkibot has disconnected!');
@@ -871,12 +895,13 @@ class TinkibotBlocks {
             this._rejectPending(new Error('Tinkibot disconnected while waiting for a response'), false);
         };
 
-        window.socket.onerror = () => {
+        socket.onerror = () => {
+            diagnostics.log('failed', socket, {phase: 'handshake or transport'});
             if (this._pendingResponse) {
                 this._rejectPending(new Error('Tinkibot connection failed'));
             }
         };
-        window.socket.onmessage = message => {
+        socket.onmessage = message => {
             let response;
             try {
                 response = JSON.parse(message.data);
