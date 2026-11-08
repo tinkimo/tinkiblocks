@@ -1,3 +1,4 @@
+const apiSocket = require('../fixtures/tinkibot-api-socket');
 const {test, beforeEach} = require('tap');
 const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
 const Runtime = require('../../src/engine/runtime');
@@ -10,13 +11,32 @@ const dispatch = require('../../src/dispatch/central-dispatch');
 class Socket {
     constructor () {
         this.sent = [];
+        this.publicSent = [];
+        Object.defineProperty(this, 'onmessage', {
+            set: callback => {
+                this._onmessage = event => {
+                    let value;
+                    try {
+                        value = JSON.parse(event.data);
+                    } catch {
+                        callback(event);
+                        return;
+                    }
+                    callback({data: JSON.stringify(apiSocket.reply(value, this.publicSent))});
+                };
+            },
+            get: () => this._onmessage
+        });
         Socket.instance = this;
     }
     send (value) {
-        this.sent.push(JSON.parse(value));
+        const frame = JSON.parse(value);
+        this.publicSent.push(frame);
+        this.sent.push(apiSocket.view(frame));
     }
     respond (value) {
-        this.onmessage({data: typeof value === 'string' ? value : JSON.stringify(value)});
+        this.onmessage({data: typeof value === 'string' ? value :
+            JSON.stringify(apiSocket.reply(value, this.publicSent))});
     }
 }
 
@@ -41,7 +61,7 @@ const setup = () => {
     runtime.targets.push(target);
     const extension = new Tinkibot(runtime);
     extension._setConnectedRobots([{
-        'nickname': 'lime', 'bot-uuid': 'robot-lime', 'blocks-uuid': extension._blocksUuid
+        'nickname': 'lime', 'bot-uuid': 'robot-lime', 'client-uuid': extension._clientUuid
     }]);
     Socket.instance.onopen();
     for (const info of extension.getInfos()) {
@@ -368,7 +388,7 @@ test('bundle correlation ignores unrelated events and stale replies', async t =>
     h.socket.respond({event: 'connected_robots',
         robots: [{'nickname': 'lime',
             'bot-uuid': 'robot-lime',
-            'blocks-uuid': h.extension._blocksUuid}]});
+            'client-uuid': h.extension._clientUuid}]});
     h.socket.respond({...succeed(request), requestId: 'old-request'});
     await tick();
     t.notOk(complete);
@@ -650,7 +670,7 @@ test('editor-created startup and shutdown dropdown blocks batch through register
     const extension = dispatch.services[vm.extensionManager._loadedExtensions.get('tinkibotSounds')];
     extension._setConnectedRobots([{'nickname': 'lime',
         'bot-uuid': 'robot-lime',
-        'blocks-uuid': extension._blocksUuid}]);
+        'client-uuid': extension._clientUuid}]);
     const socket = Socket.instance;
     socket.onopen();
     const xml = '<block type="tinkibotSounds_play_sound" id="startup">' +
@@ -862,7 +882,7 @@ test('drum dropdown repeat batches adjacent hits and preserves rests despite a d
     const extension = dispatch.services[vm.extensionManager._loadedExtensions.get('tinkibotSounds')];
     extension._setConnectedRobots([{'nickname': 'lime',
         'bot-uuid': 'robot-lime',
-        'blocks-uuid': extension._blocksUuid}]);
+        'client-uuid': extension._clientUuid}]);
     const socket = Socket.instance;
     socket.onopen();
     const drum = (id, value, next = '') => `<block type="tinkibotSounds_playDrumForBeats" id="${id}">` +

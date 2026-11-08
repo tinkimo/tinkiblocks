@@ -1,3 +1,4 @@
+const apiSocket = require('../fixtures/tinkibot-api-socket');
 const {test, beforeEach} = require('tap');
 
 const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
@@ -9,11 +10,29 @@ const Sprite = require('../../src/sprites/sprite');
 class MockWebSocket {
     constructor () {
         this.sent = [];
+        this.publicSent = [];
+        Object.defineProperty(this, 'onmessage', {
+            set: callback => {
+                this._onmessage = event => {
+                    let value;
+                    try {
+                        value = JSON.parse(event.data);
+                    } catch {
+                        callback(event);
+                        return;
+                    }
+                    callback({data: JSON.stringify(apiSocket.reply(value, this.publicSent))});
+                };
+            },
+            get: () => this._onmessage
+        });
         MockWebSocket.instance = this;
     }
 
     send (message) {
-        this.sent.push(JSON.parse(message));
+        const frame = JSON.parse(message);
+        this.publicSent.push(frame);
+        this.sent.push(apiSocket.view(frame));
     }
 
     open () {
@@ -21,7 +40,7 @@ class MockWebSocket {
     }
 
     respond (report, value) {
-        this.onmessage({data: JSON.stringify({report, value})});
+        this.onmessage({data: JSON.stringify(apiSocket.reply({report, value}, this.publicSent))});
     }
 }
 
@@ -45,7 +64,7 @@ const makeRuntime = () => {
 };
 
 const pairRobot = (extension, nickname = 'orange', botUuid = 'orange-robot-uuid') => {
-    extension._setConnectedRobots([{nickname, 'bot-uuid': botUuid, 'blocks-uuid': extension._blocksUuid}]);
+    extension._setConnectedRobots([{nickname, 'bot-uuid': botUuid, 'client-uuid': extension._clientUuid}]);
 };
 
 test('Tinkibot is loaded when the virtual machine starts', t => {
@@ -149,7 +168,7 @@ test('Tinkibot backlight clamps numeric and variable values and waits for the se
             'backlight': expected,
             'nickname': 'orange',
             'bot-uuid': 'orange-robot-uuid',
-            'blocks-uuid': extension._blocksUuid
+            'client-uuid': extension._clientUuid
         });
         MockWebSocket.instance.respond('set', 'OK');
         t.equal(await result, 'OK');
@@ -168,18 +187,30 @@ test('Tinkibot commands wait for each response before sending the next command',
     MockWebSocket.instance.open();
     await new Promise(resolve => setImmediate(resolve));
     t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'move', direction: 'forward', distance: 10, nickname: 'orange',
-            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}
+        {'command': 'move',
+            'direction': 'forward',
+            'distance': 10,
+            'nickname': 'orange',
+            'bot-uuid': 'orange-robot-uuid',
+            'client-uuid': extension._clientUuid}
     ]);
 
     MockWebSocket.instance.respond('move', 'moved');
     t.equal(await first, 'moved');
     await new Promise(resolve => setImmediate(resolve));
     t.strictSame(MockWebSocket.instance.sent, [
-        {command: 'move', direction: 'forward', distance: 10, nickname: 'orange',
-            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid},
-        {command: 'rotate', rotation: 'left', degrees: 90, nickname: 'orange',
-            'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}
+        {'command': 'move',
+            'direction': 'forward',
+            'distance': 10,
+            'nickname': 'orange',
+            'bot-uuid': 'orange-robot-uuid',
+            'client-uuid': extension._clientUuid},
+        {'command': 'rotate',
+            'rotation': 'clockwise',
+            'degrees': 90,
+            'nickname': 'orange',
+            'bot-uuid': 'orange-robot-uuid',
+            'client-uuid': extension._clientUuid}
     ]);
 
     MockWebSocket.instance.respond('rotate', 'rotated');
@@ -274,7 +305,7 @@ test('a busy note fails and stops the originating script instead of skipping not
         delete global.alert;
     });
     let stopped = false;
-    const thread = {};
+    const thread = {stack: ['note']};
     const sequencer = {retireThread: target => {
         stopped = target === thread;
     }};
@@ -356,13 +387,13 @@ test('Tinkibot tracks robot connection events', t => {
         data: JSON.stringify({
             event: 'connected_robots',
             nicknames: [
-                {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
+                {'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'},
                 {
-                    nickname: 'blue',
+                    'nickname': 'blue',
                     'bot-uuid': 'blue-robot-uuid',
-                    'blocks-uuid': 'another-environment-id'
+                    'client-uuid': 'another-environment-id'
                 },
-                {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
+                {'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'}
             ]
         })
     });
@@ -380,7 +411,7 @@ test('Tinkibot tracks robot connection events', t => {
     t.strictSame(MockWebSocket.instance.sent, [], 'a robot claimed by someone else cannot be released');
 
     MockWebSocket.instance.onmessage({
-        data: JSON.stringify({event: 'robot_connected', nickname: 'green', 'bot-uuid': 'green-robot-uuid'})
+        data: JSON.stringify({'event': 'robot_connected', 'nickname': 'green', 'bot-uuid': 'green-robot-uuid'})
     });
     t.strictSame(runtime.tinkibotConnectedRobots, [
         {nickname: 'orange', botUuid: 'orange-robot-uuid', claimedBy: null, claimState: 'free'},
@@ -395,9 +426,10 @@ test('Tinkibot tracks robot connection events', t => {
     t.strictSame(alerts, [], 'connecting a robot does not open an alert');
 
     MockWebSocket.instance.onmessage({
-        data: JSON.stringify({event: 'robot_disconnected', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'})
+        data: JSON.stringify({'event': 'robot_disconnected', 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'})
     });
     t.strictSame(runtime.tinkibotConnectedRobots, [
+        {nickname: 'orange', botUuid: 'orange-robot-uuid', claimedBy: null, claimState: 'free', connected: false},
         {
             nickname: 'blue',
             botUuid: 'blue-robot-uuid',
@@ -406,7 +438,7 @@ test('Tinkibot tracks robot connection events', t => {
         },
         {nickname: 'green', botUuid: 'green-robot-uuid', claimedBy: null, claimState: 'free'}
     ]);
-    t.strictSame(alerts, ['orange has disconnected.']);
+    t.strictSame(alerts, []);
     t.equal(
         runtime.events.filter(({event}) => event === 'TINKIBOT_ROBOT_CONNECTION_CHANGED').length,
         2
@@ -418,7 +450,7 @@ test('Tinkibot tracks robot connection events', t => {
     t.end();
 });
 
-test('Tinkibot claims and releases a robot with the persistent blocks UUID', async t => {
+test('Tinkibot claims and releases a robot with the persistent client UUID', async t => {
     const storedValues = new Map();
     const alerts = [];
     global.window = {
@@ -435,46 +467,46 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
     MockWebSocket.instance.open();
     MockWebSocket.instance.onmessage({data: JSON.stringify({
         event: 'connected_robots',
-        nicknames: [{nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}]
+        nicknames: [{'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'}]
     })});
 
     await runtime.claimTinkibotRobot('orange-robot-uuid');
-    const blocksUuid = storedValues.get('tinkiblocks.blocksUuid');
-    t.match(blocksUuid, /^[0-9a-f-]{36}$/);
+    const clientUuid = storedValues.get('tinkiblocks.blocksUuid');
+    t.match(clientUuid, /^[0-9a-f-]{36}$/);
     t.strictSame(MockWebSocket.instance.sent, [{
-        command: 'claim',
-        nickname: 'orange',
+        'command': 'claim',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid
+        'client-uuid': clientUuid
     }]);
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'claim_accepted',
-        nickname: 'orange',
+        'event': 'claim_accepted',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': 'different-blocks-uuid'
+        'client-uuid': 'different-client-uuid'
     })});
     t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'free', 'mismatched claims are ignored');
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'claim_accepted',
-        nickname: 'orange',
+        'event': 'claim_accepted',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid
+        'client-uuid': clientUuid
     })});
     t.strictSame(runtime.tinkibotConnectedRobots, [{
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
-        claimedBy: blocksUuid,
+        claimedBy: clientUuid,
         claimState: 'paired'
     }]);
 
     await runtime.releaseTinkibotRobot('orange-robot-uuid');
     t.strictSame(MockWebSocket.instance.sent[1], {
-        command: 'unclaim',
-        nickname: 'orange',
+        'command': 'unclaim',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid
+        'client-uuid': clientUuid
     });
     t.strictSame(runtime.tinkibotConnectedRobots, [{
         nickname: 'orange',
@@ -485,21 +517,21 @@ test('Tinkibot claims and releases a robot with the persistent blocks UUID', asy
 
     await runtime.claimTinkibotRobot('orange-robot-uuid');
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'claim_rejected',
-        nickname: 'orange',
+        'event': 'claim_rejected',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid
+        'client-uuid': clientUuid
     })});
     t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'free');
 
     await runtime.claimTinkibotRobot('orange-robot-uuid');
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        report: 'claim',
-        value: 'The robot has been claimed by another user',
-        nickname: 'orange',
+        'report': 'claim',
+        'value': 'The robot has been claimed by another user',
+        'nickname': 'orange',
         'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': blocksUuid,
-        timestamp: 1788206612195
+        'client-uuid': clientUuid,
+        'timestamp': 1788206612195
     })});
     t.equal(runtime.tinkibotConnectedRobots[0].claimState, 'claimed');
     t.strictSame(alerts, [
@@ -519,8 +551,8 @@ test('Tinkibot allows only one robot claim at a time', async t => {
     const extension = new TinkibotBlocks(runtime);
     MockWebSocket.instance.open();
     extension._setConnectedRobots([
-        {nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
-        {nickname: 'blue', 'bot-uuid': 'blue-robot-uuid'}
+        {'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {'nickname': 'blue', 'bot-uuid': 'blue-robot-uuid'}
     ]);
 
     await runtime.claimTinkibotRobot('orange-robot-uuid');
@@ -528,8 +560,10 @@ test('Tinkibot allows only one robot claim at a time', async t => {
     t.equal(MockWebSocket.instance.sent.length, 1, 'a pending claim prevents another claim');
 
     MockWebSocket.instance.onmessage({data: JSON.stringify({
-        event: 'claim_accepted', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid',
-        'blocks-uuid': extension._blocksUuid
+        'event': 'claim_accepted',
+        'nickname': 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'client-uuid': extension._clientUuid
     })});
     await runtime.claimTinkibotRobot('blue-robot-uuid');
     t.equal(MockWebSocket.instance.sent.length, 1, 'a paired robot prevents another claim');
@@ -566,15 +600,18 @@ test('Tinkibot volume command accepts the proxy response and releases the queue'
 
     MockWebSocket.instance.open();
     await new Promise(resolve => setImmediate(resolve));
-    t.match(MockWebSocket.instance.sent, [{command: 'set', volume: 5, nickname: 'orange',
-        'bot-uuid': 'orange-robot-uuid', 'blocks-uuid': extension._blocksUuid}]);
+    t.match(MockWebSocket.instance.sent, [{'command': 'set',
+        'volume': 5,
+        'nickname': 'orange',
+        'bot-uuid': 'orange-robot-uuid',
+        'client-uuid': extension._clientUuid}]);
 
     MockWebSocket.instance.respond('set', 'OK set volume 5');
     t.equal(await volume, 'OK set volume 5');
     await new Promise(resolve => setImmediate(resolve));
     t.match(MockWebSocket.instance.sent, [
-        {command: 'set', volume: 5, nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
-        {command: 'measure_distance', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
+        {'command': 'set', 'volume': 5, 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {'command': 'measure_distance', 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'}
     ]);
 
     MockWebSocket.instance.respond('measure_distance', 42);
@@ -603,8 +640,8 @@ test('Tinkibot command errors warn the user and release the queue', async t => {
     await t.rejects(sound, {message: 'command_failed:no_robots_connected'});
     await new Promise(resolve => setImmediate(resolve));
     t.match(MockWebSocket.instance.sent, [
-        {command: 'play_sound', sound: 'startup', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'},
-        {command: 'measure_distance', nickname: 'orange', 'bot-uuid': 'orange-robot-uuid'}
+        {'command': 'play_sound', 'sound': 'startup', 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'},
+        {'command': 'measure_distance', 'nickname': 'orange', 'bot-uuid': 'orange-robot-uuid'}
     ]);
 
     MockWebSocket.instance.respond('measure_distance', 42);
@@ -705,7 +742,7 @@ test('Tinkibot preloads media through the proxy and waits for its response', asy
             'file': name,
             'nickname': 'orange',
             'bot-uuid': 'orange-robot-uuid',
-            'blocks-uuid': extension._blocksUuid
+            'client-uuid': extension._clientUuid
         });
         MockWebSocket.instance.respond('unrelated', 'ignore');
         t.equal(extension._pendingResponse.command, command);
@@ -744,7 +781,7 @@ test('Dance fade uses dropdowns and the standard correlated command payload', as
                 direction,
                 'nickname': 'orange',
                 'bot-uuid': 'orange-robot-uuid',
-                'blocks-uuid': extension._blocksUuid
+                'client-uuid': extension._clientUuid
             });
             MockWebSocket.instance.respond('fade', 'OK fade');
             t.equal(await result, 'OK fade');
@@ -760,8 +797,45 @@ test('Fade forwards preset and numeric reporter values without losing the input'
     for (const speed of ['slow', 'medium', 'fast', 0.75, '2', 'custom']) {
         const result = extension.fade({TARGET: 'LEDs', DIRECTION: 'in', SPEED: speed});
         await new Promise(resolve => setImmediate(resolve));
-        t.equal(MockWebSocket.instance.sent.at(-1).speed, speed);
+        t.equal(MockWebSocket.instance.publicSent.at(-1).speed, String(speed));
         MockWebSocket.instance.respond('fade', 'OK fade');
         t.equal(await result, 'OK fade');
     }
+});
+
+test('disconnected paired robot survives reconnect and Remove frees the next claim', async t => {
+    global.alert = () => {};
+    t.teardown(() => delete global.alert);
+    const extension = new TinkibotBlocks(makeRuntime());
+    const socket = MockWebSocket.instance;
+    socket.open();
+    pairRobot(extension, 'lime', 'lime-uuid');
+    extension._setConnectedRobots([...extension._connectedRobots, {'nickname': 'blue', 'bot-uuid': 'blue-uuid'}]);
+    socket.onmessage({data: JSON.stringify({'event': 'robot_disconnected',
+        'nickname': 'lime',
+        'bot-uuid': 'lime-uuid'})});
+    t.equal(extension._connectedRobots[0].connected, false);
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    await t.rejects(extension.measure_voltage(), /disconnected/);
+    await extension.claimRobot('blue-uuid');
+    t.equal(socket.publicSent.length, 0, 'retained reservation blocks a second claim');
+    socket.onmessage({data: JSON.stringify({'event': 'robot_connected', 'nickname': 'lime', 'bot-uuid': 'lime-uuid'})});
+    t.not(extension._connectedRobots[0].connected, false);
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    const reading = extension.measure_voltage();
+    await new Promise(resolve => setImmediate(resolve));
+    socket.respond('measure_voltage', 4.2);
+    t.equal(await reading, 4.2, 'reconnected robot can immediately be used');
+    socket.onmessage({data: JSON.stringify({'event': 'robot_disconnected',
+        'nickname': 'lime',
+        'bot-uuid': 'lime-uuid'})});
+    await extension.removeRobot('lime-uuid');
+    const removal = socket.publicSent.at(-1);
+    t.equal(removal.command, 'remove');
+    t.equal(extension._connectedRobots.length, 2, 'wait for proxy acknowledgement before removing');
+    socket.onmessage({data: JSON.stringify({...removal, status: 'OK'})});
+    t.equal(extension._connectedRobots.length, 1);
+    await extension.claimRobot('blue-uuid');
+    t.equal(socket.publicSent.at(-1).command, 'claim');
+    t.equal(socket.publicSent.at(-1)['bot-uuid'], 'blue-uuid');
 });

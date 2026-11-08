@@ -113,11 +113,15 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 ### scratch-vm specifics
 
+- The Connections tab retains disconnected robot reservations until explicit Remove.
+  VM lifecycle events must preserve claim ownership across reconnects.
 - Extension entry points live in `src/extensions/`. Each extension exports a class with `getInfo()` and block
   implementation methods.
 - Tinkibot music timing helpers live in `src/extensions/tinkimo_tinkibot/music/`; Sounds uses Scratch's NOTE field.
 - Tinkibot action declarations and safe sequence collection live in `src/extensions/tinkimo_tinkibot/bundles/`.
-  Keep reporters, dynamic inputs, control flow and concurrent scripts outside bundles; see
+  Public WebSocket conversion/correlation lives in `tinkimo_tinkibot/api.js`; use `request-id`,
+  `client-uuid` and authoritative `bot-uuid`. Keep reporters, dynamic inputs, control flow
+  and concurrent scripts outside bundles; see
   `packages/scratch-vm/docs/tinkibot-command-bundles.md` for the WebSocket contract and boundary rules.
 - i18n strings in extensions are extracted with `format-message`. Run `npm run i18n:src` after changing them.
 

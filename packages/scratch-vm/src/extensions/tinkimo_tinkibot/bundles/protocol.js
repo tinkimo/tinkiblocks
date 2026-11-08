@@ -13,7 +13,8 @@ const request = commands => {
         throw new Error('Invalid Tinkibot bundle command');
     }
     const value = {cmds: commands.map(cmd => ({cmd}))};
-    if (new TextEncoder().encode(JSON.stringify(value)).length > MAX_BYTES) {
+    // The proxy adds one 36-character request UUID (52 JSON bytes).
+    if (new TextEncoder().encode(JSON.stringify(value)).length + 52 > MAX_BYTES) {
         throw new Error('Tinkibot bundle exceeds 4096 bytes');
     }
     return value;

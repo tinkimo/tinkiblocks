@@ -71,87 +71,26 @@ oversized individual action falls back to its existing individual path rather
 than silently truncating text. Command strings, including targeting and interior
 whitespace, are retained inside the JSON wrapper.
 
-## Proxy WebSocket interface required
+## Public WebSocket interface
 
-The matching proxy WebSocket entry point is implemented in
-[tinkiblocks-proxy PR #23](https://github.com/tinkimo/tinkiblocks-proxy/pull/23).
-Deploy it with the editor update before running automatically collected sequences.
-The editor changes do not modify proxy or firmware repository files.
-
-A collected request is a JSON object with the firmware's command wrapper and the
-existing claim/routing metadata plus a unique correlation ID:
+`api.js` centrally converts internal Scratch payloads into public commands with
+string parameters. Move/rotate/display use `forward` or `reverse`, signed
+`angle`, and `display` respectively. Every request carries `request-id`,
+`client-uuid` and authoritative `bot-uuid`; nickname is optional advisory data.
+The previous local-storage UUID entry is retained during migration.
 
 ```json
-{
-  "cmds": [
-    {"cmd": "lime.play:startup"},
-    {"cmd": "lime.forward:100"},
-    {"cmd": "lime.display:happy"},
-    {"cmd": "lime.rotate:90"}
-  ],
-  "requestId": "unique-request-id",
-  "nickname": "lime",
-  "bot-uuid": "paired-robot-uuid",
-  "blocks-uuid": "client-uuid"
-}
+{"request-id":"c94c0c75-223a-4f8e-a7ec-175c56d70215","client-uuid":"39da85c3-0aea-4250-88b5-478e01223eed","bot-uuid":"c1c4bd43-16cc-4f99-9297-186614d4e33f","cmds":[{"command":"forward","distance":"10"},{"command":"rotate","angle":"90"}]}
 ```
 
-The proxy must recognize `cmds` before its legacy `command` dispatcher, preserve
-existing claim/connection handling, and forward `{cmds: [...]}` through the bundle
-transport API. It must not interpret Scratch stacks or decide which blocks to
-batch. The extension currently selects the existing first paired robot for each
-operation; it adds no robot-selection blocks or new robot-addressing policy.
-The protocol helper preserves arbitrary original nickname prefixes, including
-`all`, and command order; it never deduplicates repeated command strings. Future
-mixed-target routing must return one correlated result for every original entry
-in source order, aggregating broadcast outcomes at the proxy rather than sending
-several partial replies or rewriting command strings in Tinkiblocks.
-
-Return a JSON object whose `requestId` exactly matches the request:
-
-```json
-{
-  "requestId": "unique-request-id",
-  "rsp": [
-    {"cmd": "lime.play:startup", "status": "OK", "msg": "OK play\n"},
-    {"cmd": "lime.forward:100", "status": "OK", "msg": "OK forward\n"},
-    {"cmd": "lime.display:happy", "status": "ERROR", "msg": "ERR original\n"},
-    {"cmd": "lime.rotate:90", "status": "NOT_EXECUTED"}
-  ]
-}
-```
-
-`rsp` must contain exactly one entry per original command, including identical
-command strings repeated at different positions. Status is `OK`, `ERROR`, or
-`NOT_EXECUTED`. `msg` is required for `OK` and `ERROR` and optional for
-`NOT_EXECUTED`; preserve its text. Do not join robot responses into a display
-string or wrap the response under `value`.
-
-An envelope-level error may be returned as:
-
-```json
-{"requestId":"unique-request-id","rsp":[],"error":{"status":"ERROR","msg":"invalid-command-array"}}
-```
-
-The existing correlated `{report: "error", value: "...", requestId: "..."}`
-WebSocket error shape is also accepted. Legacy command requests and sensor
-responses must remain supported. Unsolicited robot/claim/button events keep their
-existing shape and must not fulfill a pending bundle request.
-
-## Failure and cancellation behavior
-
-The extension validates the entire response's count, order, command strings,
-status values and message types. It then reports any `ERROR` or `NOT_EXECUTED`
-through the existing localized command-error alert and rejected-promise path.
-It does not infer that later commands failed, require an abort pattern, or resend
-commands: a complete response containing `ERROR` followed by `OK` is accepted as a
-valid protocol response and the failure is still surfaced. The current companion
-firmware happens to fail fast; this client does not impose that policy.
-
-The VM handles rejected commands using its existing behavior. In particular,
-failed music commands retain their originating-thread retirement behavior, even
-when the failed music action is not the first action in a bundle. Failure paths
-do not leave skip markers for a later loop iteration.
+The proxy resolves UUIDs, sends one compact robot request and returns ordered
+`rsp` objects containing public command details and `status`. Successful actions
+omit `message`; sensor readings use `result`. Unsuccessful commands include an
+explanatory `message`. Single responses carry these fields at
+the top level. Public responses must match request, robot and client identities.
+Internal command strings never leave the editor over WebSocket. See
+[the public API guide](https://github.com/tinkimo/tinkiblocks-proxy/blob/feat/unified-json-api/docs/websocket-api.md)
+for schemas, registration, examples and deployment order.
 
 Malformed JSON, incomplete/mismatched responses, socket failure/close and selected
 robot disconnection reject the pending operation and free the command queue.
@@ -194,3 +133,16 @@ not establish wireless delivery or motor timing.
 For a repeat body containing snare, bass, rest, hi-hat, rest, the snare and bass
 form one two-command bundle per iteration. Each rest remains a local Scratch wait;
 the isolated hi-hat uses an individual request. Iterations are never flattened.
+
+## Connection pool lifecycle
+
+`robot_disconnected` marks an existing card with `connected: false` and preserves
+its claim. New action/report requests fail locally while disconnected. A later
+`robot_connected` updates that same UUID and restores use without a new claim.
+Disconnected paired cards continue reserving the user's selection until Remove.
+`runtime.removeTinkibotRobot` sends a correlated public `remove` request; only a
+successful response or `robot_removed` event deletes the card and clears pending
+claim/removal state. The Connections tab shows a red offline status dot and replaces Claim/Release
+with Remove only while disconnected. Connected cards retain Claim/Release.
+The proxy handles physical link cleanup and rejects removing another client's
+reserved robot. An unreachable physical claim cannot be confirmed as released.
