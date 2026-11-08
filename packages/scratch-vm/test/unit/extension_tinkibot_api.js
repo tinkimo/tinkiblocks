@@ -78,7 +78,7 @@ test('bundle byte limit reserves the proxy transaction envelope overhead', t => 
     const protocol = require('../../src/extensions/tinkimo_tinkibot/bundles/protocol');
     const prefix = 'lime.write:';
     const overhead = new TextEncoder().encode(JSON.stringify({cmds: [{cmd: prefix}]})).length;
-    const command = prefix + 'x'.repeat(protocol.MAX_BYTES - overhead - 40);
+    const command = prefix + 'x'.repeat(protocol.MAX_BYTES - overhead - 48);
     t.doesNotThrow(() => protocol.request([command]));
     t.throws(() => protocol.request([`${command}x`]), /4096/);
     t.end();
