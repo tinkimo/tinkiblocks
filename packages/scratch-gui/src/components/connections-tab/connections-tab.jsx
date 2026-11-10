@@ -4,11 +4,23 @@ import {FormattedMessage} from 'react-intl';
 import VM from '@scratch/scratch-vm';
 
 import styles from './connections-tab.css';
+import ConnectionControls from './connection-controls.jsx';
 
 const ConnectionsTab = ({vm}) => {
-    const [robots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
+    const manager = vm.runtime.tinkibotConnectionManager;
+    const [connection, setConnection] = useState(manager ? manager.snapshot() : null);
+    const [proxyRobots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
     const [pendingBotUuid, setPendingBotUuid] = useState(null);
+    const serial = connection && connection.method === 'web-serial';
+    const robots = serial ? connection.robots : proxyRobots;
     const hasClaimedRobot = robots.some(robot => robot.claimState === 'paired');
+
+    useEffect(() => {
+        if (!manager) return () => {};
+        setConnection(manager.snapshot());
+        manager.on('change', setConnection);
+        return () => manager.removeListener('change', setConnection);
+    }, [manager]);
 
     useEffect(() => {
         const updateRobots = updatedRobots => {
@@ -39,16 +51,24 @@ const ConnectionsTab = ({vm}) => {
 
     return (
         <section className={styles.connections}>
+            {manager && connection ? <ConnectionControls
+                manager={manager}
+                state={connection}
+            /> : null}
             <div
                 aria-hidden
                 className={styles.headingIcon}
             >🤖</div>
             <h2>
-                <FormattedMessage
+                {serial ? <FormattedMessage
+                    defaultMessage="Discovered Tinkibots"
+                    description="Heading for robots discovered through USB modem"
+                    id="gui.connectionsTab.discoveredHeading"
+                /> : <FormattedMessage
                     defaultMessage="My robots"
                     description="Heading for the list of connected Tinkibot robots"
                     id="gui.connectionsTab.heading"
-                />
+                />}
             </h2>
             {robots.length ? (
                 <div className={styles.robotList}>
@@ -66,13 +86,24 @@ const ConnectionsTab = ({vm}) => {
                                 aria-hidden
                                 className={styles.robotIcon}
                             >🤖</span>
-                            <strong>{robot.nickname}</strong>
+                            <strong>{robot.nickname || <FormattedMessage
+                                defaultMessage="Unnamed Tinkibot"
+                                description="Label for a robot whose UUID is known but nickname is empty"
+                                id="gui.connectionsTab.unnamedRobot"
+                            />}</strong>
+                            {serial ? <code className={styles.robotUuid}>{robot.botUuid}</code> : null}
                             <span className={styles.connectedLabel}>
                                 {robot.connected === false ? (
                                     <FormattedMessage
                                         defaultMessage="Disconnected"
                                         description="Status label for a robot whose connection has been lost"
                                         id="gui.connectionsTab.disconnected"
+                                    />
+                                ) : serial ? (
+                                    <FormattedMessage
+                                        defaultMessage="Available via modem"
+                                        description="A robot responded to the modem discovery query"
+                                        id="gui.connectionsTab.availableViaModem"
                                     />
                                 ) : robot.claimState === 'free' ? (
                                     <FormattedMessage
@@ -94,7 +125,7 @@ const ConnectionsTab = ({vm}) => {
                                     />
                                 )}
                             </span>
-                            {robot.connected !== false && robot.claimState === 'free' ? (
+                            {!serial && robot.connected !== false && robot.claimState === 'free' ? (
                                 <button
                                     className={styles.claimButton}
                                     disabled={pendingBotUuid !== null || hasClaimedRobot}
@@ -117,7 +148,7 @@ const ConnectionsTab = ({vm}) => {
                                     )}
                                 </button>
                             ) : null}
-                            {robot.connected !== false && robot.claimState === 'paired' ? (
+                            {!serial && robot.connected !== false && robot.claimState === 'paired' ? (
                                 <button
                                     className={styles.releaseButton}
                                     disabled={pendingBotUuid === robot.botUuid}
@@ -140,7 +171,7 @@ const ConnectionsTab = ({vm}) => {
                                     )}
                                 </button>
                             ) : null}
-                            {robot.connected === false && robot.claimState !== 'claimed' ? (
+                            {!serial && robot.connected === false && robot.claimState !== 'claimed' ? (
                                 <button
                                     className={styles.releaseButton}
                                     disabled={pendingBotUuid !== null}
@@ -160,11 +191,17 @@ const ConnectionsTab = ({vm}) => {
                 </div>
             ) : (
                 <div className={styles.emptyState}>
-                    <FormattedMessage
+                    {serial ? (
+                        <FormattedMessage
+                            defaultMessage="No Tinkibots discovered. Connect the USB modem and turn on nearby robots."
+                            description="Empty Web Serial discovery list"
+                            id="gui.connectionsTab.noDiscoveredRobots"
+                        />
+                    ) : <FormattedMessage
                         defaultMessage="No robots are connected yet. Turn on your robot to see it here!"
                         description="Friendly instructions shown when there are no connected robots"
                         id="gui.connectionsTab.empty"
-                    />
+                    />}
                 </div>
             )}
         </section>

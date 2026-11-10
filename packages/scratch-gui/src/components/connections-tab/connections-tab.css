@@ -140,3 +140,44 @@
 .disconnected .connected-label {
     color: #666;
 }
+
+.connection-controls {
+    max-width: 50rem;
+    margin: 0 auto 2rem;
+    padding: 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.75rem;
+    background: $ui-white;
+    line-height: 1.5;
+}
+
+.connection-controls select {
+    max-width: 100%;
+    margin: 0.5rem;
+    padding: 0.4rem;
+}
+
+.connection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.connection-actions button {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.debug-panel pre {
+    max-height: 18rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.75rem;
+}
+
+.robot-uuid {
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+}

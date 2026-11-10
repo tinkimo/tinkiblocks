@@ -6,9 +6,10 @@ import EventEmitter from 'events';
 
 import ConnectionsTab from '../../../src/components/connections-tab/connections-tab';
 
-const renderConnections = robots => {
+const renderConnections = (robots, manager = null) => {
     const runtime = new EventEmitter();
     runtime.tinkibotConnectedRobots = robots;
+    runtime.tinkibotConnectionManager = manager;
     runtime.claimTinkibotRobot = jest.fn();
     runtime.releaseTinkibotRobot = jest.fn();
     runtime.removeTinkibotRobot = jest.fn();
@@ -68,4 +69,97 @@ describe('ConnectionsTab', () => {
         expect(queryByRole('button', {name: 'Release'})).toBeNull();
     });
 
+});
+
+const createManager = overrides => {
+    const manager = new EventEmitter();
+    manager.state = {method: 'web-serial',
+        supported: true,
+        secure: true,
+        status: 'disconnected',
+        modem: 'unidentified',
+        ports: [],
+        selectedPort: null,
+        robots: [],
+        logs: [],
+        verbose: false,
+        error: '',
+        switching: false,
+        proxyStatus: 'disconnected',
+        ...overrides};
+    manager.snapshot = () => manager.state;
+    for (const method of ['selectMethod', 'addPort', 'refreshPorts', 'connect', 'disconnect']) {
+        manager[method] = jest.fn(() => Promise.resolve());
+    }
+    for (const method of ['selectPort', 'setVerbose', 'clearLog', 'log']) manager[method] = jest.fn();
+    return manager;
+};
+
+describe('Web Serial Connections tab', () => {
+    test('shows modem robots separately from proxy reservations without control buttons', () => {
+        const manager = createManager({status: 'connected',
+            modem: 'identified',
+            robots: [
+                {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true}
+            ]});
+        const {getByText, getAllByText, queryByText, queryByRole, unmount} = renderConnections([
+            {nickname: 'Proxy blue', botUuid: 'proxy-robot-uuid', claimState: 'paired'}
+        ], manager);
+        expect(getByText('Discovered Tinkibots')).toBeVisible();
+        expect(getByText('USB lime')).toBeVisible();
+        expect(getByText('usb-robot-uuid')).toBeVisible();
+        expect(getByText('Available via modem')).toBeVisible();
+        expect(queryByText('Proxy blue')).toBeNull();
+        expect(queryByRole('button', {name: 'Claim'})).toBeNull();
+        expect(queryByRole('button', {name: 'Release'})).toBeNull();
+        expect(getAllByText('USB: Connected · Tinkimodem identified')[0]).toBeVisible();
+        expect(manager.listenerCount('change')).toBe(1);
+        unmount();
+        expect(manager.listenerCount('change')).toBe(0);
+    });
+
+    test('unsupported browser gives guidance and can select Local Proxy', () => {
+        const manager = createManager({supported: false, secure: false, status: 'unsupported'});
+        const {getByRole, getByText} = renderConnections([], manager);
+        expect(getByText(/Web Serial requires HTTPS/)).toBeVisible();
+        expect(getByRole('button', {name: 'Add USB Device'})).toBeDisabled();
+        fireEvent.change(getByRole('combobox', {name: 'Communication method'}), {target: {value: 'local-proxy'}});
+        expect(manager.selectMethod).toHaveBeenCalledWith('local-proxy');
+    });
+
+    test('native picker runs in the click handler; port selection and connect use manager', () => {
+        const port = {getInfo: () => ({usbVendorId: 0x303a, usbProductId: 0x1001})};
+        const manager = createManager({ports: [port], selectedPort: port});
+        const {getByRole} = renderConnections([], manager);
+        fireEvent.click(getByRole('button', {name: 'Add USB Device'}));
+        expect(manager.addPort).toHaveBeenCalledTimes(1);
+        fireEvent.change(getByRole('combobox', {name: 'USB modem'}), {target: {value: '0'}});
+        expect(manager.selectPort).toHaveBeenCalledWith(port);
+        fireEvent.click(getByRole('button', {name: 'Connect'}));
+        expect(manager.connect).toHaveBeenCalledTimes(1);
+        fireEvent.click(getByRole('button', {name: 'Refresh devices'}));
+        expect(manager.refreshPorts).toHaveBeenCalledTimes(1);
+    });
+
+    test('temporary diagnostics expose bounded log controls and copy metadata', async () => {
+        const writeText = jest.fn(() => Promise.resolve());
+        Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
+        const manager = createManager({logs: [{time: '2026-11-10T12:00:00Z', kind: 'rx', value: 'tinkimodem'}]});
+        const {getByRole, getByText} = renderConnections([], manager);
+        fireEvent.click(getByText('Connection debug log'));
+        fireEvent.click(getByRole('checkbox', {name: 'Verbose logging (raw and parsed messages)'}));
+        expect(manager.setVerbose).toHaveBeenCalledWith(true);
+        fireEvent.click(getByRole('button', {name: 'Clear log'}));
+        expect(manager.clearLog).toHaveBeenCalledTimes(1);
+        await act(async () => {
+            fireEvent.click(getByRole('button', {name: 'Copy log'}));
+            await Promise.resolve();
+        });
+        expect(JSON.parse(writeText.mock.calls[0][0])).toMatchObject({method: 'web-serial',
+            supported: true,
+            secure: true,
+            logs: manager.state.logs});
+        expect(getByText('Log copied')).toBeVisible();
+        delete navigator.clipboard;
+    });
 });

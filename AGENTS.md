@@ -113,6 +113,9 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 ### scratch-vm specifics
 
+- Web Serial discovery lives in `src/extensions/tinkimo_tinkibot/connection/`; see
+  `packages/scratch-vm/docs/tinkibot-web-serial.md` for protocol sources and hardware testing.
+  Serial discovery never creates claimable proxy reservations.
 - The Connections tab retains disconnected robot reservations until explicit Remove.
   VM lifecycle events must preserve claim ownership across reconnects.
 - Extension entry points live in `src/extensions/`. Each extension exports a class with `getInfo()` and block

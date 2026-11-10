@@ -12,6 +12,7 @@ const ActionBundles = require('./bundles');
 const robotActions = require('./bundles/actions');
 const bundleProtocol = require('./bundles/protocol');
 const publicAPI = require('./api');
+const ConnectionManager = require('./connection/connection-manager');
 
 const CLIENT_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
@@ -49,7 +50,15 @@ class TinkibotBlocks {
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         this.runtime.removeTinkibotRobot = this.removeRobot.bind(this);
-        if (typeof WebSocket !== 'undefined') this.connect();
+        this.connectionManager = new ConnectionManager({
+            connect: () => this.connect().catch(error => this.connectionManager.log('error', error.message)),
+            disconnect: () => this._disconnectProxy()
+        });
+        this.runtime.tinkibotConnectionManager = this.connectionManager;
+        if (typeof window !== 'undefined' && typeof WebSocket !== 'undefined' &&
+            this.connectionManager.method === 'local-proxy') {
+            this.connect().catch(error => this.connectionManager.log('error', error.message));
+        }
     }
 
     /**
@@ -847,19 +856,50 @@ class TinkibotBlocks {
 
 
     // helpers
+    _disconnectProxy () {
+        const socket = this._proxySocket;
+        if (socket) {
+            socket.onopen = socket.onclose = socket.onerror = socket.onmessage = null;
+            socket.close();
+            if (window.socket === socket) window.socket = null;
+            this._proxySocket = null;
+        }
+        if (this._connectionReject) this._connectionReject(new Error('Communication method changed'));
+        this._connectionReject = null;
+        this._connectionPromise = null;
+        this._connected = false;
+        this._pendingClaims.clear();
+        this._pendingRemovals.clear();
+        this._rejectPending(new Error('Communication method changed'), false);
+        this._setConnectedRobots(this._connectedRobots.map(robot => ({...robot, connected: false})));
+        this.connectionManager.reportProxy('disconnected');
+    }
+
     connect () {
+        if (this.connectionManager.method !== 'local-proxy') {
+            return Promise.reject(new Error(
+                'Web Serial supports discovery only; select Local Proxy for robot control'));
+        }
         if (this._connected) return Promise.resolve();
         if (this._connectionPromise) return this._connectionPromise;
 
         window.socket = new WebSocket('ws://127.0.0.1:9006');
-        this._connectionPromise = new Promise(resolve => {
+        this._proxySocket = window.socket;
+        this.connectionManager.reportProxy('connecting');
+        this._connectionPromise = new Promise((resolve, reject) => {
+            this._connectionReject = reject;
             window.socket.onopen = () => {
                 this._connected = true;
+                this._connectionReject = null;
+                this.connectionManager.reportProxy('connected');
                 resolve();
             };
         });
 
         window.socket.onclose = () => {
+            if (this._connectionReject) this._connectionReject(new Error('Local Proxy disconnected'));
+            this._connectionReject = null;
+            this.connectionManager.reportProxy('disconnected');
             if (!alerted) {
                 alerted = true;
                 alert('Tinkibot has disconnected!');
@@ -872,6 +912,7 @@ class TinkibotBlocks {
         };
 
         window.socket.onerror = () => {
+            this.connectionManager.reportProxy('error');
             if (this._pendingResponse) {
                 this._rejectPending(new Error('Tinkibot connection failed'));
             }

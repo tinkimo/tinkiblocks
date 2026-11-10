@@ -73,3 +73,10 @@ contributors. Thank you for your contributions and support. _[Scratch on!](https
 We provide [Scratch](https://scratch.mit.edu) free of charge, and want to keep it that way! Please consider making a
 [donation](https://www.scratchfoundation.org/donate) to support our continued engineering, design, community, and
 resource development efforts. Donations of any size are appreciated. Thank you!
+
+## Tinkibot Web Serial preview
+
+The Connections tab can identify a USB Tinkimodem and discover robots directly
+from desktop Chrome/Edge without the Python proxy. Local Proxy remains the method
+for claiming and controlling robots. See [the protocol findings, limitations and
+hardware test instructions](packages/scratch-vm/docs/tinkibot-web-serial.md).
