@@ -181,3 +181,23 @@
     font-size: 0.75rem;
     overflow-wrap: anywhere;
 }
+
+.segmented {
+    display: inline-flex;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.4rem;
+    overflow: hidden;
+}
+.segmented button {
+    border: 0;
+    border-radius: 0;
+    padding: 0.45rem 1rem;
+}
+.segmented button[aria-checked="true"] {
+    background: $motion-primary;
+    color: white;
+}
+.debug-panel {
+    max-width: 50rem;
+    margin: 1.5rem auto 0;
+}

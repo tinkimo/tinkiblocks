@@ -8,6 +8,8 @@ const VirtualMachine = require('../../src/virtual-machine');
 const adapter = require('../../src/engine/adapter');
 const dispatch = require('../../src/dispatch/central-dispatch');
 
+let managers = [];
+
 class Socket {
     constructor () {
         this.sent = [];
@@ -29,6 +31,7 @@ class Socket {
         });
         Socket.instance = this;
     }
+    close () {}
     send (value) {
         const frame = JSON.parse(value);
         this.publicSent.push(frame);
@@ -41,10 +44,12 @@ class Socket {
 }
 
 beforeEach(t => {
+    managers = [];
     global.window = {};
     global.WebSocket = Socket;
     global.alert = () => {};
-    t.teardown(() => {
+    t.teardown(async () => {
+        await Promise.all(managers.map(manager => manager.dispose()));
         delete global.window;
         delete global.WebSocket;
         delete global.alert;
@@ -60,6 +65,7 @@ const setup = () => {
     target.tempo = 60;
     runtime.targets.push(target);
     const extension = new Tinkibot(runtime);
+    managers.push(extension.connectionManager);
     extension._setConnectedRobots([{
         'nickname': 'lime', 'bot-uuid': 'robot-lime', 'client-uuid': extension._clientUuid
     }]);
@@ -662,6 +668,7 @@ test('response timeout includes sequential music duration rather than expiring a
 
 test('editor-created startup and shutdown dropdown blocks batch through registered extension primitives', async t => {
     const vm = new VirtualMachine();
+    managers.push(vm.runtime.tinkibotConnectionManager);
     const runtime = vm.runtime;
     runtime.currentStepTime = 1000 / 30;
     const target = new RenderedTarget(new Sprite(null, runtime), runtime);
@@ -873,6 +880,7 @@ test('button melody bundles all nine notes despite other button hats', async t =
 
 test('drum dropdown repeat batches adjacent hits and preserves rests despite a dormant melody hat', async t => {
     const vm = new VirtualMachine();
+    managers.push(vm.runtime.tinkibotConnectionManager);
     const runtime = vm.runtime;
     runtime.currentStepTime = 1000 / 30;
     const target = new RenderedTarget(new Sprite(null, runtime), runtime);

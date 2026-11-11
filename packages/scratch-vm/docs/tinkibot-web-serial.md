@@ -1,10 +1,11 @@
 # Shared Tinkibot API: Local Proxy and Web Serial
 
-The Connections tab selects Local Proxy (WebSocket/Python service) or Web Serial
-(USB ESP32-C3 running **tinkimoden-proxy**). Both paths support discovery,
+The Connections tab offers **Auto | Modem | Proxy**. Auto checks authorised USB
+ESP32-C3 gateways running **tinkimoden-proxy**, then falls back to the local
+WebSocket/Python service. Both paths support discovery,
 physical claims, release/remove, Scratch actions, sensor reporters, bundles and
-asynchronous events. The serial preference persists, but device permission and
-connection remain user initiated. No browser extension or desktop application
+asynchronous events. The preference persists; new device permission remains
+user initiated. Previously authorised devices connect automatically. No browser extension or desktop application
 is required for Web Serial after firmware provisioning.
 
 ## Architecture and investigation
@@ -65,7 +66,8 @@ states. UI components subscribe to that registry and call the same runtime metho
 1. Provision the ESP32-C3 using the gateway README; stop the Python proxy and all
    serial monitors. Updating source alone does not update the hosted editor.
 2. Deploy the matching editor through the existing HTTPS release process. Open it
-   in current desktop Chrome/Edge and select Connections → Web Serial.
+   in current desktop Chrome/Edge and open Connections. Auto is the default;
+   Modem restricts detection to USB and Proxy restricts it to the Python service.
 3. Add USB Device opens the browser's own permission dialog directly from the
    click handler. Cancelling is harmless. Previously authorised ports come from
    `navigator.serial.getPorts()`. Select the appropriate port and Connect.
@@ -104,7 +106,9 @@ Serial pending requests are keyed by request ID and checked against client and
 bot UUIDs. They are bounded at 32 in the browser; the C3 admits only two executing
 requests, one per UUID, returning busy beyond that. The existing VM command queue
 keeps sequential block execution; different requests cannot overwrite one another.
-Registration renews a 20-second client lease every five seconds. All requests use
+Registration renews a 20-second client lease using a nonoverlapping five-second
+refresh. One missed refresh is tolerated; three consecutive failures close the
+link. Successful replies are applied only to the connection that requested them. All requests use
 fresh IDs. Malformed/wrong/late responses do not complete another caller.
 
 Switching clears transport availability, removes old serial listeners or socket
@@ -126,7 +130,8 @@ Use Reconnect Local Proxy if the Python service starts after the initial attempt
 
 ## Diagnostics and limits
 
-ConnectionControls contains a separately removable `ConnectionDebugPanel`.
+The permanent `ConnectionDebugPanel` appears below the robot list, with an
+internally scrolling console. History survives preference and transport changes.
 It shows selected transport, serial/security support, port VID/PID, USB and
 handshake status, firmware and robot count. Verbose mode logs outgoing/incoming
 and parsed messages, IDs, robot/claim events and errors. Logs are in-memory,
@@ -206,3 +211,6 @@ General Python scripting, console/file tools and file transfers remain outside
 this firmware. Next steps are real C3 coexistence/heap validation, shared generated
 schema fixtures, robot claim/session epochs and authenticated routing before
 migrating encrypted communication or file transfers.
+
+See [Automatic connections](tinkibot-automatic-connections.md) for detection,
+recovery, investigation findings and the Windows Chrome/Edge acceptance checks.

@@ -4,7 +4,7 @@ import {FormattedMessage} from 'react-intl';
 import VM from '@scratch/scratch-vm';
 
 import styles from './connections-tab.css';
-import ConnectionControls from './connection-controls.jsx';
+import ConnectionControls, {ConnectionDebugPanel} from './connection-controls.jsx';
 
 const ConnectionsTab = ({vm}) => {
     const manager = vm.runtime.tinkibotConnectionManager;
@@ -19,6 +19,7 @@ const ConnectionsTab = ({vm}) => {
         if (!manager) return () => {};
         setConnection(manager.snapshot());
         manager.on('change', setConnection);
+        if (manager.started) manager.activate();
         return () => manager.removeListener('change', setConnection);
     }, [manager]);
 
@@ -214,6 +215,10 @@ const ConnectionsTab = ({vm}) => {
                     />}
                 </div>
             )}
+            {manager && connection ? <ConnectionDebugPanel
+                manager={manager}
+                state={connection}
+            /> : null}
         </section>
     );
 };
