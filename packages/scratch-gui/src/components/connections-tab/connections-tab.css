@@ -31,7 +31,10 @@
 }
 
 .heading-icon {
-    font-size: 2rem;
+    display: block;
+    width: 2.5rem;
+    height: 2.5rem;
+    object-fit: contain;
 }
 
 .robot-list {
@@ -57,7 +60,10 @@
 }
 
 .robot-icon {
-    font-size: 3rem;
+    display: block;
+    width: 5rem;
+    height: 5rem;
+    object-fit: contain;
 }
 
 .status-dot {

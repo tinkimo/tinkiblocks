@@ -12,7 +12,9 @@ correlation and bundle collection boundaries are unchanged.
 The status panel, robot heading/list and diagnostics share a left-aligned edge.
 Expert uses a mode/retry toolbar, a separate USB settings group, themed primary
 and secondary buttons, and consistent field spacing. Controls wrap on narrow
-panes; the console retains independent scrolling and keyboard access.
+panes; the console retains independent scrolling and keyboard access. The header
+and cards share `tinkibot-blue.png`, a transparent blue/pale-blue adaptation of the
+user-provided robot illustration; the nickname supplies its accessible label.
 
 ## Detection and recovery
 

@@ -4,6 +4,7 @@ import {FormattedMessage} from 'react-intl';
 import VM from '@scratch/scratch-vm';
 
 import styles from './connections-tab.css';
+import robotImage from './tinkibot-blue.png';
 import ConnectionControls, {ConnectionDebugPanel} from './connection-controls.jsx';
 
 const ConnectionsTab = ({vm}) => {
@@ -85,10 +86,12 @@ const ConnectionsTab = ({vm}) => {
                 />
             </p> : null}
             <div className={styles.robotsHeading}>
-                <div
-                    aria-hidden
+                <img
+                    alt=""
+                    aria-hidden="true"
                     className={styles.headingIcon}
-                >🤖</div>
+                    src={robotImage}
+                />
                 <h2>
                     {serial ? <FormattedMessage
                         defaultMessage="Discovered Tinkibots"
@@ -113,10 +116,12 @@ const ConnectionsTab = ({vm}) => {
                                 aria-hidden
                                 className={styles.statusDot}
                             />
-                            <span
-                                aria-hidden
+                            <img
+                                alt=""
+                                aria-hidden="true"
                                 className={styles.robotIcon}
-                            >🤖</span>
+                                src={robotImage}
+                            />
                             <strong>{robot.nickname || <FormattedMessage
                                 defaultMessage="Unnamed Tinkibot"
                                 description="Label for a robot whose UUID is known but nickname is empty"
