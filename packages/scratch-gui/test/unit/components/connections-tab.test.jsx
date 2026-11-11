@@ -99,10 +99,16 @@ const createManager = overrides => {
     return manager;
 };
 
+const renderExpertConnections = (robots, manager) => {
+    const view = renderConnections(robots, manager);
+    fireEvent.click(view.getByRole('button', {name: 'Expert'}));
+    return view;
+};
+
 describe('Web Serial Connections tab', () => {
     test('serial robot cards use shared claim/release operations and show UUIDs', () => {
         const manager = createManager({status: 'connected', modem: 'identified'});
-        const {getByText, getAllByText, getByRole, runtime, unmount} = renderConnections([
+        const {getByText, getAllByText, getByRole, runtime, unmount} = renderExpertConnections([
             {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true, claimState: 'free'}
         ], manager);
         expect(getByText('Discovered Tinkibots')).toBeVisible();
@@ -124,14 +130,14 @@ describe('Web Serial Connections tab', () => {
 
     test('Local Proxy can be retried without changing the transport preference', () => {
         const manager = createManager({method: 'local-proxy', preference: 'proxy', proxyStatus: 'disconnected'});
-        const {getByRole} = renderConnections([], manager);
+        const {getByRole} = renderExpertConnections([], manager);
         fireEvent.click(getByRole('button', {name: 'Reconnect Local Proxy'}));
         expect(manager.reconnectProxy).toHaveBeenCalledTimes(1);
     });
 
     test('unsupported browser gives guidance and can select Local Proxy', () => {
         const manager = createManager({supported: false, secure: false, status: 'unsupported'});
-        const {getByRole, getByText} = renderConnections([], manager);
+        const {getByRole, getByText} = renderExpertConnections([], manager);
         expect(getByText(/Web Serial requires HTTPS/)).toBeVisible();
         expect(getByRole('button', {name: 'Add USB Device'})).toBeDisabled();
         fireEvent.click(getByRole('radio', {name: 'Proxy'}));
@@ -141,7 +147,7 @@ describe('Web Serial Connections tab', () => {
     test('native picker runs in the click handler; port selection and connect use manager', () => {
         const port = {getInfo: () => ({usbVendorId: 0x303a, usbProductId: 0x1001})};
         const manager = createManager({ports: [port], selectedPort: port});
-        const {getByRole} = renderConnections([], manager);
+        const {getByRole} = renderExpertConnections([], manager);
         fireEvent.click(getByRole('button', {name: 'Add USB Device'}));
         expect(manager.addPort).toHaveBeenCalledTimes(1);
         fireEvent.change(getByRole('combobox', {name: 'USB modem'}), {target: {value: '0'}});
@@ -156,7 +162,7 @@ describe('Web Serial Connections tab', () => {
         const writeText = jest.fn(() => Promise.resolve());
         Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
         const manager = createManager({logs: [{time: '2026-11-10T12:00:00Z', kind: 'rx', value: 'tinkimodem'}]});
-        const {getByRole, getByText} = renderConnections([], manager);
+        const {getByRole, getByText} = renderExpertConnections([], manager);
         fireEvent.click(getByText('Connection debug log'));
         const output = getByText('2026-11-10T12:00:00Z [rx] tinkimodem');
         expect(output).toHaveAccessibleName('Connection log');
@@ -186,7 +192,7 @@ test('Auto preference is distinct from active transport and diagnostics stay bel
         phase: 'proxy-connected',
         activeTransport: 'local-proxy',
         logs});
-    const {getByRole, getByText, runtime} = renderConnections([
+    const {getByRole, getByText, runtime} = renderExpertConnections([
         {nickname: 'lime', botUuid: 'lime', claimState: 'free'}
     ], manager);
     expect(getByRole('radio', {name: 'Auto'})).toHaveAttribute('aria-checked', 'true');
@@ -205,4 +211,41 @@ test('Auto preference is distinct from active transport and diagnostics stay bel
     expect(consolePanel.textContent).toContain('2026-11-11T10:00:00Z [proxy] connected');
     fireEvent.click(getByRole('button', {name: 'Retry connection detection'}));
     expect(manager.retry).toHaveBeenCalledTimes(1);
+});
+
+describe('Simple connection status', () => {
+    test.each([
+        [{activeTransport: 'web-serial', phase: 'usb-connected'}, 'Connected via USB Modem', 'online'],
+        [{activeTransport: 'local-proxy', phase: 'proxy-connected'}, 'Connected via Local Proxy', 'online'],
+        [{phase: 'searching-modem'}, 'Searching for modem', 'searching'],
+        [{phase: 'connecting-proxy'}, 'Connecting to proxy', 'searching'],
+        [{phase: 'retrying'}, 'Looking for a connection', 'searching'],
+        [{phase: 'disconnected'}, 'Disconnected', 'offline']
+    ])('shows the actual connection state with controls collapsed: %s', (state, text, indicator) => {
+        const manager = createManager(state);
+        const {getByText, getByRole, queryByRole, queryByText} = renderConnections([], manager);
+        expect(getByText(text)).toBeVisible();
+        expect(getByText(text).parentElement.querySelector('[data-state]').dataset.state).toBe(indicator);
+        expect(getByRole('button', {name: 'Expert'})).toHaveAttribute('aria-expanded', 'false');
+        expect(queryByRole('radio', {name: 'Auto'})).toBeNull();
+        expect(queryByRole('button', {name: 'Add USB Device'})).toBeNull();
+        expect(queryByText('Connection debug log')).toBeNull();
+    });
+
+    test('Expert toggles manual controls and diagnostics without losing log history', () => {
+        const manager = createManager({logs: [{time: 'now', kind: 'error', value: 'Proxy unavailable'}]});
+        const {getByRole, getByText, queryByRole, queryByText} = renderConnections([], manager);
+        const expert = getByRole('button', {name: 'Expert'});
+        fireEvent.click(expert);
+        expect(expert).toHaveAttribute('aria-expanded', 'true');
+        expect(getByRole('radio', {name: 'Auto'})).toBeVisible();
+        fireEvent.click(getByText('Connection debug log'));
+        expect(getByText('now [error] Proxy unavailable')).toBeVisible();
+        fireEvent.click(expert);
+        expect(queryByRole('radio', {name: 'Auto'})).toBeNull();
+        expect(queryByText('Connection debug log')).toBeNull();
+        fireEvent.click(expert);
+        expect(getByText('now [error] Proxy unavailable')).toBeInTheDocument();
+        expect(manager.state.logs).toHaveLength(1);
+    });
 });

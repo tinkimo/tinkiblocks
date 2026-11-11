@@ -510,7 +510,7 @@ test('Auto with no authorised modem falls back to proxy', async t => {
     t.equal(manager.snapshot().activeTransport, 'local-proxy');
 });
 
-test('Unavailable proxy has a bounded timeout and three backoff retries', async t => {
+test('Unavailable proxy has bounded timeouts, three fast retries, then slow background checks', async t => {
     const clock = FakeTimers.install();
     const {manager, calls} = makeManager(t);
     manager.proxy.connect = () => {
@@ -520,13 +520,13 @@ test('Unavailable proxy has a bounded timeout and three backoff retries', async 
     const start = manager.start();
     await clock.tickAsync(2501);
     await start;
-    t.equal(manager.snapshot().phase, 'disconnected');
+    t.equal(manager.snapshot().phase, 'retrying');
     t.match(manager.snapshot().error, /timed out/);
     await clock.tickAsync(30000);
     t.equal(calls.filter(call => call === 'connect').length, 4);
     t.equal(manager.retryCount, 3);
     await clock.tickAsync(60000);
-    t.equal(calls.filter(call => call === 'connect').length, 4, 'retry loop stops');
+    t.equal(calls.filter(call => call === 'connect').length, 6, 'background checks are spaced by 30 seconds');
     await manager.dispose();
     clock.uninstall();
 });
@@ -534,7 +534,7 @@ test('Unavailable proxy has a bounded timeout and three backoff retries', async 
 test('Manual Modem never falls back to proxy', async t => {
     const {manager, calls} = makeManager(t);
     await manager.selectPreference('modem');
-    t.equal(manager.snapshot().phase, 'disconnected');
+    t.equal(manager.snapshot().phase, 'retrying');
     t.notOk(calls.includes('connect'));
 });
 
@@ -556,7 +556,7 @@ test('Manual port selection pins Auto to that port until preference changes', as
     manager.selectPort(selected);
     await manager.start();
     t.same(other.sent, []);
-    t.notOk(calls.includes('connect'), 'manual selection cannot silently fall back');
+    t.ok(calls.includes('connect'), 'Auto can fall back while keeping the preferred USB selection');
     await manager.selectPreference('auto');
     t.equal(manager.transport.port, other);
 });
@@ -812,4 +812,88 @@ test('Rejected release notifies UI completion even when ownership remains unchan
     t.equal(extension._connectedRobots[0].claimState, 'paired');
     t.equal(extension._pendingReleases.size, 0);
     t.equal(events.length, count + 1, 'controls can retry without rebuilding unchanged periodic snapshots');
+});
+
+test('Auto falls back to proxy after the manually selected USB modem is removed', async t => {
+    const {manager, serial, calls} = makeManager(t);
+    const port = new Port();
+    serial.ports = [port];
+    manager.selectPort(port);
+    await manager.start();
+    t.equal(manager.snapshot().activeTransport, 'web-serial');
+    serial.ports = [];
+    port.inUse = true;
+    await manager.fail(new Error('USB modem stopped'));
+    await manager.retry();
+    t.equal(manager.snapshot().activeTransport, 'local-proxy');
+    t.ok(calls.includes('connect'));
+    t.equal(manager.manualPort, port, 'selected modem stays preferred when it returns');
+});
+
+test('Proxy started after the initial retry budget is discovered by a slow background check', async t => {
+    const clock = FakeTimers.install();
+    const {manager} = makeManager(t);
+    let available = false;
+    manager.proxy.connect = () => available ? Promise.resolve() : Promise.reject(new Error('Proxy not running'));
+    await manager.selectPreference('proxy');
+    await clock.tickAsync(15000);
+    t.equal(manager.snapshot().activeTransport, null);
+    available = true;
+    await clock.tickAsync(30001);
+    t.equal(manager.snapshot().activeTransport, 'local-proxy');
+    await manager.disconnect();
+    available = false;
+    await clock.tickAsync(60000);
+    t.equal(manager.snapshot().activeTransport, null, 'manual disconnect pauses background checks');
+    await manager.dispose();
+    clock.uninstall();
+});
+
+test('Real VM switches from USB to a fresh proxy socket and receives the proxy robot list', async t => {
+    const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
+    const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+    const serial = new Serial([new Port()]);
+    global.window = {isSecureContext: true};
+    Object.defineProperty(global, 'navigator', {configurable: true, value: {serial}});
+    const sockets = [];
+    global.WebSocket = class {
+        constructor (url) {
+            this.url = url;
+            sockets.push(this);
+        }
+        close () {
+            this.closed = true;
+        }
+    };
+    const extension = new TinkibotBlocks({emit: () => {}});
+    const manager = extension.connectionManager;
+    t.teardown(async () => {
+        await manager.dispose();
+        delete global.window;
+        delete global.WebSocket;
+        if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+        else delete global.navigator;
+    });
+    await manager.start();
+    t.equal(manager.snapshot().activeTransport, 'web-serial');
+    await manager.disconnect();
+    serial.ports = [];
+    const switching = manager.selectPreference('proxy');
+    await flush();
+    t.equal(sockets.length, 1);
+    t.equal(manager.snapshot().activeTransport, null, 'no green status before WebSocket opens');
+    sockets[0].onopen();
+    await switching;
+    t.equal(manager.snapshot().activeTransport, 'local-proxy');
+    t.equal(sockets[0].url, 'ws://127.0.0.1:9006');
+    sockets[0].onmessage({data: JSON.stringify({event: 'connected_robots',
+        robots: [{'bot-uuid': ID2, 'nickname': 'proxy pink'}]})});
+    t.equal(extension._connectedRobots[0].nickname, 'proxy pink');
+    // A stale shared ready flag must never impersonate an actual proxy socket.
+    await extension._disconnectProxy();
+    extension._connected = true;
+    const reconnecting = extension._connectProxy();
+    t.equal(sockets.length, 2, 'a real socket is required even if USB left a ready flag');
+    sockets[1].onopen();
+    await reconnecting;
 });

@@ -439,7 +439,8 @@ class ConnectionManager extends EventEmitter {
         if (this.preference !== 'proxy' && this.available) {
             this.update({phase: proxyWasConnected ? 'proxy-connected' : 'searching-modem'});
             await this.refreshPorts();
-            const ports = this.manualPort ? [this.manualPort] : this.state.ports;
+            const ports = this.manualPort ?
+                this.state.ports.filter(port => port === this.manualPort) : this.state.ports;
             for (const port of ports) {
                 if (!valid()) return;
                 if (this.failedPorts.has(port)) continue;
@@ -482,6 +483,7 @@ class ConnectionManager extends EventEmitter {
                 this.apiReady = true;
                 this.serialAttempt++;
                 this.refreshFailures = 0;
+                this.retryCount = 0;
                 this.update({method: this.method,
                     activeTransport: this.method,
                     phase: 'usb-connected',
@@ -499,7 +501,7 @@ class ConnectionManager extends EventEmitter {
             }
         }
         if (!valid()) return;
-        if (this.preference !== 'modem' && !this.manualPort) {
+        if (['auto', 'proxy'].includes(this.preference)) {
             if (proxyWasConnected) {
                 this.update({phase: 'proxy-connected'});
                 return;
@@ -537,8 +539,10 @@ class ConnectionManager extends EventEmitter {
 
     scheduleRecovery () {
         if (!this.started || this.paused || this.disposed || this.state.switching ||
-            this.retryTimer || this.retryCount >= 3) return;
-        const delay = [1000, 3000, 10000][this.retryCount++];
+            this.retryTimer) return;
+        const fastRetry = this.retryCount < 3;
+        const delay = fastRetry ? [1000, 3000, 10000][this.retryCount++] : 30000;
+        if (fastRetry) this.update({phase: 'retrying'});
         this.log('recovery', `Retry in ${delay} ms`);
         this.retryTimer = setTimeout(() => {
             this.retryTimer = null;
@@ -688,6 +692,12 @@ class ConnectionManager extends EventEmitter {
                 phase: status === 'connected' ? 'proxy-connected' :
                     (status === 'connecting' ? 'connecting-proxy' : 'disconnected')
             } : {})});
+        if (status === 'connected') {
+            this.retryCount = 0;
+            clearTimeout(this.retryTimer);
+            this.retryTimer = null;
+            this.update({error: ''});
+        }
         this.log('proxy', status);
         if (['disconnected', 'error'].includes(status) && this.method === 'local-proxy') {
             this.proxyNeedsReset = true;

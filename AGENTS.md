@@ -115,6 +115,7 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 - Web Serial robot API transport lives in `src/extensions/tinkimo_tinkibot/connection/`; see
   `packages/scratch-vm/docs/tinkibot-web-serial.md` for gateway compatibility and hardware testing.
+  The normal Connections view shows a status light/transport; Expert reveals manual controls and diagnostics.
   `ConnectionManager` owns the persisted Auto/Modem/Proxy preference and recovery;
   see `packages/scratch-vm/docs/tinkibot-automatic-connections.md`. Never automatically request serial permission.
   Both transports use the shared robot API/registry; pending or uncertain serial claims cannot run blocks.

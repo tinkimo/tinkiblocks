@@ -68,7 +68,7 @@ states. UI components subscribe to that registry and call the same runtime metho
 2. Deploy the matching editor through the existing HTTPS release process. Open it
    in current desktop Chrome/Edge and open Connections. Auto is the default;
    Modem restricts detection to USB and Proxy restricts it to the Python service.
-3. Add USB Device opens the browser's own permission dialog directly from the
+3. Open Expert. Add USB Device opens the browser's own permission dialog directly from the
    click handler. Cancelling is harmless. Previously authorised ports come from
    `navigator.serial.getPorts()`. Select the appropriate port and Connect.
 4. Expect `identify` → `tinkimoden-proxy`, followed by a correlated `register`
@@ -130,7 +130,7 @@ Use Reconnect Local Proxy if the Python service starts after the initial attempt
 
 ## Diagnostics and limits
 
-The permanent `ConnectionDebugPanel` appears below the robot list, with an
+Open Expert to reveal the permanent `ConnectionDebugPanel` below the robot list, with an
 internally scrolling console. History survives preference and transport changes.
 It shows selected transport, serial/security support, port VID/PID, USB and
 handshake status, firmware and robot count. Verbose mode logs outgoing/incoming

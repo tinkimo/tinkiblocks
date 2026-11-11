@@ -11,6 +11,8 @@ const ConnectionsTab = ({vm}) => {
     const [connection, setConnection] = useState(manager ? manager.snapshot() : null);
     const [proxyRobots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
     const [pendingBotUuid, setPendingBotUuid] = useState(null);
+    const [expertOpen, setExpertOpen] = useState(false);
+    const toggleExpert = useCallback(() => setExpertOpen(open => !open), []);
     const serial = connection && connection.method === 'web-serial';
     const robots = proxyRobots;
     const hasClaimedRobot = robots.some(robot => ['paired', 'pending', 'reserved'].includes(robot.claimState));
@@ -56,8 +58,10 @@ const ConnectionsTab = ({vm}) => {
             tabIndex={0}
         >
             {manager && connection ? <ConnectionControls
+                expertOpen={expertOpen}
                 manager={manager}
                 state={connection}
+                onToggleExpert={toggleExpert}
             /> : null}
             <div
                 aria-hidden
@@ -218,7 +222,7 @@ const ConnectionsTab = ({vm}) => {
                     />}
                 </div>
             )}
-            {manager && connection ? <ConnectionDebugPanel
+            {manager && connection && expertOpen ? <ConnectionDebugPanel
                 manager={manager}
                 state={connection}
             /> : null}

@@ -1,9 +1,19 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useId, useState} from 'react';
 import PropTypes from 'prop-types';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import styles from './connections-tab.css';
 
 const messages = defineMessages({
+    'expert': {
+        id: 'gui.connectionsTab.expert',
+        defaultMessage: 'Expert',
+        description: 'Reveal manual connection controls and diagnostics'
+    },
+    'retrying': {
+        id: 'gui.connectionsTab.retrying',
+        defaultMessage: 'Looking for a connection',
+        description: 'Connection detection and reconnection are in progress'
+    },
     'auto': {
         id: 'gui.connectionsTab.auto',
         defaultMessage: 'Auto',
@@ -293,8 +303,14 @@ ConnectionDebugPanel.propTypes = {
     state: PropTypes.object.isRequired
 };
 
-const ConnectionControls = ({manager, state}) => {
+const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
     const intl = useIntl();
+    const expertId = useId();
+    const searching = state.switching || ['searching-modem', 'connecting-proxy', 'retrying'].includes(state.phase);
+    const connected = Boolean(state.activeTransport);
+    const indicator = connected ? 'online' : (searching ? 'searching' : 'offline');
+    const statusMessage = connected ? (state.activeTransport === 'web-serial' ? 'usb-connected' : 'proxy-connected') :
+        (searching ? (messages[state.phase] ? state.phase : 'retrying') : 'disconnected');
     const serial = state.preference !== 'proxy';
     const busy = state.switching || state.status === 'connecting';
     const open = state.status === 'connected' || state.status === 'connecting';
@@ -314,117 +330,147 @@ const ConnectionControls = ({manager, state}) => {
         () => run(open ? manager.disconnect() : manager.connectSelected()), [manager, open, run]);
     return (
         <div className={styles.connectionControls}>
-            <div
-                aria-label={intl.formatMessage(messages.method)}
-                className={styles.segmented}
-                role="radiogroup"
-            >
-                {['auto', 'modem', 'proxy'].map(preference => (
-                    <button
-                        aria-checked={(state.preference || 'auto') === preference}
-                        key={preference}
-                        role="radio"
-                        type="button"
-                        value={preference}
-                        onClick={changeMethod}
-                    >{intl.formatMessage(messages[preference === 'proxy' ? 'proxyPreference' : preference])}</button>
-                ))}
+            <div className={styles.connectionSummary}>
+                <div
+                    aria-live="polite"
+                    className={styles.connectionStatus}
+                    role="status"
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`${styles.connectionLight} ${styles[indicator]}`}
+                        data-state={indicator}
+                    />
+                    <span>{intl.formatMessage(messages[statusMessage])}</span>
+                </div>
+                <button
+                    aria-controls={expertId}
+                    aria-expanded={expertOpen}
+                    className={styles.expertToggle}
+                    type="button"
+                    onClick={onToggleExpert}
+                >{intl.formatMessage(messages.expert)}</button>
             </div>
-            <p role="status">{intl.formatMessage(messages[state.phase] || messages.disconnected)}</p>
-            {state.upgradePending ? <p role="status">{intl.formatMessage(messages.deferred)}</p> : null}
-            <button
-                type="button"
-                onClick={retry}
-            >{intl.formatMessage(messages.retry)}</button>
-            {serial ? (
-                <div>
-                    {available ? null : (
-                        <p role="status">
+            <div
+                className={styles.expertPanel}
+                hidden={!expertOpen}
+                id={expertId}
+            >
+                <div
+                    aria-label={intl.formatMessage(messages.method)}
+                    className={styles.segmented}
+                    role="radiogroup"
+                >
+                    {['auto', 'modem', 'proxy'].map(preference => (
+                        <button
+                            aria-checked={(state.preference || 'auto') === preference}
+                            key={preference}
+                            role="radio"
+                            type="button"
+                            value={preference}
+                            onClick={changeMethod}
+                        >
+                            {intl.formatMessage(messages[preference === 'proxy' ? 'proxyPreference' : preference])}
+                        </button>
+                    ))}
+                </div>
+                {state.upgradePending ? <p role="status">{intl.formatMessage(messages.deferred)}</p> : null}
+                <button
+                    type="button"
+                    onClick={retry}
+                >{intl.formatMessage(messages.retry)}</button>
+                {serial ? (
+                    <div>
+                        {available ? null : (
+                            <p role="status">
+                                <FormattedMessage
+                                    defaultMessage="Web Serial requires HTTPS and a current desktop Chrome
+                                    or Microsoft Edge browser.
+                                    Check that this site's serial permission is allowed."
+                                    description="Web Serial capability and security guidance"
+                                    id="gui.connectionsTab.serialUnavailable"
+                                />
+                            </p>
+                        )}
+                        <label>
+                            {intl.formatMessage(messages.device)}
+                            <select
+                                disabled={!available || open || busy}
+                                value={state.ports.indexOf(state.selectedPort)}
+                                onChange={changePort}
+                            >
+                                {state.ports.length ? null : (
+                                    <option value={-1}>{intl.formatMessage(messages.noPorts)}</option>
+                                )}
+                                {state.ports.map((port, index) => (
+                                    <option
+                                        key={index}
+                                        value={index}
+                                    >{portLabel(port, index, intl)}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <div className={styles.connectionActions}>
+                            <button
+                                disabled={!available || busy || open}
+                                type="button"
+                                onClick={addPort}
+                            >{intl.formatMessage(messages.add)}</button>
+                            <button
+                                disabled={!available || busy}
+                                type="button"
+                                onClick={refreshPorts}
+                            >{intl.formatMessage(messages.refresh)}</button>
+                            <button
+                                disabled={!available || state.switching || (!open && !state.selectedPort)}
+                                type="button"
+                                onClick={toggleConnection}
+                            >{intl.formatMessage(open ? messages.disconnect : messages.connect)}</button>
+                        </div>
+                        <p role="status">{intl.formatMessage(messages.usbStatus, {
+                            status: intl.formatMessage(messages[state.status]),
+                            modem: intl.formatMessage(messages[state.modem])
+                        })}</p>
+                        <p>
                             <FormattedMessage
-                                defaultMessage="Web Serial requires HTTPS and a current desktop Chrome
-                                or Microsoft Edge browser.
-                                Check that this site's serial permission is allowed."
-                                description="Web Serial capability and security guidance"
-                                id="gui.connectionsTab.serialUnavailable"
+                                defaultMessage="USB connects to the modem. Robots below are discovered through it.
+                                Claim a robot and accept on its physical buttons before running blocks.
+                                Requires tinkimoden-proxy firmware; the original modem cannot run this robot API."
+                                description="Gateway hardware and physical confirmation requirements"
+                                id="gui.connectionsTab.gatewayRequirements"
                             />
                         </p>
-                    )}
-                    <label>
-                        {intl.formatMessage(messages.device)}
-                        <select
-                            disabled={!available || open || busy}
-                            value={state.ports.indexOf(state.selectedPort)}
-                            onChange={changePort}
-                        >
-                            {state.ports.length ? null : (
-                                <option value={-1}>{intl.formatMessage(messages.noPorts)}</option>
-                            )}
-                            {state.ports.map((port, index) => (
-                                <option
-                                    key={index}
-                                    value={index}
-                                >{portLabel(port, index, intl)}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <div className={styles.connectionActions}>
-                        <button
-                            disabled={!available || busy || open}
-                            type="button"
-                            onClick={addPort}
-                        >{intl.formatMessage(messages.add)}</button>
-                        <button
-                            disabled={!available || busy}
-                            type="button"
-                            onClick={refreshPorts}
-                        >{intl.formatMessage(messages.refresh)}</button>
-                        <button
-                            disabled={!available || state.switching || (!open && !state.selectedPort)}
-                            type="button"
-                            onClick={toggleConnection}
-                        >{intl.formatMessage(open ? messages.disconnect : messages.connect)}</button>
                     </div>
-                    <p role="status">{intl.formatMessage(messages.usbStatus, {
-                        status: intl.formatMessage(messages[state.status]),
-                        modem: intl.formatMessage(messages[state.modem])
+                ) : <div>
+                    <p role="status">{intl.formatMessage(messages.proxyStatus, {
+                        status: intl.formatMessage(messages[state.proxyStatus])
                     })}</p>
-                    <p>
+                    {['disconnected', 'error'].includes(state.proxyStatus) ? <button
+                        type="button"
+                        onClick={reconnectProxy}
+                    >
                         <FormattedMessage
-                            defaultMessage="USB connects to the modem. Robots below are discovered through it.
-                            Claim a robot and accept on its physical buttons before running blocks.
-                            Requires tinkimoden-proxy firmware; the original modem cannot run this robot API."
-                            description="Gateway hardware and physical confirmation requirements"
-                            id="gui.connectionsTab.gatewayRequirements"
+                            defaultMessage="Reconnect Local Proxy"
+                            description="Retry the existing Python proxy after a connection failure"
+                            id="gui.connectionsTab.reconnectProxy"
                         />
-                    </p>
-                </div>
-            ) : <div>
-                <p role="status">{intl.formatMessage(messages.proxyStatus, {
-                    status: intl.formatMessage(messages[state.proxyStatus])
-                })}</p>
-                {['disconnected', 'error'].includes(state.proxyStatus) ? <button
+                    </button> : null}
+                </div>}
+                {state.activeTransport === 'local-proxy' ? <button
                     type="button"
-                    onClick={reconnectProxy}
+                    onClick={disconnect}
                 >
-                    <FormattedMessage
-                        defaultMessage="Reconnect Local Proxy"
-                        description="Retry the existing Python proxy after a connection failure"
-                        id="gui.connectionsTab.reconnectProxy"
-                    />
+                    {intl.formatMessage(messages.disconnect)}
                 </button> : null}
-            </div>}
-            {state.activeTransport === 'local-proxy' ? <button
-                type="button"
-                onClick={disconnect}
-            >
-                {intl.formatMessage(messages.disconnect)}
-            </button> : null}
-            {state.error ? <p role="alert">{state.error}</p> : null}
+                {state.error ? <p role="alert">{state.error}</p> : null}
+            </div>
         </div>
     );
 };
 
 ConnectionControls.propTypes = {
+    expertOpen: PropTypes.bool.isRequired,
+    onToggleExpert: PropTypes.func.isRequired,
     manager: PropTypes.object.isRequired,
     state: PropTypes.object.isRequired
 };

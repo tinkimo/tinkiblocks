@@ -77,7 +77,9 @@ resource development efforts. Donations of any size are appreciated. Thank you!
 ## Tinkibot Web Serial gateway
 
 The Connections tab offers Auto / Modem / Proxy through the same robot API.
-Auto validates authorised USB gateways first, then tries the local proxy. With `tinkimoden-proxy` firmware on the USB ESP32-C3, desktop Chrome/Edge
+Auto validates authorised USB gateways first, then tries the local proxy.
+A green/amber/red light shows connection progress; Expert reveals manual controls
+and diagnostics. With `tinkimoden-proxy` firmware on the USB ESP32-C3, desktop Chrome/Edge
 can discover, claim, control and read sensors from robots without a Python proxy.
 A claim still needs confirmation on the robot. See [setup, protocol compatibility,
 resource limits and hardware testing](packages/scratch-vm/docs/tinkibot-web-serial.md).

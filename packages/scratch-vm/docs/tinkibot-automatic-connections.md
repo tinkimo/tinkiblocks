@@ -1,7 +1,11 @@
 # Automatic Tinkibot connections
 
 Connections offers Auto (default), Modem and Proxy. Preference and the actual
-active transport are separate manager state. The VM remains the authoritative
+active transport are separate manager state. The normal view shows a status light
+and the active transport. Green means connected, amber pulses during detection or
+fast retries, and red means disconnected. Reduced-motion preferences disable the
+pulse. Expert reveals mode selection, USB and retry controls, detailed errors and
+the bottom diagnostic console. The VM remains the authoritative
 robot registry; React subscribes to it. Blocks, the public request API, response
 correlation and bundle collection boundaries are unchanged.
 
@@ -14,7 +18,8 @@ correlation and bundle collection boundaries are unchanged.
   the next port opens. No DTR/RTS/reset sequence is sent.
 - Only Add USB Device calls `requestPort()`, directly from a click. Cancellation
   leaves the current connection alone. Selecting/authorising a port pins that
-  choice until the preference changes; Connect uses that choice.
+  preferred USB choice until the preference changes; Connect uses that choice.
+  Auto still falls back to Proxy when that device is unavailable; Modem stays USB-only.
 - If no compatible authorised port succeeds, Auto connects to
   `ws://127.0.0.1:9006`, with a 2.5-second connection deadline. Modem never falls
   back. Proxy never enumerates or opens USB ports.
@@ -25,8 +30,11 @@ correlation and bundle collection boundaries are unchanged.
   the UI offers a notification and Retry. A deferred candidate ends its lease
   and releases the port. Explicit preference changes cancel pending work.
 - USB attach/detach, serial stream errors, proxy loss, tab visibility and opening
-  Connections trigger policy checks. Recovery uses at most three delayed attempts
-  (1, 3, 10 seconds). Retry explicitly starts a fresh cycle. Disconnect pauses
+  Connections trigger policy checks. Recovery uses three fast delayed attempts
+  (1, 3, 10 seconds), then checks every 30 seconds so a proxy started later is
+  discovered without opening Expert. Each connection attempt is bounded; working
+  connections are left alone. Successful connection resets the fast-retry budget.
+  Retry explicitly starts a fresh cycle. Disconnect pauses
   recovery until Connect, Retry or a preference change.
 - Failed candidate ports are remembered for the session, avoiding repeated opens
   of unrelated hardware. Reattachment or explicit Retry permits another probe.
@@ -36,7 +44,7 @@ correlation and bundle collection boundaries are unchanged.
   viewport-bounded height and keyboard focus; Copy log remains reachable.
 - The diagnostic history is shared, in memory, and survives switches: up to 200
   timestamped entries of 1,000 characters, redacted as before. Verbose mode adds
-  raw/parsed traffic for both transports. Expand the bottom console to clear or
+  raw/parsed traffic for both transports. Open Expert and expand the bottom console to clear or
   copy metadata and logs. It scrolls internally.
 
 ## Discovery investigation and fixes
@@ -112,14 +120,15 @@ npm run build:dist
 
 Validation results for this change:
 
-- Serial/connection suite: 39 scenarios, 171 assertions passed.
+- Serial/connection suite: 42 scenarios, 185 assertions passed.
 - Existing VM/proxy/API/music/bundle regressions: 483 assertions passed.
-- GUI: 47 suites, 311 tests and 15 snapshots passed; one existing skipped test.
+- GUI: 47 suites, 318 tests and 15 snapshots passed; one existing skipped test.
 - VM build, GUI development/production builds and translation extraction passed.
   Production retains two asset-size warnings.
 - Scoped manager/serial/bundle and GUI lint: zero errors. GUI retains rule-conflict
   arrow-parenthesis and generic PropTypes warnings. The legacy VM extension has
-  233 lint errors and three warnings, exactly matching its baseline; package-wide
+  232 existing lint errors and three warnings (233 errors before removing the
+  disconnected alert); package-wide
   lint therefore remains blocked. Whitespace checks passed.
 - No physical modem/robot, firmware flash or hosted deployment validation.
 
@@ -131,6 +140,12 @@ reconnect and preference switching. This is browser simulation, not hardware
 verification.
 
 ## Windows Chrome/Edge manual acceptance
+
+Open Expert to access the controls and console in these checks. The normal view
+keeps just the light, transport status and Expert button visible. Verify the light
+is green only after a USB handshake or WebSocket open, amber during detection and
+fast retries, and red between unsuccessful background checks. Enable reduced
+motion in the OS to verify amber remains steady.
 
 1. Use the matching HTTPS editor and provisioned gateway. Close serial monitors.
    Open Connections with no saved preference: Auto should connect to an already
@@ -195,8 +210,27 @@ while its contents scroll independently; keyboard scrolling and Copy access pass
 The earlier component smoke used stub CSS and did not exercise this flex-layout
 failure. The updated verification uses the real Connections and GUI tab styles.
 
-The reported one-of-two physical robot discovery problem remains unconfirmed.
-A host simulation of sequential BLE connections with distinct UUIDs reaches both
-registry rows, while two BLE peers reporting the same UUID reproduce one row and
-`robot_uuid_peer_changed`. Compare the two standalone UUIDs and capture the verbose
-log with both robots on before attributing the hardware symptom to either path.
+The user confirmed that yellow and pink had the same persisted robot UUID.
+Assigning distinct UUIDs resolved the two-robot symptom. Host simulations likewise
+retain both distinct UUIDs and reject a second peer claiming the same UUID with
+`robot_uuid_peer_changed`. No gateway relaxation of peer identity binding is needed.
+
+## Proxy recovery and Expert view regression
+
+A manually selected USB port previously excluded the proxy fallback in Auto,
+even after unplugging that modem. The selected port now restricts which USB
+candidate is preferred, while Auto can fall back to Proxy when it is absent or
+fails validation. Explicit Modem still never falls back, and Proxy never probes USB.
+Initial recovery also stopped after three retries, missing a Python service started
+later. The manager now continues low-frequency, bounded checks at 30-second spacing;
+manual Disconnect pauses them. A stale shared ready flag without a proxy socket
+cannot short-circuit WebSocket creation. Transport loss is reflected by status
+instead of a blocking disconnected alert.
+
+The real-CSS Chromium check uses the real VM and a native browser WebSocket
+connected to a local test server on port 9006. It verifies: compact green USB status,
+Expert hiding/revealing controls, removal of a pinned USB modem falling back to the
+proxy and consuming its robot list, amber fast retries, red after the fast budget,
+and green recovery after restarting the actual test server later. Diagnostics and
+Copy remain scroll-accessible on a 1024×600 viewport. No page errors occurred.
+This verifies browser/socket behaviour, not physical BLE or the user's laptop.

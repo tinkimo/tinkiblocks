@@ -17,8 +17,6 @@ const ConnectionManager = require('./connection/connection-manager');
 const CLIENT_UUID_STORAGE_KEY = 'tinkiblocks.blocksUuid';
 const CLAIMED_BY_OTHER_USER = 'another-user';
 
-// has an websocket message already been received
-let alerted = false;
 let the_locale = null;
 
 //-----------------------------------
@@ -898,7 +896,7 @@ class TinkibotBlocks {
     }
 
     _connectProxy () {
-        if (this._connected) return Promise.resolve();
+        if (this._connected && this._proxySocket) return Promise.resolve();
         if (this._connectionPromise) return this._connectionPromise;
 
         window.socket = new WebSocket('ws://127.0.0.1:9006');
@@ -921,10 +919,6 @@ class TinkibotBlocks {
             if (this._connectionReject) this._connectionReject(new Error('Local Proxy disconnected'));
             this._connectionReject = null;
             this.connectionManager.reportProxy('disconnected');
-            if (!alerted) {
-                alerted = true;
-                alert('Tinkibot has disconnected!');
-            }
             this._connected = false;
             this._connectionPromise = null;
             this._pendingClaims.clear();
