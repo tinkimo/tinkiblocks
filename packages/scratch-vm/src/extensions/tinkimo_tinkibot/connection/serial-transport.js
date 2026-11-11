@@ -73,6 +73,7 @@ class SerialTransport {
         try {
             while (!this.closing) {
                 const {value, done} = await this.reader.read();
+                if (this.closing) return;
                 if (done) {
                     if (!this.closing) throw new Error('Serial device disconnected');
                     return;

@@ -88,7 +88,7 @@ const createManager = overrides => {
         proxyStatus: 'disconnected',
         ...overrides};
     manager.snapshot = () => manager.state;
-    for (const method of ['selectMethod', 'addPort', 'refreshPorts', 'connect', 'disconnect']) {
+    for (const method of ['selectMethod', 'addPort', 'refreshPorts', 'connect', 'disconnect', 'reconnectProxy']) {
         manager[method] = jest.fn(() => Promise.resolve());
     }
     for (const method of ['selectPort', 'setVerbose', 'clearLog', 'log']) manager[method] = jest.fn();
@@ -96,26 +96,33 @@ const createManager = overrides => {
 };
 
 describe('Web Serial Connections tab', () => {
-    test('shows modem robots separately from proxy reservations without control buttons', () => {
-        const manager = createManager({status: 'connected',
-            modem: 'identified',
-            robots: [
-                {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true}
-            ]});
-        const {getByText, getAllByText, queryByText, queryByRole, unmount} = renderConnections([
-            {nickname: 'Proxy blue', botUuid: 'proxy-robot-uuid', claimState: 'paired'}
+    test('serial robot cards use shared claim/release operations and show UUIDs', () => {
+        const manager = createManager({status: 'connected', modem: 'identified'});
+        const {getByText, getAllByText, getByRole, runtime, unmount} = renderConnections([
+            {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true, claimState: 'free'}
         ], manager);
         expect(getByText('Discovered Tinkibots')).toBeVisible();
         expect(getByText('USB lime')).toBeVisible();
         expect(getByText('usb-robot-uuid')).toBeVisible();
-        expect(getByText('Available via modem')).toBeVisible();
-        expect(queryByText('Proxy blue')).toBeNull();
-        expect(queryByRole('button', {name: 'Claim'})).toBeNull();
-        expect(queryByRole('button', {name: 'Release'})).toBeNull();
+        fireEvent.click(getByRole('button', {name: 'Claim'}));
+        expect(runtime.claimTinkibotRobot).toHaveBeenCalledWith('usb-robot-uuid');
+        act(() => runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', [
+            {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true, claimState: 'pending'}
+        ]));
+        expect(getByText('Awaiting robot confirmation; release to cancel')).toBeVisible();
+        fireEvent.click(getByRole('button', {name: 'Release'}));
+        expect(runtime.releaseTinkibotRobot).toHaveBeenCalledWith('usb-robot-uuid');
         expect(getAllByText('USB: Connected · Tinkimodem identified')[0]).toBeVisible();
         expect(manager.listenerCount('change')).toBe(1);
         unmount();
         expect(manager.listenerCount('change')).toBe(0);
+    });
+
+    test('Local Proxy can be retried without changing the transport preference', () => {
+        const manager = createManager({method: 'local-proxy', proxyStatus: 'disconnected'});
+        const {getByRole} = renderConnections([], manager);
+        fireEvent.click(getByRole('button', {name: 'Reconnect Local Proxy'}));
+        expect(manager.reconnectProxy).toHaveBeenCalledTimes(1);
     });
 
     test('unsupported browser gives guidance and can select Local Proxy', () => {

@@ -74,9 +74,10 @@ We provide [Scratch](https://scratch.mit.edu) free of charge, and want to keep i
 [donation](https://www.scratchfoundation.org/donate) to support our continued engineering, design, community, and
 resource development efforts. Donations of any size are appreciated. Thank you!
 
-## Tinkibot Web Serial preview
+## Tinkibot Web Serial gateway
 
-The Connections tab can identify a USB Tinkimodem and discover robots directly
-from desktop Chrome/Edge without the Python proxy. Local Proxy remains the method
-for claiming and controlling robots. See [the protocol findings, limitations and
-hardware test instructions](packages/scratch-vm/docs/tinkibot-web-serial.md).
+The Connections tab supports Local Proxy and Web Serial through the same robot
+API. With `tinkimoden-proxy` firmware on the USB ESP32-C3, desktop Chrome/Edge
+can discover, claim, control and read sensors from robots without a Python proxy.
+A claim still needs confirmation on the robot. See [setup, protocol compatibility,
+resource limits and hardware testing](packages/scratch-vm/docs/tinkibot-web-serial.md).

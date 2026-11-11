@@ -1,6 +1,7 @@
 const EventEmitter = require('events');
 const {SerialTransport} = require('./serial-transport');
-const ModemDiscovery = require('./modem-discovery');
+const uuid = require('uuid');
+const publicAPI = require('../api');
 
 const STORAGE_KEY = 'tinkiblocks.communicationMethod';
 const METHODS = ['local-proxy', 'web-serial'];
@@ -40,18 +41,15 @@ class ConnectionManager extends EventEmitter {
             verbose: false,
             error: '',
             switching: false,
-            proxyStatus: 'disconnected'};
+            proxyStatus: 'disconnected',
+            firmware: null};
         this.transport = new SerialTransport({
             onMessage: message => this.receive(message),
             onError: error => {
                 if (!this.transport.closing) this.fail(error);
             }
         });
-        this.discovery = new ModemDiscovery({
-            send: text => this.send(text),
-            onRobots: robots => this.update({robots}),
-            log: (...args) => this.log(...args)
-        });
+        this.pendingRequests = new Map();
         this.operations = Promise.resolve();
         this.serialAttempt = 0;
         this.onPortsChanged = event => {
@@ -160,7 +158,8 @@ class ConnectionManager extends EventEmitter {
                 await this.proxy.disconnect();
                 this.unlisten();
                 await this.disconnect();
-                this.update({method, robots: [], error: ''});
+                this.update({method, robots: [], error: '', firmware: null});
+                this.emit('message', {event: 'connected_robots', robots: []});
                 try {
                     if (this.storage) this.storage.setItem(STORAGE_KEY, method);
                 } catch (error) {
@@ -168,7 +167,7 @@ class ConnectionManager extends EventEmitter {
                 }
                 this.log('method', method);
                 if (method === 'web-serial') this.listen();
-                else this.proxy.connect();
+                else Promise.resolve(this.proxy.connect()).catch(error => this.log('error', error.message));
             } finally {
                 this.update({switching: false});
             }
@@ -194,10 +193,26 @@ class ConnectionManager extends EventEmitter {
                 if (this.transport.closing || attempt !== this.serialAttempt) return;
                 await this.identify();
                 if (attempt !== this.serialAttempt) return;
-                this.update({status: 'connected', modem: 'identified'});
-                this.log('modem', 'tinkimodem identified');
-                this.discovery.robots.clear();
-                this.discovery.start();
+                const registration = await this.control('register').catch(error => {
+                    throw new Error(`Gateway registration failed; install tinkimoden-proxy firmware: ${error.message}`);
+                });
+                if (!Array.isArray(registration.capabilities) ||
+                    !registration.capabilities.includes('robot-api-v1')) {
+                    throw new Error('Install tinkimoden-proxy firmware with robot-api-v1 support');
+                }
+                if (attempt !== this.serialAttempt) return;
+                this.apiReady = true;
+                this.update({status: 'connected', modem: 'identified', firmware: registration.firmware});
+                this.acceptRobots(registration.robots);
+                this.emit('ready');
+                this.log('modem', {firmware: registration.firmware, capabilities: registration.capabilities});
+                const leaseEpoch = this.serialAttempt;
+                this.leaseTimer = setInterval(() => {
+                    this.control('register').then(result => this.acceptRobots(result.robots))
+                        .catch(error => {
+                            if (this.serialAttempt === leaseEpoch) this.fail(error);
+                        });
+                }, 5000);
             } catch (error) {
                 if (attempt !== this.serialAttempt) return;
                 await this.disconnect();
@@ -242,38 +257,174 @@ class ConnectionManager extends EventEmitter {
     }
 
     receive (message) {
+        if (this.method !== 'web-serial' || this.transport.closing) return;
         if (message.kind !== 'text') {
             this.log(message.kind === 'overflow' ? 'error' : 'binary', message);
             return;
         }
         if (!message.text) return;
         this.log('rx', message.text);
-        if (message.text.toLowerCase() === 'tinkimodem' && this.identifyDone) this.identifyDone();
-        else this.discovery.receive(message.text);
+        if (['tinkimodem', 'tinkimoden-proxy'].includes(message.text.toLowerCase()) && this.identifyDone) {
+            this.identifyDone();
+        } else {
+            let value;
+            try {
+                value = JSON.parse(message.text);
+                if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                    throw new Error('Expected JSON object');
+                }
+            } catch (error) {
+                this.log('error', `Invalid gateway JSON: ${error.message}`);
+                return;
+            }
+            this.log('parsed', value);
+            if (value.event) {
+                if (!this.apiReady) return;
+                if (value.event === 'session_ended') {
+                    this.fail(new Error(value.message || 'Gateway session ended'));
+                    return;
+                }
+                if (value.event === 'connected_robots') this.acceptRobots(value.robots);
+                else if (value.event === 'diagnostic') this.log('diagnostic', value);
+                else {
+                    if (value.event === 'robot_disconnected') {
+                        for (const [id, request] of this.pendingRequests) {
+                            if (request.payload['bot-uuid'] === value['bot-uuid']) {
+                                clearTimeout(request.timer);
+                                request.reject(new Error('Robot disconnected before replying'));
+                                this.pendingRequests.delete(id);
+                            }
+                        }
+                    }
+                    this.emit('message', value);
+                    this.log('event', value);
+                }
+                return;
+            }
+            if (value.status === 'ERROR' && !value['request-id']) {
+                this.fail(new Error(value.message || 'Uncorrelated gateway error'));
+                return;
+            }
+            const pending = this.pendingRequests.get(value['request-id']);
+            if (!pending || value['client-uuid'] !== pending.payload['client-uuid'] ||
+                value['bot-uuid'] !== pending.payload['bot-uuid'] || !['OK', 'ERROR'].includes(value.status)) return;
+            clearTimeout(pending.timer);
+            this.pendingRequests.delete(value['request-id']);
+            if (!pending.internal) this.emit('message', value);
+            pending.resolve(value);
+        }
     }
 
-    async disconnect () {
+    reconnectProxy () {
+        return this.enqueue(async () => {
+            if (this.method !== 'local-proxy' || this.state.proxyStatus === 'connected') return;
+            await this.proxy.disconnect();
+            if (!this.disposed) await this.proxy.connect();
+        });
+    }
+
+    ensureConnected () {
+        if (this.method === 'local-proxy') return this.proxy.connect();
+        return this.apiReady && this.state.status === 'connected' ? Promise.resolve() :
+            Promise.reject(new Error('Connect a compatible USB gateway from the Connections tab'));
+    }
+
+    acceptRobots (robots) {
+        if (!Array.isArray(robots)) throw new Error('Invalid gateway robot list');
+        this.update({robots});
+        this.emit('message', {event: 'connected_robots', robots});
+    }
+
+    control (command) {
+        return this.sendRequest({'command': command,
+            'client-uuid': this.clientUuid,
+            'request-id': uuid.v4()}, true).then(result => {
+            if (result.status !== 'OK') throw new Error(result.message || 'Gateway control request failed');
+            return result;
+        });
+    }
+
+    sendRequest (payload, internal = false) {
+        if (this.method === 'local-proxy') {
+            try {
+                return Promise.resolve(this.proxy.send(payload));
+            } catch (error) {
+                return Promise.reject(error);
+            }
+        }
+        if (!internal && !this.apiReady) return Promise.reject(new Error('USB gateway is not ready'));
+        if (this.pendingRequests.size >= 32 || this.pendingRequests.has(payload['request-id'])) {
+            return Promise.reject(new Error('Too many pending requests or duplicate request ID'));
+        }
+        const wire = `${JSON.stringify(payload)}\n`;
+        if (new TextEncoder().encode(wire).length > 6145) {
+            return Promise.reject(new Error('Gateway request exceeds 6144 UTF-8 bytes'));
+        }
+        return new Promise((resolve, reject) => {
+            const timeout = publicAPI.timeout(payload);
+            const timer = setTimeout(() => {
+                this.pendingRequests.delete(payload['request-id']);
+                this.log('error', {message: 'Gateway request timed out', request: payload['request-id']});
+                reject(new Error('Gateway request timed out'));
+            }, timeout);
+            this.pendingRequests.set(payload['request-id'], {payload, resolve, reject, timer, internal});
+            this.send(wire).catch(error => {
+                clearTimeout(timer);
+                this.pendingRequests.delete(payload['request-id']);
+                reject(error);
+            });
+        });
+    }
+
+    async disconnect (notifyGateway = true) {
         this.serialAttempt++;
-        this.discovery.stop();
+        clearInterval(this.leaseTimer);
+        const wasReady = this.apiReady;
+        this.apiReady = false;
+        const error = new Error('Robot transport disconnected');
+        for (const pending of this.pendingRequests.values()) {
+            clearTimeout(pending.timer);
+            pending.reject(error);
+        }
+        this.pendingRequests.clear();
         if (this.identifyDone) this.identifyDone(new Error('Serial connection cancelled'));
+        if (wasReady && notifyGateway && !this.transport.closing) {
+            // End the client lease without replaying, releasing or cancelling physical actions.
+            let timer;
+            await Promise.race([
+                this.send(`${JSON.stringify({'command': 'end-session',
+                    'client-uuid': this.clientUuid,
+                    'request-id': uuid.v4()})}\n`).catch(failure => this.log('error', failure.message)),
+                new Promise(resolve => {
+                    timer = setTimeout(resolve, 200);
+                })
+            ]);
+            clearTimeout(timer);
+        }
         try {
             await this.transport.close();
-        } catch (error) {
-            this.log('error', error.message);
-            this.update({error: error.message});
+        } catch (failure) {
+            this.log('error', failure.message);
+            this.update({error: failure.message});
         }
-        this.update({status: this.available ? 'disconnected' : 'unsupported', modem: 'unidentified'});
+        this.update({status: this.available ? 'disconnected' : 'unsupported',
+            modem: 'unidentified',
+            robots: this.state.robots.map(robot => ({...robot, connected: false}))});
+        this.emit('disconnected', error);
     }
 
     async fail (error) {
         this.log('error', error.message);
-        await this.disconnect();
+        await this.disconnect(false);
         this.update({status: 'error', error: error.message});
     }
 
     reportProxy (status) {
         this.update({proxyStatus: status});
         this.log('proxy', status);
+        if (status === 'disconnected' && this.method === 'local-proxy') {
+            this.emit('disconnected', new Error('Local Proxy disconnected'));
+        }
     }
 
     async dispose () {

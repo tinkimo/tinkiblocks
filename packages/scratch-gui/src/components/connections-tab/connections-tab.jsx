@@ -12,8 +12,8 @@ const ConnectionsTab = ({vm}) => {
     const [proxyRobots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
     const [pendingBotUuid, setPendingBotUuid] = useState(null);
     const serial = connection && connection.method === 'web-serial';
-    const robots = serial ? connection.robots : proxyRobots;
-    const hasClaimedRobot = robots.some(robot => robot.claimState === 'paired');
+    const robots = proxyRobots;
+    const hasClaimedRobot = robots.some(robot => ['paired', 'pending', 'reserved'].includes(robot.claimState));
 
     useEffect(() => {
         if (!manager) return () => {};
@@ -99,11 +99,17 @@ const ConnectionsTab = ({vm}) => {
                                         description="Status label for a robot whose connection has been lost"
                                         id="gui.connectionsTab.disconnected"
                                     />
-                                ) : serial ? (
+                                ) : ['reserved', 'confirmable'].includes(robot.claimState) ? (
                                     <FormattedMessage
-                                        defaultMessage="Available via modem"
-                                        description="A robot responded to the modem discovery query"
-                                        id="gui.connectionsTab.availableViaModem"
+                                        defaultMessage="Request confirmation on the robot"
+                                        description="A retained reservation needs robot-side confirmation"
+                                        id="gui.connectionsTab.reservedClaim"
+                                    />
+                                ) : robot.claimState === 'pending' ? (
+                                    <FormattedMessage
+                                        defaultMessage="Awaiting robot confirmation; release to cancel"
+                                        description="Pending or uncertain gateway claim"
+                                        id="gui.connectionsTab.pendingClaim"
                                     />
                                 ) : robot.claimState === 'free' ? (
                                     <FormattedMessage
@@ -111,7 +117,7 @@ const ConnectionsTab = ({vm}) => {
                                         description="Status label for a robot which is available to claim"
                                         id="gui.connectionsTab.free"
                                     />
-                                ) : robot.claimState === 'paired' ? (
+                                ) : ['paired', 'pending', 'reserved'].includes(robot.claimState) ? (
                                     <FormattedMessage
                                         defaultMessage="Claimed by you"
                                         description="Status label for a robot claimed by this user"
@@ -125,53 +131,57 @@ const ConnectionsTab = ({vm}) => {
                                     />
                                 )}
                             </span>
-                            {!serial && robot.connected !== false && robot.claimState === 'free' ? (
-                                <button
-                                    className={styles.claimButton}
-                                    disabled={pendingBotUuid !== null || hasClaimedRobot}
-                                    type="button"
-                                    data-bot-uuid={robot.botUuid}
-                                    onClick={claimRobot}
-                                >
-                                    {pendingBotUuid === robot.botUuid ? (
-                                        <FormattedMessage
-                                            defaultMessage="Claiming…"
-                                            description="Button label while a robot claim is being processed"
-                                            id="gui.connectionsTab.claiming"
-                                        />
-                                    ) : (
-                                        <FormattedMessage
-                                            defaultMessage="Claim"
-                                            description="Button to claim a robot for this user"
-                                            id="gui.connectionsTab.claim"
-                                        />
-                                    )}
-                                </button>
-                            ) : null}
-                            {!serial && robot.connected !== false && robot.claimState === 'paired' ? (
-                                <button
-                                    className={styles.releaseButton}
-                                    disabled={pendingBotUuid === robot.botUuid}
-                                    type="button"
-                                    data-bot-uuid={robot.botUuid}
-                                    onClick={releaseRobot}
-                                >
-                                    {pendingBotUuid === robot.botUuid ? (
-                                        <FormattedMessage
-                                            defaultMessage="Releasing…"
-                                            description="Button label while a robot release is being processed"
-                                            id="gui.connectionsTab.releasing"
-                                        />
-                                    ) : (
-                                        <FormattedMessage
-                                            defaultMessage="Release"
-                                            description="Button to release a paired robot for other users"
-                                            id="gui.connectionsTab.release"
-                                        />
-                                    )}
-                                </button>
-                            ) : null}
-                            {!serial && robot.connected === false && robot.claimState !== 'claimed' ? (
+                            {robot.connected !== false &&
+                                ['free', 'reserved', 'confirmable'].includes(robot.claimState) ? (
+                                    <button
+                                        className={styles.claimButton}
+                                        disabled={pendingBotUuid !== null || (hasClaimedRobot && robots.some(other =>
+                                            other.botUuid !== robot.botUuid &&
+                                        ['paired', 'pending', 'reserved'].includes(other.claimState)))}
+                                        type="button"
+                                        data-bot-uuid={robot.botUuid}
+                                        onClick={claimRobot}
+                                    >
+                                        {pendingBotUuid === robot.botUuid ? (
+                                            <FormattedMessage
+                                                defaultMessage="Claiming…"
+                                                description="Button label while a robot claim is being processed"
+                                                id="gui.connectionsTab.claiming"
+                                            />
+                                        ) : (
+                                            <FormattedMessage
+                                                defaultMessage="Claim"
+                                                description="Button to claim a robot for this user"
+                                                id="gui.connectionsTab.claim"
+                                            />
+                                        )}
+                                    </button>
+                                ) : null}
+                            {robot.connected !== false &&
+                                ['paired', 'pending', 'reserved'].includes(robot.claimState) ? (
+                                    <button
+                                        className={styles.releaseButton}
+                                        disabled={pendingBotUuid === robot.botUuid}
+                                        type="button"
+                                        data-bot-uuid={robot.botUuid}
+                                        onClick={releaseRobot}
+                                    >
+                                        {pendingBotUuid === robot.botUuid ? (
+                                            <FormattedMessage
+                                                defaultMessage="Releasing…"
+                                                description="Button label while a robot release is being processed"
+                                                id="gui.connectionsTab.releasing"
+                                            />
+                                        ) : (
+                                            <FormattedMessage
+                                                defaultMessage="Release"
+                                                description="Button to release a paired robot for other users"
+                                                id="gui.connectionsTab.release"
+                                            />
+                                        )}
+                                    </button>
+                                ) : null}
+                            {robot.connected === false && robot.claimState !== 'claimed' ? (
                                 <button
                                     className={styles.releaseButton}
                                     disabled={pendingBotUuid !== null}

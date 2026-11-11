@@ -179,6 +179,8 @@ const ConnectionDebugPanel = ({manager, state}) => {
                 status: state.status,
                 modem: state.modem,
                 proxyStatus: state.proxyStatus,
+                firmware: state.firmware || null,
+                robots: state.robots,
                 device: state.selectedPort ? state.selectedPort.getInfo() : null,
                 logs: state.logs
             }, null, 2));
@@ -219,6 +221,14 @@ const ConnectionDebugPanel = ({manager, state}) => {
                 >{intl.formatMessage(messages.copy)}</button>
                 {copyStatus ? <span role="status">{intl.formatMessage(messages[copyStatus])}</span> : null}
             </div>
+            <p>
+                <FormattedMessage
+                    defaultMessage="Firmware: {version} · Discovered robots: {count}"
+                    description="Gateway firmware and registry diagnostics"
+                    id="gui.connectionsTab.gatewayInfo"
+                    values={{version: state.firmware || '—', count: state.robots.length}}
+                />
+            </p>
             <pre>{state.logs.map(entry => `${entry.time} [${entry.kind}] ${entry.value}`).join('\n')}</pre>
         </details>
     );
@@ -241,6 +251,7 @@ const ConnectionControls = ({manager, state}) => {
         manager.selectPort(state.ports[Number(event.target.value)]);
     }, [manager, state.ports]);
     const addPort = useCallback(() => run(manager.addPort()), [manager, run]);
+    const reconnectProxy = useCallback(() => run(manager.reconnectProxy()), [manager, run]);
     const refreshPorts = useCallback(() => run(manager.refreshPorts()), [manager, run]);
     const toggleConnection = useCallback(
         () => run(open ? manager.disconnect() : manager.connect()), [manager, open, run]);
@@ -312,16 +323,28 @@ const ConnectionControls = ({manager, state}) => {
                     <p>
                         <FormattedMessage
                             defaultMessage="USB connects to the modem. Robots below are discovered through it.
-                            This preview supports discovery only; use Local Proxy to claim and control robots.
-                            Other serial devices are not assumed to be Tinkimo modems."
-                            description="Explain modem versus robots and proof of concept scope"
-                            id="gui.connectionsTab.discoveryOnly"
+                            Claim a robot and accept on its physical buttons before running blocks.
+                            Requires tinkimoden-proxy firmware; the original modem cannot run this robot API."
+                            description="Gateway hardware and physical confirmation requirements"
+                            id="gui.connectionsTab.gatewayRequirements"
                         />
                     </p>
                 </div>
-            ) : <p role="status">{intl.formatMessage(messages.proxyStatus, {
-                status: intl.formatMessage(messages[state.proxyStatus])
-            })}</p>}
+            ) : <div>
+                <p role="status">{intl.formatMessage(messages.proxyStatus, {
+                    status: intl.formatMessage(messages[state.proxyStatus])
+                })}</p>
+                {['disconnected', 'error'].includes(state.proxyStatus) ? <button
+                    type="button"
+                    onClick={reconnectProxy}
+                >
+                    <FormattedMessage
+                        defaultMessage="Reconnect Local Proxy"
+                        description="Retry the existing Python proxy after a connection failure"
+                        id="gui.connectionsTab.reconnectProxy"
+                    />
+                </button> : null}
+            </div>}
             {state.error ? <p role="alert">{state.error}</p> : null}
             <ConnectionDebugPanel
                 manager={manager}

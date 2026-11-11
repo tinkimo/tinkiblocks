@@ -86,10 +86,20 @@ test('bundle byte limit reserves the proxy transaction envelope overhead', t => 
 
 
 test('successful music needs no message and successful reporters use result', t => {
-    const value = {'client-uuid': 'client', 'bot-uuid': bot, status: 'OK', command: 'play_drum'};
+    const value = {'client-uuid': 'client', 'bot-uuid': bot, 'status': 'OK', 'command': 'play_drum'};
     const pending = {botUuid: bot, publicCommands: [{command: 'play_drum'}]};
     t.equal(api.response(value, pending, 'client'), '');
     t.equal(api.response({...value, command: 'measure_voltage', result: '4.2'},
         {botUuid: bot, publicCommands: [{command: 'measure_voltage'}]}, 'client'), '4.2');
+    t.end();
+});
+
+
+test('transport deadlines preserve long generated-music and mixed bundle budgets', t => {
+    const melody = {cmds: Array.from({length: 32}, () => ({command: 'play_note', note: '60', duration: '300'}))};
+    t.equal(api.timeout(melody), (32 * 305000) + 5000);
+    t.equal(api.timeout({cmds: [{command: 'forward', distance: '10'},
+        {command: 'play_drum', drum: '1', duration: '300'}]}), 2105000);
+    t.equal(api.timeout({command: 'claim'}), 30000);
     t.end();
 });

@@ -4,7 +4,6 @@ const EventEmitter = require('events');
 const FakeTimers = require('@sinonjs/fake-timers');
 const {SerialTransport, SerialFramer} = require('../../src/extensions/tinkimo_tinkibot/connection/serial-transport');
 const ConnectionManager = require('../../src/extensions/tinkimo_tinkibot/connection/connection-manager');
-const ModemDiscovery = require('../../src/extensions/tinkimo_tinkibot/connection/modem-discovery');
 
 const ID1 = '01234567-89ab-cdef-0123-456789abcdef';
 const ID2 = '11234567-89ab-cdef-0123-456789abcdef';
@@ -30,8 +29,23 @@ class Port {
         this.writable = new WritableStream({write: data => {
             const text = new TextDecoder().decode(data);
             this.sent.push(text);
-            if (text === 'identify\n' && this.identify) this.receive('BLE: status\r\ntinki', 'modem\r\n');
+            if (text === 'identify\n' && this.identify) this.receive('tinki', 'modem\r\n');
+            if (text.startsWith('{')) {
+                const request = JSON.parse(text);
+                if (request.command === 'register') {
+                    this.reply(request, {robots: this.robots || [],
+                        firmware: '0.1.0',
+                        capabilities: this.oldFirmware ? [] : ['robot-api-v1']});
+                } else if (this.onRequest) this.onRequest(request);
+            }
         }});
+    }
+    reply (request, value) {
+        this.receive(`${JSON.stringify({'request-id': request['request-id'],
+            'client-uuid': request['client-uuid'],
+            ...(request['bot-uuid'] ? {'bot-uuid': request['bot-uuid']} : {}),
+            'status': 'OK',
+            ...value})}\n`);
     }
     receive (...parts) {
         for (const part of parts) this.controller.enqueue(bytes(part));
@@ -74,6 +88,7 @@ const makeManager = t => {
         disconnect: () => calls.push('disconnect')}, {serial,
         secure: true,
         storage: {getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value)}});
+    manager.clientUuid = ID1;
     t.teardown(() => manager.dispose());
     return {manager, serial, calls, storage};
 };
@@ -107,39 +122,6 @@ test('permission picker: empty, cancellation, selection, metadata and hotplug', 
     serial.emit('connect', {type: 'connect'});
     await flush();
     t.equal(manager.snapshot().ports.length, 2);
-});
-
-test('connect, handshake, multiple robots, removal, switching and reconnect', async t => {
-    const {manager, serial, calls, storage} = makeManager(t);
-    await manager.selectMethod('web-serial');
-    await manager.addPort();
-    const port = manager.snapshot().selectedPort;
-    await manager.connect();
-    t.equal(manager.snapshot().status, 'connected');
-    t.equal(manager.snapshot().modem, 'identified');
-    t.same(port.options, {baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none'});
-    await flush();
-    t.same(port.sent, ['identify\n', 'all.get:uuid\n']);
-    port.receive(`+lime.OK get uuid ${ID1.slice(0, 10)}`, `${ID1.slice(10)}\r\n+blue.OK get uuid ${ID2}\n`,
-        '+tinkimodem.OK get uuid 21234567-89ab-cdef-0123-456789abcdef\n',
-        'garbage\n+lime.OK get nickname Lime\n');
-    await flush();
-    t.equal(manager.snapshot().robots.length, 2);
-    t.equal(manager.snapshot().robots.find(robot => robot.botUuid === ID1).nickname, 'Lime');
-    t.ok(port.sent.includes('lime.get:nickname\n'));
-    t.ok(port.sent.includes('blue.get:nickname\n'));
-    serial.emit('disconnect', {type: 'disconnect', target: port});
-    await flush();
-    t.equal(manager.snapshot().status, 'error');
-    t.ok(manager.snapshot().robots.every(robot => !robot.connected));
-    t.equal(port.closed, 1);
-    await manager.connect();
-    t.equal(manager.snapshot().status, 'connected');
-    await manager.selectMethod('local-proxy');
-    t.same(calls, ['disconnect', 'disconnect', 'connect']);
-    t.equal(port.closed, 2);
-    t.equal(serial.listenerCount('disconnect'), 0);
-    t.equal(storage.get('tinkiblocks.communicationMethod'), 'local-proxy');
 });
 
 test('port in use surfaces an error and permits retry', async t => {
@@ -225,30 +207,6 @@ test('writes are atomic; close releases stream locks and supports reopen', async
     t.equal(port.closed, 2);
 });
 
-test('discovery expires missing robots and ignores unrelated traffic', async t => {
-    let now = 0;
-    let robots;
-    const discovery = new ModemDiscovery({send: async () => {},
-        onRobots: value => {
-            robots = value;
-        },
-        log: () => {},
-        now: () => now});
-    discovery.start();
-    t.teardown(() => discovery.stop());
-    discovery.receive(`+lime.OK get uuid ${ID1}`);
-    discovery.receive('BLE: connected');
-    discovery.receive('+blue.OK get uuid invalid');
-    discovery.receive('+blue.event:button left pressed');
-    t.equal(robots.length, 1);
-    now = 15000;
-    await discovery.poll();
-    t.equal(robots[0].connected, false);
-    discovery.receive(`+lime.OK get uuid ${ID1}`);
-    t.equal(robots[0].connected, true);
-    t.equal(robots.length, 1);
-});
-
 test('bounded diagnostics redact secrets, gate raw logs, and clear', async t => {
     const {manager} = makeManager(t);
     manager.log('rx', 'not retained');
@@ -275,45 +233,6 @@ test('persisted Web Serial never starts a proxy and permission denial is visible
     t.match(manager.snapshot().error, /Permissions Policy/);
 });
 
-test('extension switches the real WebSocket lifecycle without routing serial control', async t => {
-    const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
-    const sockets = [];
-    global.window = {};
-    global.WebSocket = class {
-        constructor () {
-            sockets.push(this);
-        }
-        close () {
-            this.closed = true;
-        }
-    };
-    t.teardown(() => {
-        delete global.window;
-        delete global.WebSocket;
-    });
-    const runtime = {emit: () => {}};
-    const extension = new TinkibotBlocks(runtime);
-    sockets[0].onopen();
-    extension._setConnectedRobots([{'nickname': 'lime', 'bot-uuid': ID1, 'client-uuid': extension._clientUuid}]);
-    await extension.connectionManager.selectMethod('web-serial');
-    t.ok(sockets[0].closed);
-    t.equal(sockets[0].onmessage, null);
-    t.equal(extension._connected, false);
-    t.equal(extension._connectedRobots[0].connected, false);
-    t.equal(extension._connectedRobots[0].claimState, 'paired', 'reservation retained');
-    await t.rejects(extension.connect(), /discovery only/);
-    await extension.connectionManager.selectMethod('local-proxy');
-    t.equal(sockets.length, 2);
-    sockets[1].onopen();
-    sockets[1].onmessage({data: JSON.stringify({event: 'connected_robots',
-        robots: [
-            {'nickname': 'lime', 'bot-uuid': ID1, 'client-uuid': extension._clientUuid}
-        ]})});
-    t.equal(extension._connectedRobots[0].claimState, 'paired');
-    t.not(extension._connectedRobots[0].connected, false);
-    await extension.connectionManager.dispose();
-});
-
 test('disconnect during port.open cannot start a stale handshake', async t => {
     const {manager, serial} = makeManager(t);
     await manager.selectMethod('web-serial');
@@ -336,7 +255,7 @@ test('disconnect during port.open cannot start a stale handshake', async t => {
     t.equal(manager.snapshot().status, 'disconnected');
     t.same(port.sent, []);
     t.equal(port.closed, 1);
-    t.notOk(manager.discovery.active);
+    t.notOk(manager.apiReady);
 });
 
 test('serial write failure takes the modem offline and releases locks', async t => {
@@ -353,20 +272,186 @@ test('serial write failure takes the modem offline and releases locks', async t 
 });
 
 
-test('UUID discovery includes unnamed robots and routes nicknames containing spaces', async t => {
-    const sent = [];
-    let robots;
-    const discovery = new ModemDiscovery({send: async text => sent.push(text),
-        onRobots: value => {
-            robots = value;
-        },
-        log: () => {}});
-    discovery.start();
-    t.teardown(() => discovery.stop());
-    discovery.receive(`+.OK get uuid ${ID1}`);
-    discovery.receive(`+two words.OK get uuid ${ID2}`);
+test('gateway capability handshake, JSON robots, correlated concurrent requests and cleanup', async t => {
+    const {manager, serial, calls} = makeManager(t);
+    await manager.selectMethod('web-serial');
+    const port = new Port();
+    port.robots = [{'bot-uuid': ID2, 'nickname': 'lime', 'connected': true}];
+    serial.ports.push(port);
+    await manager.refreshPorts();
+    await manager.connect();
+    t.equal(manager.snapshot().status, 'connected');
+    t.equal(manager.snapshot().firmware, '0.1.0');
+    t.equal(manager.snapshot().robots[0]['bot-uuid'], ID2);
+    t.same(port.options, {baudRate: 115200, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none'});
+    t.equal(port.sent[0], 'identify\n');
+    t.equal(JSON.parse(port.sent[1]).command, 'register');
+    const seen = [];
+    manager.on('message', value => seen.push(value));
+    const a = {'request-id': ID1, 'client-uuid': ID1, 'bot-uuid': ID2, 'command': 'measure_distance'};
+    const b = {...a, 'request-id': ID2, 'command': 'measure_voltage'};
+    const first = manager.sendRequest(a);
+    const second = manager.sendRequest(b);
     await flush();
-    t.equal(robots.length, 2);
-    t.equal(robots[0].nickname, '');
-    t.same(sent, ['all.get:uuid\n', 'two words.get:nickname\n']);
+    port.reply(a, {'client-uuid': ID2, 'command': a.command, 'result': 'wrong identity'});
+    await flush();
+    t.equal(manager.pendingRequests.size, 2);
+    port.reply(b, {command: b.command, result: '4.2'});
+    port.reply(a, {command: a.command, result: '123'});
+    t.equal((await second).result, '4.2');
+    t.equal((await first).result, '123');
+    t.equal(seen.length, 2);
+    const outstanding = manager.sendRequest({...a, 'request-id': 'pending'});
+    const rejected = t.rejects(outstanding, /disconnected/);
+    await manager.selectMethod('local-proxy');
+    await rejected;
+    t.equal(manager.pendingRequests.size, 0);
+    t.equal(serial.listenerCount('disconnect'), 0);
+    t.equal(port.closed, 1);
+    t.same(calls, ['disconnect', 'disconnect', 'connect']);
+    t.ok(port.sent.some(text => text.startsWith('{') && JSON.parse(text).command === 'end-session'));
+    await manager.selectMethod('web-serial');
+    await manager.connect();
+    t.equal(manager.snapshot().status, 'connected');
+    serial.emit('disconnect', {type: 'disconnect', target: port});
+    await flush();
+    t.equal(manager.snapshot().status, 'error');
+    t.ok(manager.snapshot().robots.every(robot => !robot.connected));
+});
+
+test('original modem cannot silently enable control without gateway capabilities', async t => {
+    const {manager} = makeManager(t);
+    await manager.selectMethod('web-serial');
+    await manager.addPort();
+    manager.snapshot().selectedPort.oldFirmware = true;
+    await manager.connect();
+    t.equal(manager.snapshot().status, 'error');
+    t.match(manager.snapshot().error, /robot-api-v1/);
+    await t.rejects(manager.ensureConnected(), /compatible USB gateway/);
+    t.notOk(manager.transport.port);
+});
+
+test('serial request timeout and stale replies do not affect a new request', async t => {
+    const clock = FakeTimers.install();
+    t.teardown(() => clock.uninstall());
+    const {manager} = makeManager(t);
+    await manager.selectMethod('web-serial');
+    await manager.addPort();
+    await manager.connect();
+    const payload = {'request-id': ID1, 'client-uuid': ID1, 'bot-uuid': ID2, 'command': 'claim'};
+    const pending = manager.sendRequest(payload);
+    const rejected = t.rejects(pending, /timed out/);
+    await clock.tickAsync(30001);
+    await rejected;
+    t.equal(manager.pendingRequests.size, 0);
+    const port = manager.snapshot().selectedPort;
+    port.reply(payload, {command: 'claim'});
+    await flush();
+    t.equal(manager.pendingRequests.size, 0);
+});
+
+test('Scratch claims, actions, bundles, sensor reporters and release use the selected serial API', async t => {
+    const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
+    const serial = new Serial([new Port()]);
+    const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+    global.window = {isSecureContext: true};
+    Object.defineProperty(global, 'navigator', {configurable: true, value: {serial}});
+    global.WebSocket = class {
+        constructor () {
+            this.sent = []; global.window.socket = this;
+        }
+        send (value) {
+            this.sent.push(JSON.parse(value));
+        }
+        close () {}
+    };
+    global.alert = () => {};
+    t.teardown(() => {
+        delete global.window;
+        if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+        else delete global.navigator;
+        delete global.WebSocket;
+        delete global.alert;
+    });
+    const extension = new TinkibotBlocks({emit: () => {}, getTargetForStage: () => ({tempo: 60})});
+    const proxy = global.window.socket;
+    proxy.onopen();
+    const manager = extension.connectionManager;
+    t.teardown(() => manager.dispose());
+    await manager.selectMethod('web-serial');
+    const port = serial.ports[0];
+    port.robots = [{'bot-uuid': ID2, 'nickname': 'lime', 'connected': true, 'claim-status': 'free'}];
+    await manager.refreshPorts();
+    await manager.connect();
+    let rejectRelease = true;
+    port.onRequest = request => {
+        if (request.command === 'claim') port.reply(request, {command: 'claim', completed: false});
+        else if (request.command === 'unclaim') {
+            port.reply(request, {command: 'unclaim',
+                completed: !rejectRelease,
+                status: rejectRelease ? 'ERROR' : 'OK',
+                message: 'test release rejection'});
+            rejectRelease = false;
+        } else if (request.cmds) port.reply(request, {rsp: request.cmds.map(item => ({...item, status: 'OK'}))});
+        else {
+            port.reply(request, {command: request.command,
+                ...(request.command === 'measure_distance' ? {result: '123'} : {})});
+        }
+    };
+    await extension.claimRobot(ID2);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'free', 'an immediate OK is not physical acceptance');
+    port.receive(`${JSON.stringify({'event': 'claim_accepted',
+        'nickname': 'lime',
+        'bot-uuid': ID2,
+        'client-uuid': extension._clientUuid})}\n`);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    t.equal(await extension.measure_distance(), '123');
+    await extension._sendCommand({command: 'forward', distance: 10});
+    const results = await extension._sendBundle([
+        {opcode: 'move', payload: {command: 'move', direction: 'forward', distance: 10}},
+        {opcode: 'rotate', payload: {command: 'rotate', rotation: 'clockwise', degrees: 90}}
+    ]);
+    t.equal(results.length, 2);
+    t.equal(proxy.sent.length, 0, 'no robot path leaks to the inactive WebSocket');
+    t.ok(port.sent.some(text => text.startsWith('{') && JSON.parse(text).cmds));
+    port.receive(`${JSON.stringify({event: 'connected_robots',
+        robots: [
+            {'bot-uuid': ID2,
+                'nickname': 'lime',
+                'client-uuid': extension._clientUuid,
+                'claim-status': 'uncertain',
+                'connected': true}
+        ]})}\n`);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'reserved');
+    await t.rejects(extension.measure_distance(), /No Tinkibot robot is claimed/);
+    await extension.claimRobot(ID2);
+    await flush();
+    port.receive(`${JSON.stringify({'event': 'claim_accepted',
+        'nickname': 'lime',
+        'bot-uuid': ID2,
+        'client-uuid': extension._clientUuid})}\n`);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'paired');
+    await extension.releaseRobot(ID2);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'paired', 'failed release retains ownership');
+    t.equal(extension._pendingReleases.size, 0);
+    await extension.releaseRobot(ID2);
+    await flush();
+    t.equal(extension._connectedRobots[0].claimState, 'free');
+    await manager.selectMethod('local-proxy');
+    global.window.socket.onopen();
+    t.not(global.window.socket, proxy);
+});
+
+test('explicit Local Proxy retry resets the adapter and cannot interrupt serial mode', async t => {
+    const {manager, calls} = makeManager(t);
+    await manager.reconnectProxy();
+    t.same(calls, ['disconnect', 'connect']);
+    await manager.selectMethod('web-serial');
+    await manager.reconnectProxy();
+    t.same(calls, ['disconnect', 'connect', 'disconnect']);
 });
