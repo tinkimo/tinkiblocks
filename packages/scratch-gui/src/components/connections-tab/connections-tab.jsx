@@ -86,12 +86,6 @@ const ConnectionsTab = ({vm}) => {
                 />
             </p> : null}
             <div className={styles.robotsHeading}>
-                <img
-                    alt=""
-                    aria-hidden="true"
-                    className={styles.headingIcon}
-                    src={robotImage}
-                />
                 <h2>
                     {serial ? <FormattedMessage
                         defaultMessage="Discovered Tinkibots"

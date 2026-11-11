@@ -30,13 +30,6 @@
     margin: 0 0 1rem;
 }
 
-.heading-icon {
-    display: block;
-    width: 3rem;
-    height: 3rem;
-    object-fit: contain;
-}
-
 .robot-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
