@@ -11,6 +11,7 @@ const ConnectionsTab = ({vm}) => {
     const [connection, setConnection] = useState(manager ? manager.snapshot() : null);
     const [proxyRobots, setRobots] = useState(vm.runtime.tinkibotConnectedRobots || []);
     const [pendingBotUuid, setPendingBotUuid] = useState(null);
+    const [actionError, setActionError] = useState(null);
     const [expertOpen, setExpertOpen] = useState(false);
     const toggleExpert = useCallback(() => setExpertOpen(open => !open), []);
     const serial = connection && connection.method === 'web-serial';
@@ -34,23 +35,32 @@ const ConnectionsTab = ({vm}) => {
         return () => vm.runtime.removeListener('TINKIBOT_CONNECTED_ROBOTS_CHANGED', updateRobots);
     }, [vm]);
 
-    const claimRobot = useCallback(event => {
-        const botUuid = event.currentTarget.dataset.botUuid;
+    const runRobotAction = useCallback((action, botUuid) => {
         setPendingBotUuid(botUuid);
-        vm.runtime.claimTinkibotRobot(botUuid);
-    }, [vm]);
+        setActionError(null);
+        const failed = error => {
+            setPendingBotUuid(null);
+            setActionError(error.message);
+            if (manager) manager.log('error', error.message);
+        };
+        try {
+            Promise.resolve(action(botUuid)).catch(failed);
+        } catch (error) {
+            failed(error);
+        }
+    }, [manager]);
+
+    const claimRobot = useCallback(event => {
+        runRobotAction(vm.runtime.claimTinkibotRobot, event.currentTarget.dataset.botUuid);
+    }, [vm, runRobotAction]);
 
     const releaseRobot = useCallback(event => {
-        const botUuid = event.currentTarget.dataset.botUuid;
-        setPendingBotUuid(botUuid);
-        vm.runtime.releaseTinkibotRobot(botUuid);
-    }, [vm]);
+        runRobotAction(vm.runtime.releaseTinkibotRobot, event.currentTarget.dataset.botUuid);
+    }, [vm, runRobotAction]);
 
     const removeRobot = useCallback(event => {
-        const botUuid = event.currentTarget.dataset.botUuid;
-        setPendingBotUuid(botUuid);
-        vm.runtime.removeTinkibotRobot(botUuid);
-    }, [vm]);
+        runRobotAction(vm.runtime.removeTinkibotRobot, event.currentTarget.dataset.botUuid);
+    }, [vm, runRobotAction]);
 
     return (
         <section
@@ -63,6 +73,17 @@ const ConnectionsTab = ({vm}) => {
                 state={connection}
                 onToggleExpert={toggleExpert}
             /> : null}
+            {actionError ? <p
+                className={styles.actionError}
+                role="alert"
+            >
+                <FormattedMessage
+                    defaultMessage="Robot action failed: {error}"
+                    description="Recoverable failure of a claim, release or remove action"
+                    id="gui.connectionsTab.actionError"
+                    values={{error: actionError}}
+                />
+            </p> : null}
             <div className={styles.robotsHeading}>
                 <div
                     aria-hidden

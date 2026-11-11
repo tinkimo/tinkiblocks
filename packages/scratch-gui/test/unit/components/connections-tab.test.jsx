@@ -249,3 +249,24 @@ describe('Simple connection status', () => {
         expect(manager.state.logs).toHaveLength(1);
     });
 });
+
+test.each([
+    ['Remove', 'removeTinkibotRobot', {connected: false, claimState: 'paired'}],
+    ['Claim', 'claimTinkibotRobot', {connected: true, claimState: 'free'}],
+    ['Release', 'releaseTinkibotRobot', {connected: true, claimState: 'paired'}]
+])('%s handles a rejected runtime operation and permits retry', async (label, method, state) => {
+    const {getByRole, runtime} = renderConnections([{nickname: 'pink', botUuid: 'pink', ...state}]);
+    runtime[method].mockRejectedValue(new Error('Connection is disconnected or switching'));
+    await act(async () => {
+        fireEvent.click(getByRole('button', {name: label}));
+        await Promise.resolve();
+    });
+    expect(getByRole('alert')).toHaveTextContent('Robot action failed: Connection is disconnected or switching');
+    expect(getByRole('button', {name: label})).toBeEnabled();
+    runtime[method].mockResolvedValue();
+    await act(async () => {
+        fireEvent.click(getByRole('button', {name: label}));
+        await Promise.resolve();
+    });
+    expect(runtime[method]).toHaveBeenCalledTimes(2);
+});

@@ -426,3 +426,14 @@
     accent-color: $motion-primary;
     margin-inline-end: 0.5rem;
 }
+
+.action-error {
+    max-width: 50rem;
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d32f2f;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $text-primary;
+    font-size: 0.85rem;
+}

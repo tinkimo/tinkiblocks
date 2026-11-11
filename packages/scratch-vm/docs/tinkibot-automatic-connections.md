@@ -125,9 +125,9 @@ npm run build:dist
 
 Validation results for this change:
 
-- Serial/connection suite: 42 scenarios, 185 assertions passed.
+- Serial/connection suite: 43 scenarios, 194 assertions passed.
 - Existing VM/proxy/API/music/bundle regressions: 483 assertions passed.
-- GUI: 47 suites, 318 tests and 15 snapshots passed; one existing skipped test.
+- GUI: 47 suites, 321 tests and 15 snapshots passed; one existing skipped test.
 - VM build, GUI development/production builds and translation extraction passed.
   Production retains two asset-size warnings.
 - Scoped manager/serial/bundle and GUI lint: zero errors. GUI retains rule-conflict
@@ -239,3 +239,23 @@ proxy and consuming its robot list, amber fast retries, red after the fast budge
 and green recovery after restarting the actual test server later. Diagnostics and
 Copy remain scroll-accessible on a 1024×600 viewport. No page errors occurred.
 This verifies browser/socket behaviour, not physical BLE or the user's laptop.
+
+## Removing an offline robot
+
+When the transport is connected, Remove still waits for the existing server or
+gateway acknowledgement. When a robot is offline and the transport is disconnected,
+paused or switching, Remove forgets that local row without trying to reconnect.
+It clears the browser's pending controls for that UUID and frees the local selection.
+It does not send an unclaim or imply physical release. An authoritative list after
+reconnection can show the robot or its retained backend reservation again; use
+Remove while connected to clean up the backend registry as well.
+
+Claim, Release and Remove clicks handle rejected or thrown runtime operations.
+Failures appear inline and reset pending controls for retry, rather than escaping
+as an unhandled rejection and development error overlay. Regression tests cover
+local offline removal in all three transport states, existing connected removal
+acknowledgements, and rejected actions with successful retry.
+
+The offline-removal regression additionally passes in Chromium using the real
+component and VM: a paused owned row is removed without reconnecting, a deliberately
+rejected action produces an inline error, and retry succeeds with no page errors.

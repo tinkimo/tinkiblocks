@@ -1181,6 +1181,16 @@ class TinkibotBlocks {
     async removeRobot (botUuid) {
         const robot = this._connectedRobots.find(item => item.botUuid === botUuid);
         if (!robot || robot.claimState === 'claimed' || this._pendingRemovals.has(botUuid)) return;
+        if (robot.connected === false && (!this._connected || this.connectionManager.paused ||
+            this.connectionManager.state.switching)) {
+            // Forgetting an unavailable row does not release physical ownership.
+            this._pendingClaims.delete(botUuid);
+            this._pendingReleases.delete(botUuid);
+            this._pendingRemovals.delete(botUuid);
+            this._setConnectedRobots(this._connectedRobots.filter(item => item.botUuid !== botUuid));
+            this.runtime.emit('TINKIBOT_ROBOT_CONNECTION_CHANGED');
+            return;
+        }
         await this.connect();
         const requestId = uuid.v4();
         this._pendingRemovals.set(botUuid, requestId);

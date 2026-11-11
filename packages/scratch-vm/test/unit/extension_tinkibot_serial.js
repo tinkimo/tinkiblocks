@@ -897,3 +897,31 @@ test('Real VM switches from USB to a fresh proxy socket and receives the proxy r
     sockets[1].onopen();
     await reconnecting;
 });
+
+test('Remove forgets an offline robot locally when the transport is disconnected, paused or switching', async t => {
+    const TinkibotBlocks = require('../../src/extensions/tinkimo_tinkibot');
+    for (const state of ['disconnected', 'paused', 'switching']) {
+        const extension = new TinkibotBlocks({emit: () => {}});
+        const manager = extension.connectionManager;
+        extension._connected = state !== 'disconnected';
+        manager.paused = state === 'paused';
+        manager.state.switching = state === 'switching';
+        extension._setConnectedRobots([
+            {'bot-uuid': ID2, 'nickname': 'offline pink', 'connected': false, 'client-uuid': extension._clientUuid},
+            {'bot-uuid': ID1, 'nickname': 'yellow'}
+        ]);
+        let networkCalls = 0;
+        extension.connect = () => {
+            networkCalls++;
+            return Promise.reject(new Error('Connection is disconnected or switching'));
+        };
+        extension._sendRobotRequest = () => {
+            networkCalls++;
+        };
+        await extension.removeRobot(ID2);
+        t.equal(networkCalls, 0, `${state}: forgetting an offline row needs no network connection`);
+        t.same(extension._connectedRobots.map(robot => robot.botUuid), [ID1]);
+        t.equal(extension._pendingRemovals.size, 0);
+        await manager.dispose();
+    }
+});
