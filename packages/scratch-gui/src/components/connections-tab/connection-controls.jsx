@@ -159,6 +159,11 @@ const messages = defineMessages({
         defaultMessage: 'Verbose logging (raw and parsed messages)',
         description: 'Enable detailed USB diagnostics'
     },
+    'logContent': {
+        id: 'gui.connectionsTab.logContent',
+        defaultMessage: 'Connection log',
+        description: 'Keyboard accessible scrollable connection diagnostic output'
+    },
     'debug': {
         id: 'gui.connectionsTab.debug',
         defaultMessage: 'Connection debug log',
@@ -275,7 +280,10 @@ export const ConnectionDebugPanel = ({manager, state}) => {
                     values={{version: state.firmware || '—', count: state.robots.length}}
                 />
             </p>
-            <pre>{state.logs.map(entry => `${entry.time} [${entry.kind}] ${entry.value}`).join('\n')}</pre>
+            <pre
+                aria-label={intl.formatMessage(messages.logContent)}
+                tabIndex={0}
+            >{state.logs.map(entry => `${entry.time} [${entry.kind}] ${entry.value}`).join('\n')}</pre>
         </details>
     );
 };

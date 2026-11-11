@@ -158,6 +158,10 @@ describe('Web Serial Connections tab', () => {
         const manager = createManager({logs: [{time: '2026-11-10T12:00:00Z', kind: 'rx', value: 'tinkimodem'}]});
         const {getByRole, getByText} = renderConnections([], manager);
         fireEvent.click(getByText('Connection debug log'));
+        const output = getByText('2026-11-10T12:00:00Z [rx] tinkimodem');
+        expect(output).toHaveAccessibleName('Connection log');
+        output.focus();
+        expect(output).toHaveFocus();
         fireEvent.click(getByRole('checkbox', {name: 'Verbose logging (raw and parsed messages)'}));
         expect(manager.setVerbose).toHaveBeenCalledWith(true);
         fireEvent.click(getByRole('button', {name: 'Clear log'}));

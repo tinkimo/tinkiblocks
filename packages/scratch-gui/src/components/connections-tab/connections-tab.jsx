@@ -51,7 +51,10 @@ const ConnectionsTab = ({vm}) => {
     }, [vm]);
 
     return (
-        <section className={styles.connections}>
+        <section
+            className={styles.connections}
+            tabIndex={0}
+        >
             {manager && connection ? <ConnectionControls
                 manager={manager}
                 state={connection}

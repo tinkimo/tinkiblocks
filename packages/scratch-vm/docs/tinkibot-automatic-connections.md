@@ -31,6 +31,9 @@ correlation and bundle collection boundaries are unchanged.
 - Failed candidate ports are remembered for the session, avoiding repeated opens
   of unrelated hardware. Reattachment or explicit Retry permits another probe.
   Chrome/Edge may require authorisation again for a different USB device or port.
+- The Connections pane is constrained to the editor tab and scrolls vertically,
+  including on short laptop screens. The console has its own visible scrollbar,
+  viewport-bounded height and keyboard focus; Copy log remains reachable.
 - The diagnostic history is shared, in memory, and survives switches: up to 200
   timestamped entries of 1,000 characters, redacted as before. Verbose mode adds
   raw/parsed traffic for both transports. Expand the bottom console to clear or
@@ -181,3 +184,19 @@ No firmware flashing, real-radio test or hosted-editor deployment was performed.
 
 Translation extraction was run; its generated source files are ignored by this
 repository. No dependencies or firmware files changed.
+
+### Console viewport regression
+
+A real-CSS Chromium reproduction at 1024×600 showed the Connections pane expanding
+to 694 px and ending below the clipped editor at y=786, without its own overflow.
+The pane now fills the positioned tab bounds (508 px, ending at y=600), and its
+694 px contents scroll. With 200 diagnostic entries the console stays at 238 px
+while its contents scroll independently; keyboard scrolling and Copy access pass.
+The earlier component smoke used stub CSS and did not exercise this flex-layout
+failure. The updated verification uses the real Connections and GUI tab styles.
+
+The reported one-of-two physical robot discovery problem remains unconfirmed.
+A host simulation of sequential BLE connections with distinct UUIDs reaches both
+registry rows, while two BLE peers reporting the same UUID reproduce one row and
+`robot_uuid_peer_changed`. Compare the two standalone UUIDs and capture the verbose
+log with both robots on before attributing the hardware symptom to either path.
