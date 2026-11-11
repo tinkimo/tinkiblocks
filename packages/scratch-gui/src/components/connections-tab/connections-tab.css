@@ -32,8 +32,8 @@
 
 .heading-icon {
     display: block;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 3rem;
+    height: 3rem;
     object-fit: contain;
 }
 
@@ -61,8 +61,8 @@
 
 .robot-icon {
     display: block;
-    width: 5rem;
-    height: 5rem;
+    width: 6rem;
+    height: 6rem;
     object-fit: contain;
 }
 

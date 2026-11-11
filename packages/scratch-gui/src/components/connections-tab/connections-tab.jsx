@@ -4,7 +4,7 @@ import {FormattedMessage} from 'react-intl';
 import VM from '@scratch/scratch-vm';
 
 import styles from './connections-tab.css';
-import robotImage from './tinkibot-blue.png';
+import robotImage from './tinkibot-outline.png';
 import ConnectionControls, {ConnectionDebugPanel} from './connection-controls.jsx';
 
 const ConnectionsTab = ({vm}) => {

@@ -13,8 +13,10 @@ The status panel, robot heading/list and diagnostics share a left-aligned edge.
 Expert uses a mode/retry toolbar, a separate USB settings group, themed primary
 and secondary buttons, and consistent field spacing. Controls wrap on narrow
 panes; the console retains independent scrolling and keyboard access. The header
-and cards share `tinkibot-blue.png`, a transparent blue/pale-blue adaptation of the
-user-provided robot illustration; the nickname supplies its accessible label.
+and cards share `tinkibot-outline.png`, a simple dark-grey outline adaptation of
+the user-provided robot illustration with transparent interiors and no body shading.
+It is displayed at 48 px in the heading and 96 px on cards; the nickname supplies
+its accessible label.
 
 ## Detection and recovery
 
