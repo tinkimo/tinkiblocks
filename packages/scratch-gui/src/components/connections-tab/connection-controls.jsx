@@ -356,31 +356,33 @@ const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
                 hidden={!expertOpen}
                 id={expertId}
             >
-                <div
-                    aria-label={intl.formatMessage(messages.method)}
-                    className={styles.segmented}
-                    role="radiogroup"
-                >
-                    {['auto', 'modem', 'proxy'].map(preference => (
-                        <button
-                            aria-checked={(state.preference || 'auto') === preference}
-                            key={preference}
-                            role="radio"
-                            type="button"
-                            value={preference}
-                            onClick={changeMethod}
-                        >
-                            {intl.formatMessage(messages[preference === 'proxy' ? 'proxyPreference' : preference])}
-                        </button>
-                    ))}
+                <div className={styles.expertToolbar}>
+                    <div
+                        aria-label={intl.formatMessage(messages.method)}
+                        className={styles.segmented}
+                        role="radiogroup"
+                    >
+                        {['auto', 'modem', 'proxy'].map(preference => (
+                            <button
+                                aria-checked={(state.preference || 'auto') === preference}
+                                key={preference}
+                                role="radio"
+                                type="button"
+                                value={preference}
+                                onClick={changeMethod}
+                            >
+                                {intl.formatMessage(messages[preference === 'proxy' ? 'proxyPreference' : preference])}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={retry}
+                    >{intl.formatMessage(messages.retry)}</button>
                 </div>
                 {state.upgradePending ? <p role="status">{intl.formatMessage(messages.deferred)}</p> : null}
-                <button
-                    type="button"
-                    onClick={retry}
-                >{intl.formatMessage(messages.retry)}</button>
                 {serial ? (
-                    <div>
+                    <div className={styles.settingsSection}>
                         {available ? null : (
                             <p role="status">
                                 <FormattedMessage
@@ -392,7 +394,7 @@ const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
                                 />
                             </p>
                         )}
-                        <label>
+                        <label className={styles.deviceField}>
                             {intl.formatMessage(messages.device)}
                             <select
                                 disabled={!available || open || busy}
@@ -422,6 +424,7 @@ const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
                                 onClick={refreshPorts}
                             >{intl.formatMessage(messages.refresh)}</button>
                             <button
+                                className={styles.primaryAction}
                                 disabled={!available || state.switching || (!open && !state.selectedPort)}
                                 type="button"
                                 onClick={toggleConnection}
@@ -431,7 +434,7 @@ const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
                             status: intl.formatMessage(messages[state.status]),
                             modem: intl.formatMessage(messages[state.modem])
                         })}</p>
-                        <p>
+                        <p className={styles.connectionHelp}>
                             <FormattedMessage
                                 defaultMessage="USB connects to the modem. Robots below are discovered through it.
                                 Claim a robot and accept on its physical buttons before running blocks.
@@ -441,11 +444,12 @@ const ConnectionControls = ({expertOpen, manager, state, onToggleExpert}) => {
                             />
                         </p>
                     </div>
-                ) : <div>
+                ) : <div className={styles.settingsSection}>
                     <p role="status">{intl.formatMessage(messages.proxyStatus, {
                         status: intl.formatMessage(messages[state.proxyStatus])
                     })}</p>
                     {['disconnected', 'error'].includes(state.proxyStatus) ? <button
+                        className={styles.primaryAction}
                         type="button"
                         onClick={reconnectProxy}
                     >

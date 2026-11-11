@@ -63,21 +63,23 @@ const ConnectionsTab = ({vm}) => {
                 state={connection}
                 onToggleExpert={toggleExpert}
             /> : null}
-            <div
-                aria-hidden
-                className={styles.headingIcon}
-            >🤖</div>
-            <h2>
-                {serial ? <FormattedMessage
-                    defaultMessage="Discovered Tinkibots"
-                    description="Heading for robots discovered through USB modem"
-                    id="gui.connectionsTab.discoveredHeading"
-                /> : <FormattedMessage
-                    defaultMessage="My robots"
-                    description="Heading for the list of connected Tinkibot robots"
-                    id="gui.connectionsTab.heading"
-                />}
-            </h2>
+            <div className={styles.robotsHeading}>
+                <div
+                    aria-hidden
+                    className={styles.headingIcon}
+                >🤖</div>
+                <h2>
+                    {serial ? <FormattedMessage
+                        defaultMessage="Discovered Tinkibots"
+                        description="Heading for robots discovered through USB modem"
+                        id="gui.connectionsTab.discoveredHeading"
+                    /> : <FormattedMessage
+                        defaultMessage="My robots"
+                        description="Heading for the list of connected Tinkibot robots"
+                        id="gui.connectionsTab.heading"
+                    />}
+                </h2>
+            </div>
             {robots.length ? (
                 <div className={styles.robotList}>
                     {robots.map(robot => (

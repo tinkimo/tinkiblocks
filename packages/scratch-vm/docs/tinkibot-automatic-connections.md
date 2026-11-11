@@ -9,6 +9,11 @@ the bottom diagnostic console. The VM remains the authoritative
 robot registry; React subscribes to it. Blocks, the public request API, response
 correlation and bundle collection boundaries are unchanged.
 
+The status panel, robot heading/list and diagnostics share a left-aligned edge.
+Expert uses a mode/retry toolbar, a separate USB settings group, themed primary
+and secondary buttons, and consistent field spacing. Controls wrap on narrow
+panes; the console retains independent scrolling and keyboard access.
+
 ## Detection and recovery
 
 - Auto enumerates `navigator.serial.getPorts()` and checks ports sequentially.

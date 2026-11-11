@@ -9,7 +9,7 @@
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
-    padding: 2.5rem;
+    padding: 1.25rem;
     overflow-x: hidden;
     overflow-y: scroll;
     scrollbar-gutter: stable;
@@ -18,14 +18,20 @@
 }
 
 .connections h2 {
-    margin: 0.5rem 0 2rem;
-    text-align: center;
-    font-size: 1.75rem;
+    margin: 0;
+    text-align: left;
+    font-size: 1.25rem;
+}
+
+.robots-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
 }
 
 .heading-icon {
-    text-align: center;
-    font-size: 3.5rem;
+    font-size: 2rem;
 }
 
 .robot-list {
@@ -33,7 +39,7 @@
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: 1rem;
     max-width: 50rem;
-    margin: auto;
+    margin: 0;
 }
 
 .robot-card {
@@ -125,7 +131,7 @@
 
 .empty-state {
     max-width: 28rem;
-    margin: auto;
+    margin: 0;
     padding: 2rem;
     border: 2px dashed $motion-primary;
     border-radius: 1rem;
@@ -151,7 +157,7 @@
 
 .connection-controls {
     max-width: 50rem;
-    margin: 0 auto 2rem;
+    margin: 0 0 1.5rem;
     padding: 1rem;
     border: 1px solid $ui-black-transparent;
     border-radius: 0.75rem;
@@ -160,9 +166,17 @@
 }
 
 .connection-controls select {
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
-    margin: 0.5rem;
-    padding: 0.4rem;
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $text-primary;
+    font: inherit;
+    font-size: 0.85rem;
 }
 
 .connection-actions {
@@ -172,9 +186,50 @@
     margin: 0.75rem 0;
 }
 
-.connection-actions button {
+.connection-controls button,
+.debug-panel button {
+    min-height: 2.25rem;
     padding: 0.5rem 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $motion-tertiary;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.25;
     cursor: pointer;
+}
+
+.connection-controls button:hover:not(:disabled),
+.debug-panel button:hover:not(:disabled) {
+    border-color: $motion-primary;
+    background: $ui-primary;
+}
+
+.connection-controls button:focus-visible,
+.connection-controls select:focus-visible,
+.debug-panel button:focus-visible,
+.debug-panel summary:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+
+.connection-controls button:disabled,
+.connection-controls select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.connection-controls .primary-action {
+    border-color: $motion-primary;
+    background: $motion-primary;
+    color: $ui-white;
+}
+
+.connection-controls .primary-action:hover:not(:disabled) {
+    background: $motion-tertiary;
+    border-color: $motion-tertiary;
 }
 
 .debug-panel pre {
@@ -200,18 +255,23 @@
     border-radius: 0.4rem;
     overflow: hidden;
 }
-.segmented button {
+.connection-controls .segmented button {
     border: 0;
     border-radius: 0;
     padding: 0.45rem 1rem;
 }
-.segmented button[aria-checked="true"] {
+.connection-controls .segmented button[aria-checked="true"],
+.connection-controls .segmented button[aria-checked="true"]:hover {
     background: $motion-primary;
-    color: white;
+    color: $ui-white;
 }
 .debug-panel {
     max-width: 50rem;
-    margin: 1.5rem auto 0;
+    margin: 1.5rem 0 0;
+    padding: 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.75rem;
+    background: $ui-white;
 }
 
 .connections,
@@ -310,4 +370,59 @@
 
 @media (prefers-reduced-motion: reduce) {
     .searching { animation: none; }
+}
+
+.expert-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.settings-section {
+    padding: 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-primary;
+}
+
+.device-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 32rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.settings-section p {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+}
+
+.settings-section .connection-help {
+    max-width: 42rem;
+    color: $text-primary-transparent;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+.debug-panel summary {
+    color: $motion-tertiary;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.debug-panel p,
+.debug-panel label {
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.debug-panel input {
+    accent-color: $motion-primary;
+    margin-inline-end: 0.5rem;
 }
