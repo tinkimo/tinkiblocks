@@ -1,0 +1,144 @@
+# Project image editor
+
+The Images tab follows Connections (tab index 4). Its reusable SVG uses the same
+current-colour stroke and sizing class as the Connections icon. It is mounted
+only while selected, so its keyboard shortcuts do not capture Code-tab keys.
+
+## Editing
+
+`packages/scratch-gui/src/components/images-tab/` contains the React editor,
+localized labels, styling, screen icon and pure RGB pixel operations. The model
+is always 160 × 118 RGB888, with a 320 × 236 nearest-neighbour drawing canvas and
+160 × 118 clean preview. The drawing surface can shrink while keeping its aspect
+ratio. No status pixels or editing overlays enter image data.
+
+Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
+rectangle and ellipse, thresholded monospace text, colour sampling, region
+copy/cut/paste/move, palette and custom colour input work without a robot.
+Dragging interpolates strokes; shapes and text preview before committing.
+Ctrl/Cmd-Z, Shift-Z/Y, C/X/V and arrow-key selection movement are scoped to the
+editor. Inputs retain native text-editing shortcuts. Pointer cancellation restores
+the uncommitted image. Undo history persists across image/tab switches, holds
+30 operations per image and at most 140 RGB snapshots across the collection
+(about 8 MiB). History is intentionally not part of the saved project.
+
+Create, rename, duplicate and confirmed delete use `ImageCollection`, with stable
+UUIDs, case-insensitive unique filenames, and a 64-image project limit. Filenames
+are 1–64 ASCII letters/digits/underscores/hyphens, starting with a letter or digit.
+New images use the next available `imageN` name. Image dimensions cannot change.
+Import accepts PNG/JPEG, previews contain or centre-crop onto the chosen opaque
+background, then creates a new image. PNG export writes the native image only.
+
+## Persistence and project lifecycle
+
+`src/tinkibot-images/collection.js` owns RGB buffers, filenames and selection.
+The VM exposes `projectImages` and emits `TINKIBOT_IMAGES_CHANGED`; edits and
+selection changes emit `PROJECT_CHANGED` for existing dirty/autosave handling.
+`sb3.serialize` adds `meta.tinkibotImages`:
+
+```json
+{"version":1,"selectedId":"<uuid>","images":[
+  {"id":"<uuid>","name":"image1","width":160,"height":118,"rgb":"<base64 RGB888>"}
+]}
+```
+
+The data lives in `project.json` inside the normal `.sb3` archive. This compatible
+metadata extension is deliberate: GUI server autosave uploads `vm.toJSON()` and
+the VM's existing costume/sound asset list separately. Embedding bounded lossless
+RGB data covers both archive downloads and JSON server autosave without adding
+an unknown asset type, a separate remote store, asynchronous PNG encoding or
+extra browser persistence. ZIP compression still applies. Each image is 56,640
+RGB bytes, represented by 75,520 base64 characters before ZIP compression.
+The full project does not depend on external files or local storage.
+
+Load validates version, IDs, dimensions, data length, names and duplicate names
+before replacing the collection. Old projects get an empty gallery. Clear/new
+project resets it. A load generation prevents older asynchronous validation or
+target deserialization from overwriting a newer project. Restore assigns the
+collection synchronously; it never races an asynchronous image decoder. Sprite
+exports do not include project images. Scratch targets and assets are unchanged.
+
+## Robot format and upload
+
+`rgb565.js` converts to the existing headerless, row-major big-endian RGB565
+format, 37,760 bytes. Only upload quantizes RGB888 to the hardware's RGB565; project
+storage and PNG export preserve the original colours. Upload and project saving
+are independent. Display/preload menus dynamically combine built-in names with
+current project filenames; uploads use `<name>.rgb565` under `/files/user/`.
+
+Upload requires one connected robot claimed by this client. It shares the existing
+command queue and prevents concurrent image uploads. Transport switching uses the
+existing busy checks. Errors are surfaced and no success is shown before verified
+completion. Progress callbacks update the UI; FILE_PENDING asks the student to
+confirm replacement on the robot. Protected system names remain protected by the
+robot's storage validation.
+
+* **Local Proxy:** the bounded `upload_image` JSON command carries the RGB565
+  filename and base64 bytes. The updated proxy validates the exact dimensions and
+  claim owner, uses a private temporary file and its existing TFP FileSender,
+  and broadcasts correlated progress events. Existing BLE and modem/ESP-NOW
+  connection/capacity negotiation, retries, SHA-256 verification, overwrite
+  confirmation and cleanup are reused.
+* **Web Serial:** the existing serial reader now retains binary frame bodies and
+  its serialized writer accepts byte arrays. `serial-upload.js` requires a
+  positive `TFP1-MODEM <nonce> <capacity>` response to the documented route-open
+  request before binary output. `tfp.js` implements the same CRC32/COBS, SHA-256,
+  negotiated chunk sizes, stop-and-wait retry, pending/ready, ACK, completion and
+  cancel contract. It never opens a second serial connection.
+
+## Firmware and compatibility
+
+The checked-out robot firmware defaults to portrait 128 × 160 with a 20-pixel
+status strip. Its companion change recognizes 37,760-byte editor images and
+selects landscape rotation with a compact 10-pixel status strip, exposing exactly
+160 × 118 application pixels. Status and dialog restoration respect this viewport.
+Legacy portrait RGB565 files keep their existing rendering path. The on-disk RGB565
+word format and TFP protocol have not changed.
+
+**Modem prerequisite:** the checked-out protocol documentation explicitly says
+older Tinkimodem firmware is text-only and does not support TFP. No Tinkimodem
+source repository is present in this workspace. Such firmware must be upgraded
+with the documented TFP route negotiation/binary forwarding before USB/ESP-NOW
+uploads can work. The editor fails negotiation without sending binary to an
+unsupported modem. Browser tests and host protocol tests are not physical modem,
+BLE, ESP-NOW or LCD interoperability evidence.
+
+## Validation
+
+GUI tests cover the tab editor, pointer mapping, tools, colour accuracy, text,
+selection operations, CRUD, undo/redo, import layout, isolation and upload feedback.
+VM tests include a real archive round trip with multiple images, selected ID and
+exact RGB comparison, byte-for-byte original Scratch asset comparisons, JSON
+autosave, old projects, new projects, concurrent loads, dynamic menus, RGB565
+encoding, a Python-generated TFP wire fixture, upload success/failure, overwrite
+acceptance and existing-serial-channel negotiation/cleanup.
+
+Run focused checks from the respective package directories:
+
+```sh
+# scratch-gui
+../../node_modules/.bin/jest --runInBand --runTestsByPath test/unit/components/images-tab.test.jsx
+# scratch-vm
+../../node_modules/.bin/tap --disable-coverage test/unit/tinkibot_images.js
+```
+
+Companion proxy and firmware tests live in `tests/test_image_upload.py` and
+`tests/test_editor_images.py`. Run each repository's full unittest suite.
+
+### Results in the implementation environment
+
+* GUI: all 48 unit suites passed (336 tests, one existing skip; 15 snapshots).
+  The editor's 15 focused tests also pass independently.
+* VM: all 54 new image checks passed. The full unit run reported 2,860 passing
+  checks and three failures in existing `project_changed_state.js` costume tests.
+  The same missing-renderer `createSVGSkin` failure was reproduced with the
+  unchanged VM source; it is independent of the image editor.
+* Proxy: all 217 unittest tests passed, including upload cancellation cleanup.
+* Robot firmware: all 558 unittest tests passed.
+* VM build and GUI development/production/standalone builds completed. New image
+  modules pass their focused lint checks. Translation source extraction completed.
+* Real Chromium testing covered icon alignment, canvas dimensions, drawing,
+  undo/redo, native PNG export without grid pixels, import preview, multiple
+  images, saving an `.sb3`, reloading the application and reopening that project,
+  retained pixels and responsive aspect ratio. Physical robot/modem testing is
+  still required.

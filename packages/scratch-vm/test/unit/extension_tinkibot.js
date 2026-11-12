@@ -693,7 +693,8 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
 });
 
 test('Tinkibot preload blocks provide combined media menus', t => {
-    const infos = new TinkibotBlocks(makeRuntime()).getInfos();
+    const extension = new TinkibotBlocks(makeRuntime());
+    const infos = extension.getInfos();
     const display = infos.find(info => info.id === 'tinkibotDisplay');
     const sounds = infos.find(info => info.id === 'tinkibotSounds');
     t.match(display.blocks.find(block => block.opcode === 'preload_image'), {
@@ -707,8 +708,10 @@ test('Tinkibot preload blocks provide combined media menus', t => {
         arguments: {AUDIO: {type: 'string', menu: 'sound_options'}}
     });
     const menus = display.menus;
-    t.strictSame(menus.preload_image_options.items, [...new Set([
-        ...menus.image_options.items, ...menus.letter_options.items,
+    t.equal(menus.image_options.items, 'getProjectImageOptions');
+    t.equal(menus.preload_image_options.items, 'getProjectPreloadImageOptions');
+    t.strictSame(extension.getProjectPreloadImageOptions(), [...new Set([
+        ...extension.getProjectImageOptions(), ...menus.letter_options.items,
         ...menus.number_options.items, ...menus.mosaic_options.items
     ])]);
     const vm = new VirtualMachine();

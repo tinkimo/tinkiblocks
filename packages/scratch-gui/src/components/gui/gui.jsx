@@ -15,6 +15,9 @@ import CostumeTab from '../../containers/costume-tab.jsx';
 import TargetPane from '../../containers/target-pane.jsx';
 import SoundTab from '../../containers/sound-tab.jsx';
 import ConnectionsTab from '../connections-tab/connections-tab.jsx';
+import ImagesTab from '../images-tab/images-tab.jsx';
+import ScreenIcon from '../images-tab/screen-icon.jsx';
+import {IMAGES_TAB_INDEX} from '../../reducers/editor-tab';
 import StageWrapper from '../../containers/stage-wrapper.jsx';
 import Loader from '../loader/loader.jsx';
 import Box from '../box/box.jsx';
@@ -518,6 +521,18 @@ const GUIComponent = props => {
                                                 </span>
                                             ) : null}
                                         </Tab>
+                                        <Tab
+                                            className={tabClassNames.tab}
+                                            role="tab"
+                                            tabIndex="0"
+                                        >
+                                            <ScreenIcon className={styles.connectionsTabIcon} />
+                                            <FormattedMessage
+                                                defaultMessage="Images"
+                                                description="Button to create pictures for a Tinkibot"
+                                                id="gui.gui.imagesTab"
+                                            />
+                                        </Tab>
                                     </TabList>
                                 </Box>
                                 <TabPanel
@@ -581,6 +596,12 @@ const GUIComponent = props => {
                                     role="tabpanel"
                                 >
                                     <ConnectionsTab vm={vm} />
+                                </TabPanel>
+                                <TabPanel
+                                    className={tabClassNames.tabPanel}
+                                    role="tabpanel"
+                                >
+                                    {activeTabIndex === IMAGES_TAB_INDEX ? <ImagesTab vm={vm} /> : null}
                                 </TabPanel>
                             </Tabs>
                             {backpackVisible && backpackConfigured ? (

@@ -113,6 +113,10 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 ### scratch-vm specifics
 
+- Project robot images live in `src/tinkibot-images/` and `meta.tinkibotImages` in project JSON.
+  The Images tab edits native 160 × 118 RGB888; uploads use existing RGB565/TFP.
+  See `packages/scratch-vm/docs/tinkibot-image-editor.md` for persistence and transport prerequisites.
+
 - Web Serial robot API transport lives in `src/extensions/tinkimo_tinkibot/connection/`; see
   `packages/scratch-vm/docs/tinkibot-web-serial.md` for gateway compatibility and hardware testing.
   The normal Connections view shows a status light/transport; Expert reveals manual controls and diagnostics.

@@ -283,6 +283,12 @@ class ConnectionManager extends EventEmitter {
 
     receive (message) {
         if (this.method !== 'web-serial' || this.transport.closing) return;
+        if (this.uploadChannel) {
+            if (message.kind === 'binary') {
+                this.uploadChannel.feed(message.data); return;
+            }
+            if (message.kind === 'text' && this.uploadChannel.text(message.text)) return;
+        }
         if (message.kind !== 'text') {
             this.log(message.kind === 'overflow' ? 'error' : 'binary', message);
             return;
