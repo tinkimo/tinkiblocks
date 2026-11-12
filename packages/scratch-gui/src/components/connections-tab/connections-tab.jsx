@@ -121,7 +121,6 @@ const ConnectionsTab = ({vm}) => {
                                 description="Label for a robot whose UUID is known but nickname is empty"
                                 id="gui.connectionsTab.unnamedRobot"
                             />}</strong>
-                            {serial ? <code className={styles.robotUuid}>{robot.botUuid}</code> : null}
                             <span className={styles.connectedLabel}>
                                 {robot.connected === false ? (
                                     <FormattedMessage
