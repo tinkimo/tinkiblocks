@@ -6,7 +6,7 @@ const HEIGHT = 118;
 const BYTE_LENGTH = WIDTH * HEIGHT * 3;
 const MAX_IMAGES = 64;
 const validId = id => /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
-const validName = name => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name);
+const validName = name => /^[a-z0-9][a-z0-9-]{0,63}$/.test(name);
 
 /** Lossless RGB project data; independent of a browser canvas or robot connection. */
 class ImageCollection {
@@ -39,9 +39,16 @@ class ImageCollection {
         return image;
     }
 
+    normalizeName (value) {
+        return value.toLowerCase().replace(/[\s_]+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+            .replace(/^-+/, '')
+            .slice(0, 64);
+    }
+
     validateName (name, id) {
         if (typeof name !== 'string' || !validName(name)) {
-            throw new Error('Use 1–64 letters, numbers, hyphens or underscores');
+            throw new Error('Use 1–64 lowercase letters, numbers or hyphens, starting with a letter or number');
         }
         if (this.images.some(image => image.id !== id && image.name.toLowerCase() === name.toLowerCase())) {
             throw new Error('An image with that name already exists');
@@ -89,6 +96,7 @@ class ImageCollection {
         if (data.version !== 1 || !Array.isArray(data.images) || data.images.length > MAX_IMAGES) {
             throw new Error('Invalid project image collection');
         }
+        const usedNames = new Set();
         for (const image of data.images) {
             if (!image || typeof image.id !== 'string' || !validId(image.id) ||
                 collection.images.some(item => item.id === image.id) || image.width !== WIDTH ||
@@ -96,10 +104,21 @@ class ImageCollection {
                 image.rgb.length !== BYTE_LENGTH * 4 / 3 || !/^[A-Za-z0-9+/]+$/.test(image.rgb)) {
                 throw new Error('Invalid project image asset');
             }
-            collection.validateName(image.name);
+            if (typeof image.name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(image.name)) {
+                throw new Error('Invalid project image filename');
+            }
+            const base = collection.normalizeName(image.name);
+            let name = base;
+            let suffix = 2;
+            while (usedNames.has(name)) {
+                const ending = `-${suffix++}`;
+                name = base.slice(0, 64 - ending.length) + ending;
+            }
+            collection.validateName(name);
             const pixels = new Uint8Array(Buffer.from(image.rgb, 'base64'));
             if (pixels.length !== BYTE_LENGTH) throw new Error('Invalid project image pixels');
-            collection.images.push({id: image.id, name: image.name, pixels});
+            collection.images.push({id: image.id, name, pixels});
+            usedNames.add(name);
         }
         collection.selectedId = collection.images.some(image => image.id === data.selectedId) ?
             data.selectedId : (collection.images[0] || {}).id || null;

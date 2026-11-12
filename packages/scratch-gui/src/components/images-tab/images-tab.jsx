@@ -5,12 +5,27 @@ import PropTypes from 'prop-types';
 import {useIntl} from 'react-intl';
 import messages from './messages';
 import styles from './images-tab.css';
+import FilenameField from './filename-field';
 import {WIDTH, HEIGHT, HISTORY_LIMIT, point, rgb, hex, colourAt, line, fill, shape, region,
     copyRegion, pasteRegion, eraseRegion, imageCanvas, text, importCanvas} from './pixels';
 
-const tools = ['pencil', 'brush', 'eraser', 'fill', 'line', 'rectangle', 'rectangleFilled',
-    'ellipse', 'ellipseFilled', 'text', 'picker', 'select'];
-const symbols = ['✎', '🖌', '▱', '▨', '╱', '□', '■', '○', '●', 'T', '◉', '⬚'];
+const toolGroups = [
+    {label: 'drawTools', items: ['pencil', 'brush', 'eraser', 'fill', 'text']},
+    {label: 'shapeTools', items: ['line', 'rectangle', 'rectangleFilled', 'ellipse', 'ellipseFilled']},
+    {label: 'selectionTools', items: ['select', 'picker']}
+];
+const symbols = {pencil: '✎',
+    brush: '🖌',
+    eraser: '▱',
+    fill: '▨',
+    line: '╱',
+    rectangle: '□',
+    rectangleFilled: '■',
+    ellipse: '○',
+    ellipseFilled: '●',
+    text: 'T',
+    picker: '◉',
+    select: '⬚'};
 const palette = ['#000000', '#ffffff', '#ef4444', '#f97316', '#facc15', '#84cc16', '#22c55e',
     '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#92400e', '#64748b', '#cbd5e1'];
 const histories = new WeakMap();
@@ -41,7 +56,7 @@ const ImagesTab = ({vm}) => {
     const [size, setSize] = useState(5);
     const [fontSize, setFontSize] = useState(12);
     const [words, setWords] = useState(intl.formatMessage(messages.initialText));
-    const [grid, setGrid] = useState(false);
+    const [nameInvalid, setNameInvalid] = useState(false);
     const [error, setError] = useState('');
     const [upload, setUpload] = useState(null);
     const [imported, setImported] = useState(null);
@@ -82,18 +97,6 @@ const ImagesTab = ({vm}) => {
         }
         const context = canvas.current.getContext('2d');
         context.setLineDash([]);
-        if (grid) {
-            context.strokeStyle = 'rgba(80, 90, 100, 0.15)';
-            context.lineWidth = 0.5;
-            context.beginPath();
-            for (let x = 0; x <= 320; x += 2) {
-                context.moveTo(x, 0); context.lineTo(x, 236);
-            }
-            for (let y = 0; y <= 236; y += 2) {
-                context.moveTo(0, y); context.lineTo(320, y);
-            }
-            context.stroke();
-        }
         if (selection.current) {
             const box = selection.current;
             context.strokeStyle = '#8854d0';
@@ -145,7 +148,7 @@ const ImagesTab = ({vm}) => {
     useEffect(() => {
         if (!gesture.current && current) pixels.current = new Uint8Array(current.pixels);
         paint(pixels.current);
-    }, [current && current.pixels, grid]);
+    }, [current && current.pixels]);
 
     const undo = redo => {
         if (!current) return;
@@ -378,52 +381,72 @@ const ImagesTab = ({vm}) => {
             <main className={styles.workspace}>
                 {current ? <React.Fragment>
                     <div className={styles.row}>
-                        <label>{label('rename')} <input
-                            key={`${current.id}/${current.name}`}
-                            defaultValue={current.name}
-                            maxLength={64}
-                            title={label('filenameHint')}
-                            onBlur={event => attempt(() =>
-                                collection.rename(current.id, event.target.value.trim()))}
-                            onKeyDown={event => {
-                                if (event.key === 'Enter') event.target.blur();
-                            }}
-                        /></label>
-                        {button('duplicate', () => collection.create(null, current.pixels),
-                            collection.images.length >= 64)}
-                        {button('deleteImage', () => {
-                            if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
-                        })}
+                        <FilenameField
+                            collection={collection}
+                            image={current}
+                            onValidityChange={setNameInvalid}
+                        />
+                        <fieldset className={styles.controlGroup}>
+                            <legend>{label('imageActions')}</legend>
+                            {button('duplicate', () => collection.create(null, current.pixels),
+                                collection.images.length >= 64)}
+                            {button('deleteImage', () => {
+                                if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
+                            })}
+                        </fieldset>
                     </div>
                     <div
                         className={styles.tools}
                         role="toolbar"
                         aria-label={label('tools')}
                     >
-                        {tools.map((item, index) => (<button
-                            key={item}
-                            type="button"
-                            aria-pressed={tool === item}
-                            title={label(item)}
-                            onClick={() => {
-                                cancel(); setTool(item);
-                            }}
-                        >
-                            <span aria-hidden>{symbols[index]}</span> {label(item)}</button>))}
+                        {toolGroups.map(group => (
+                            <fieldset
+                                className={styles.controlGroup}
+                                key={group.label}
+                            >
+                                <legend>{label(group.label)}</legend>
+                                <div className={styles.groupButtons}>
+                                    {group.items.map(item => (
+                                        <button
+                                            key={item}
+                                            type="button"
+                                            aria-pressed={tool === item}
+                                            title={label(item)}
+                                            onClick={() => {
+                                                cancel(); setTool(item);
+                                            }}
+                                        >
+                                            <span aria-hidden>{symbols[item]}</span> {label(item)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
+                        ))}
                     </div>
                     <div className={styles.row}>
-                        {button('undo', () => undo(false), !history.undo.length)}
-                        {button('redo', () => undo(true), !history.redo.length)}
-                        {button('copy', () => copy(false), !selection.current)}
-                        {button('cut', () => copy(true), !selection.current)}
-                        {button('paste', paste, !clipboard.current)}
-                        {button('clear', () => {
-                            if (window.confirm(label('clearConfirm'))) {
-                                const data = new Uint8Array((WIDTH * HEIGHT) * 3);
-                                for (let i = 0; i < (WIDTH * HEIGHT); i++) data.set(rgb(background), i * 3);
-                                commit(data);
-                            }
-                        })}
+                        <fieldset className={styles.controlGroup}>
+                            <legend>{label('editActions')}</legend>
+                            <div className={styles.groupButtons}>
+                                {button('undo', () => undo(false), !history.undo.length)}
+                                {button('redo', () => undo(true), !history.redo.length)}
+                                {button('clear', () => {
+                                    if (window.confirm(label('clearConfirm'))) {
+                                        const data = new Uint8Array((WIDTH * HEIGHT) * 3);
+                                        for (let i = 0; i < (WIDTH * HEIGHT); i++) data.set(rgb(background), i * 3);
+                                        commit(data);
+                                    }
+                                })}
+                            </div>
+                        </fieldset>
+                        <fieldset className={styles.controlGroup}>
+                            <legend>{label('selectionActions')}</legend>
+                            <div className={styles.groupButtons}>
+                                {button('copy', () => copy(false), !selection.current)}
+                                {button('cut', () => copy(true), !selection.current)}
+                                {button('paste', paste, !clipboard.current)}
+                            </div>
+                        </fieldset>
                     </div>
                     <div
                         className={styles.palette}
@@ -471,11 +494,6 @@ const ImagesTab = ({vm}) => {
                                 {[8, 10, 12, 16, 24, 32].map(value => <option key={value}>{value}</option>)}
                             </select></label>
                         </React.Fragment> : null}
-                        <label><input
-                            type="checkbox"
-                            checked={grid}
-                            onChange={event => setGrid(event.target.checked)}
-                        /> {label('grid')}</label>
                     </div>
                     <div className={styles.canvases}>
                         <div>
@@ -506,11 +524,12 @@ const ImagesTab = ({vm}) => {
                             />
                         </div>
                     </div>
-                    <div className={styles.row}>
+                    <fieldset className={styles.controlGroup}>
+                        <legend>{label('fileActions')}</legend>
                         {button('exportImage', exportImage)}
                         {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
-                            !paired || Boolean(upload && upload.busy))}
-                    </div>
+                            !paired || nameInvalid || Boolean(upload && upload.busy))}
+                    </fieldset>
                     {upload && upload.busy ? (
                         <div role="status">
                             <progress

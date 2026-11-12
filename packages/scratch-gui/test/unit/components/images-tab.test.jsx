@@ -155,3 +155,55 @@ test('upload feedback uses the selected image and surfaces failures', async () =
     fireEvent.click(getByRole('button', {name: 'Upload to Robot'}));
     expect(await findByRole('alert')).toHaveTextContent('Disconnected');
 });
+
+
+test('controls are grouped by purpose and the grid control is removed', () => {
+    const {getByRole, queryByRole} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    for (const name of ['Draw', 'Shapes', 'Select & pick', 'Edit image', 'Selection', 'Image actions', 'Export & upload']) {
+        expect(getByRole('group', {name})).toBeVisible();
+    }
+    expect(queryByRole('checkbox', {name: 'Pixel grid'})).toBeNull();
+});
+
+test('filename rules are visible above the field and invalid names are prevented inline', () => {
+    const {getByRole, getByLabelText, getByText, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    const first = vm.projectImages.get();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    const input = getByLabelText('Image filename');
+    const hint = getByText(/Use lowercase letters, numbers and hyphens/);
+    expect(hint.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(input).toHaveAttribute('aria-describedby', 'image-filename-hint');
+    fireEvent.change(input, {target: {value: 'Sunny_Day 2!'}});
+    expect(input).toHaveValue('sunny-day-2');
+    fireEvent.blur(input);
+    expect(vm.projectImages.get().name).toBe('sunny-day-2');
+    fireEvent.change(input, {target: {value: first.name}});
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(getByRole('alert')).toHaveAttribute('id', 'image-filename-error');
+    expect(input).toHaveAttribute('aria-describedby', 'image-filename-hint image-filename-error');
+    fireEvent.blur(input);
+    expect(vm.projectImages.get().name).toBe('sunny-day-2');
+    fireEvent.change(input, {target: {value: ''}});
+    expect(getByRole('alert')).toHaveTextContent('Enter a filename');
+    fireEvent.change(input, {target: {value: 'moon-light'}});
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+    fireEvent.blur(input);
+    expect(vm.projectImages.get().name).toBe('moon-light');
+});
+
+
+test('reopening the same project clears a stale filename draft and its error', () => {
+    const {getByRole, getByLabelText, queryByRole, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    const saved = vm.projectImages.serialize();
+    fireEvent.change(getByLabelText('Image filename'), {target: {value: ''}});
+    expect(getByRole('alert')).toBeVisible();
+    act(() => {
+        vm.projectImages = ImageCollection.restore(saved);
+        vm.emit('TINKIBOT_IMAGES_CHANGED');
+    });
+    expect(getByLabelText('Image filename')).toHaveValue('image1');
+    expect(queryByRole('alert')).toBeNull();
+});

@@ -1,6 +1,51 @@
 import {defineMessages} from 'react-intl';
 
 export default defineMessages({
+    drawTools: {
+        id: 'gui.images.drawTools',
+        defaultMessage: 'Draw',
+        description: 'Image editor: drawTools'
+    },
+    shapeTools: {
+        id: 'gui.images.shapeTools',
+        defaultMessage: 'Shapes',
+        description: 'Image editor: shapeTools'
+    },
+    selectionTools: {
+        id: 'gui.images.selectionTools',
+        defaultMessage: 'Select & pick',
+        description: 'Image editor: selectionTools'
+    },
+    imageActions: {
+        id: 'gui.images.imageActions',
+        defaultMessage: 'Image actions',
+        description: 'Image editor: imageActions'
+    },
+    editActions: {
+        id: 'gui.images.editActions',
+        defaultMessage: 'Edit image',
+        description: 'Image editor: editActions'
+    },
+    selectionActions: {
+        id: 'gui.images.selectionActions',
+        defaultMessage: 'Selection',
+        description: 'Image editor: selectionActions'
+    },
+    fileActions: {
+        id: 'gui.images.fileActions',
+        defaultMessage: 'Export & upload',
+        description: 'Image editor: fileActions'
+    },
+    filenameDuplicate: {
+        id: 'gui.images.filenameDuplicate',
+        defaultMessage: 'Another image already uses this filename. Choose a different name.',
+        description: 'Image editor: filenameDuplicate'
+    },
+    filenameRequired: {
+        id: 'gui.images.filenameRequired',
+        defaultMessage: 'Enter a filename using lowercase letters, numbers and hyphens.',
+        description: 'Image editor: filenameRequired'
+    },
     initialText: {
         id: 'gui.images.initialText',
         defaultMessage: 'Hello!',
@@ -125,11 +170,6 @@ export default defineMessages({
         id: 'gui.images.background',
         defaultMessage: 'Background colour',
         description: 'Image editor: background'
-    },
-    grid: {
-        id: 'gui.images.grid',
-        defaultMessage: 'Pixel grid',
-        description: 'Image editor: grid'
     },
     undo: {
         id: 'gui.images.undo',
@@ -289,7 +329,8 @@ export default defineMessages({
     },
     filenameHint: {
         id: 'gui.images.filenameHint',
-        defaultMessage: 'Letters, numbers, hyphens and underscores; no extension.',
+        defaultMessage: 'Use lowercase letters, numbers and hyphens, starting with a letter or number. ' +
+            'Up to 64 characters; no spaces or file extension.',
         description: 'Image editor: filenameHint'
     }
 });

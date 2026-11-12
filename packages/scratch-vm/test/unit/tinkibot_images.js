@@ -20,8 +20,8 @@ test('image CRUD keeps stable IDs, unique names and independent buffers', t => {
     t.not(first.id, second.id);
     second.pixels[0] = 13;
     t.equal(first.pixels[0], 255);
-    images.rename(first.id, 'my_picture');
-    t.throws(() => images.rename(second.id, 'MY_PICTURE'), /already exists/);
+    images.rename(first.id, 'my-picture');
+    t.throws(() => images.rename(second.id, 'my-picture'), /already exists/);
     t.throws(() => images.rename(second.id, '../escape'), /letters/);
     images.select(first.id);
     const restored = ImageCollection.restore(images.serialize());
@@ -226,4 +226,24 @@ test('USB upload negotiates one existing modem route and streams TFP acknowledge
         new Uint8Array(300)), /Modem unavailable/);
     t.equal(wires.length, before, 'no binary is sent before positive modem negotiation');
     t.equal(manager.uploadChannel, null);
+});
+
+
+test('filenames use lowercase letters, numbers and hyphens; restored images keep their pixels', t => {
+    const images = new ImageCollection();
+    t.equal(images.normalizeName('My Picture_2.PNG!'), 'my-picture-2png');
+    for (const name of ['Upper', 'under_score', '-leading', 'has space', 'x.png', '']) {
+        t.throws(() => images.rename(images.create().id, name), /lowercase/);
+    }
+    const first = images.create('sunny-day');
+    const second = images.create('other');
+    const saved = images.serialize();
+    saved.images.find(image => image.id === first.id).name = 'Sunny_Day';
+    saved.images.find(image => image.id === second.id).name = 'sunny-day';
+    const restored = ImageCollection.restore(saved);
+    t.equal(restored.get(first.id).name, 'sunny-day');
+    t.equal(restored.get(second.id).name, 'sunny-day-2');
+    t.same(restored.get(first.id).pixels, first.pixels);
+    t.equal(restored.selectedId, saved.selectedId);
+    t.end();
 });

@@ -10,7 +10,9 @@ only while selected, so its keyboard shortcuts do not capture Code-tab keys.
 localized labels, styling, screen icon and pure RGB pixel operations. The model
 is always 160 × 118 RGB888, with a 320 × 236 nearest-neighbour drawing canvas and
 160 × 118 clean preview. The drawing surface can shrink while keeping its aspect
-ratio. No status pixels or editing overlays enter image data.
+ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
+image editing, image actions and export/upload controls have labeled groups.
+There is no pixel grid control.
 
 Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
 rectangle and ellipse, thresholded monospace text, colour sampling, region
@@ -24,7 +26,11 @@ the uncommitted image. Undo history persists across image/tab switches, holds
 
 Create, rename, duplicate and confirmed delete use `ImageCollection`, with stable
 UUIDs, case-insensitive unique filenames, and a 64-image project limit. Filenames
-are 1–64 ASCII letters/digits/underscores/hyphens, starting with a letter or digit.
+are 1–64 lowercase ASCII letters/digits/hyphens, starting with a letter or digit.
+Filename rules appear above the input; capitals become lowercase and spaces or
+underscores become hyphens. Empty or duplicate names show an error beside the
+field and block upload until corrected. Restored legacy names are normalized,
+with numbered suffixes for collisions, preserving all IDs, selection and RGB data.
 New images use the next available `imageN` name. Image dimensions cannot change.
 Import accepts PNG/JPEG, previews contain or centre-crop onto the chosen opaque
 background, then creates a new image. PNG export writes the native image only.
@@ -95,13 +101,15 @@ selects landscape rotation with a compact 10-pixel status strip, exposing exactl
 Legacy portrait RGB565 files keep their existing rendering path. The on-disk RGB565
 word format and TFP protocol have not changed.
 
-**Modem prerequisite:** the checked-out protocol documentation explicitly says
-older Tinkimodem firmware is text-only and does not support TFP. No Tinkimodem
-source repository is present in this workspace. Such firmware must be upgraded
-with the documented TFP route negotiation/binary forwarding before USB/ESP-NOW
-uploads can work. The editor fails negotiation without sending binary to an
-unsupported modem. Browser tests and host protocol tests are not physical modem,
-BLE, ESP-NOW or LCD interoperability evidence.
+**Modem prerequisite:** older text-only Tinkimodem firmware cannot forward TFP.
+The consolidated byte-safe Web Serial gateway now implements that forwarding in
+https://github.com/tinkimo/tinkimoden-proxy/pull/1, including ESP-NOW and
+confirmed-MTU BLE routes. Use matching TFP-capable robot and gateway firmware.
+The desktop proxy still uses its existing direct BLE/original-modem interfaces;
+the consolidated JSON gateway is selected through Web Serial. Negotiation fails
+without binary output if a modem cannot positively confirm support. Host protocol
+tests, reference receiver checks and browser tests do not prove physical modem,
+BLE, ESP-NOW or LCD interoperability.
 
 ## Validation
 
@@ -127,9 +135,9 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 ### Results in the implementation environment
 
-* GUI: all 48 unit suites passed (336 tests, one existing skip; 15 snapshots).
-  The editor's 15 focused tests also pass independently.
-* VM: all 54 new image checks passed. The full unit run reported 2,860 passing
+* GUI: all 48 unit suites passed (339 tests, one existing skip; 15 snapshots).
+  The editor's 18 focused tests also pass independently.
+* VM: all 65 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the
   unchanged VM source; it is independent of the image editor.
