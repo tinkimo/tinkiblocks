@@ -243,11 +243,6 @@
     font-size: 0.75rem;
 }
 
-.robot-uuid {
-    font-size: 0.75rem;
-    overflow-wrap: anywhere;
-}
-
 .segmented {
     display: inline-flex;
     border: 1px solid $ui-black-transparent;
