@@ -104,9 +104,11 @@ robot's storage validation.
 ## Firmware and compatibility
 
 The checked-out robot firmware defaults to portrait 128 × 160 with a 20-pixel
-status strip. Its companion change recognizes 37,760-byte editor images and
-selects landscape rotation with a compact 10-pixel status strip, exposing exactly
-160 × 118 application pixels. Status and dialog restoration respect this viewport.
+status strip. Its companion change recognizes 37,760-byte editor images and keeps
+portrait rotation with a compact 10-pixel status strip, exposing a 128 × 150
+application viewport. It contains the source artwork upright at 128 × 94 with
+black letterboxing. Status and dialog restoration respect this viewport. Deploy
+the companion firmware update to fix physical screen orientation.
 Legacy portrait RGB565 files keep their existing rendering path. The on-disk RGB565
 word format and TFP protocol have not changed.
 
