@@ -6,6 +6,7 @@ import {useIntl} from 'react-intl';
 import messages from './messages';
 import styles from './images-tab.css';
 import FilenameField from './filename-field';
+import RobotPreview from './robot-preview';
 import {WIDTH, HEIGHT, HISTORY_LIMIT, point, rgb, hex, colourAt, line, fill, shape, region,
     copyRegion, pasteRegion, eraseRegion, imageCanvas, text, importCanvas} from './pixels';
 
@@ -379,8 +380,8 @@ const ImagesTab = ({vm}) => {
                 <p>{label('savedHint')}</p>
             </aside>
             <main className={styles.workspace}>
-                {current ? <React.Fragment>
-                    <div className={styles.row}>
+                {current ? <div className={styles.content}>
+                    <div className={styles.imageHeader}>
                         <FilenameField
                             collection={collection}
                             image={current}
@@ -516,15 +517,14 @@ const ImagesTab = ({vm}) => {
                             <p>{tool === 'select' ? label('selectionHint') : label('nativeSize')}</p>
                         </div>
                         <div className={styles.preview}><h3>{label('preview')}</h3>
-                            <canvas
+                            <RobotPreview
                                 ref={preview}
-                                width={160}
-                                height={118}
-                                aria-label={label('preview')}
+                                nickname={((vm.runtime.tinkibotConnectedRobots || [])
+                                    .find(robot => robot.claimState === 'paired') || {}).nickname}
                             />
                         </div>
                     </div>
-                    <fieldset className={styles.controlGroup}>
+                    <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
                         <legend>{label('fileActions')}</legend>
                         {button('exportImage', exportImage)}
                         {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
@@ -541,7 +541,7 @@ const ImagesTab = ({vm}) => {
                     ) : null}
                     {upload && upload.success ? <p role="status">{label('uploaded')}</p> : null}
                     {paired ? null : <p>{label('offline')}</p>}
-                </React.Fragment> : <p className={styles.empty}>{label('empty')}</p>}
+                </div> : <p className={styles.empty}>{label('empty')}</p>}
                 {error ? <p
                     role="alert"
                     className={styles.error}

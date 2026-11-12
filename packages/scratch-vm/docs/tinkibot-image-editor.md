@@ -14,6 +14,12 @@ ratio. No status pixels or editing overlays enter image data. Drawing, shapes, s
 image editing, image actions and export/upload controls have labeled groups.
 There is no pixel grid control.
 
+The preview sits inside a clean vector illustration of the yellow robot top,
+with side buttons, corner screws, a screen bezel and a separate status strip.
+Only the native artwork is exported or uploaded. The editing area has a bounded
+width and compact wrapping control groups, so wide windows do not stretch the
+tools or export controls across the screen.
+
 Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
 rectangle and ellipse, thresholded monospace text, colour sampling, region
 copy/cut/paste/move, palette and custom colour input work without a robot.

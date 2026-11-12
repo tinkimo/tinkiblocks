@@ -150,6 +150,9 @@
     display: block;
 }
 .preview {
+    flex: 0 0 auto;
+    width: 306px;
+    max-width: 100%;
     border: 1px solid $ui-black-transparent;
     padding: 0.75rem;
     border-radius: 0.75rem;
@@ -159,11 +162,6 @@
     font-size: 0.8rem;
     margin-top: 0;
 }
-.preview canvas {
-    width: 160px;
-    height: 118px;
-    image-rendering: pixelated;
-}
 .error {
     color: #b91c1c;
 }
@@ -172,6 +170,8 @@
     max-width: 22rem;
 }
 .import-panel {
+    width: fit-content;
+    max-width: 760px;
     position: sticky;
     bottom: 0;
     padding: 1rem;
@@ -218,16 +218,20 @@
     gap: 0.4rem;
 }
 .tools {
-    align-items: stretch;
+    align-items: flex-start;
 }
 .tools .control-group {
-    flex: 1 1 12rem;
+    flex: 0 1 252px;
+    width: 252px;
+    max-width: 100%;
 }
 .tools .control-group:last-child {
-    flex: 0 1 8rem;
+    flex-basis: 128px;
+    width: 128px;
 }
 .filename {
-    flex: 1 1 20rem;
+    flex: 0 1 30rem;
+    min-width: 0;
 }
 .filename label {
     font-weight: 600;
@@ -245,4 +249,23 @@
 
 .control-group > button + button {
     margin-inline-start: 0.4rem;
+}
+
+.content {
+    width: 100%;
+    max-width: 760px;
+}
+.image-header {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.file-actions {
+    width: fit-content;
+    max-width: 100%;
+}
+.canvases {
+    gap: 1.5rem;
 }

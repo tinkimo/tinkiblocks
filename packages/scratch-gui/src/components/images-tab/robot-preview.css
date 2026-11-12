@@ -1,0 +1,20 @@
+.robot {
+    position: relative;
+    width: 280px;
+    max-width: 100%;
+    aspect-ratio: 280 / 224;
+}
+.housing {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.screen {
+    position: absolute;
+    left: 21.428571%;
+    top: 25.892857%;
+    width: 57.142857%;
+    height: 52.678571%;
+    image-rendering: pixelated;
+    background: white;
+}
