@@ -94,7 +94,14 @@ const ImagesTab = ({vm}) => {
             const context = target.getContext('2d');
             context.imageSmoothingEnabled = false;
             context.clearRect(0, 0, target.width, target.height);
-            context.drawImage(source, 0, 0, target.width, target.height);
+            if (target === preview.current) {
+                // Match the firmware's upright 128 × 150 application viewport.
+                context.fillStyle = '#000000';
+                context.fillRect(0, 0, target.width, target.height);
+                context.drawImage(source, 0, 28, 128, 94);
+            } else {
+                context.drawImage(source, 0, 0, target.width, target.height);
+            }
         }
         const context = canvas.current.getContext('2d');
         context.setLineDash([]);

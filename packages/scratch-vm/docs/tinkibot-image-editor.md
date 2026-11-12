@@ -9,13 +9,16 @@ only while selected, so its keyboard shortcuts do not capture Code-tab keys.
 `packages/scratch-gui/src/components/images-tab/` contains the React editor,
 localized labels, styling, screen icon and pure RGB pixel operations. The model
 is always 160 × 118 RGB888, with a 320 × 236 nearest-neighbour drawing canvas and
-160 × 118 clean preview. The drawing surface can shrink while keeping its aspect
-ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
+128 × 150 upright robot preview. The landscape artwork fits inside the portrait
+LCD at 128 × 94, with 28 black rows above and below; the status strip remains
+above the application area. Source images and native PNG exports remain
+160 × 118. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
 image editing, image actions and export/upload controls have labeled groups.
 There is no pixel grid control.
 
 The preview sits inside a clean vector illustration of the yellow robot top,
-with side buttons, corner screws, a screen bezel and a separate status strip.
+with a tall raised centre cover, silver button mounts, black switches, corner
+screws, a portrait screen bezel and a separate status strip.
 Only the native artwork is exported or uploaded. The editing area has a bounded
 width and compact wrapping control groups, so wide windows do not stretch the
 tools or export controls across the screen.
@@ -154,5 +157,6 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 * Real Chromium testing covered icon alignment, canvas dimensions, drawing,
   undo/redo, native PNG export without grid pixels, import preview, multiple
   images, saving an `.sb3`, reloading the application and reopening that project,
-  retained pixels and responsive aspect ratio. Physical robot/modem testing is
-  still required.
+  retained pixels and responsive aspect ratio. Portrait preview checks cover
+  upright asymmetric artwork, firmware-matched letterboxing and compact groups.
+  Physical robot/modem testing is still required.

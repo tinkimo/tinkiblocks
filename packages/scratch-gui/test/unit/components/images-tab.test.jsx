@@ -112,7 +112,8 @@ test('editor works offline, renders LCD icon and fixed canvases, and manages ima
     const canvas = getByLabelText('Drawing canvas, 160 by 118 pixels');
     expect(canvas).toHaveAttribute('width', '320');
     expect(canvas).toHaveAttribute('height', '236');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('width', '160');
+    expect(getByLabelText('Robot preview')).toHaveAttribute('width', '128');
+    expect(getByLabelText('Robot preview')).toHaveAttribute('height', '150');
     expect(getByRole('button', {name: 'Upload to Robot'})).toBeDisabled();
     expect(vm.projectImages.get().pixels.length).toBe(160 * 118 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));

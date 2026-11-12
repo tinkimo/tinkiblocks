@@ -2,7 +2,7 @@
     position: relative;
     width: 280px;
     max-width: 100%;
-    aspect-ratio: 280 / 224;
+    aspect-ratio: 280 / 320;
 }
 .housing {
     display: block;
@@ -11,10 +11,10 @@
 }
 .screen {
     position: absolute;
-    left: 21.428571%;
-    top: 25.892857%;
-    width: 57.142857%;
-    height: 52.678571%;
+    left: 27.142857%;
+    top: 28.125%;
+    width: 45.714286%;
+    height: 46.875%;
     image-rendering: pixelated;
     background: white;
 }
