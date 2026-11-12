@@ -39,7 +39,8 @@ const response = (value, pending, clientUuid) => {
             if (!item || Object.keys(expected).some(key => key !== 'message' && item[key] !== expected[key])) {
                 throw new Error(`Invalid Tinkibot result at command ${i + 1}`);
             }
-            return {cmd: pending.bundleCommands[i], status: item.status,
+            return {cmd: pending.bundleCommands[i],
+                status: item.status,
                 msg: item.status === 'OK' ? (item.message || '') : item.message};
         });
         const results = protocol.response({rsp}, pending.bundleCommands);
@@ -56,4 +57,15 @@ const response = (value, pending, clientUuid) => {
     return typeof result === 'undefined' ? '' : result;
 };
 
-module.exports = {command, response};
+// Match the proxy/gateway execution budget without shortening long music bundles.
+const timeout = payload => {
+    if (['register', 'discover', 'end-session'].includes(payload.command)) return 5000;
+    if (['claim', 'unclaim', 'remove'].includes(payload.command)) return 30000;
+    const items = payload.cmds || [payload];
+    const music = items.filter(item => ['play_note', 'play_drum'].includes(item.command));
+    const musicMs = music.reduce((total, item) => total + ((Number(item.duration) || 0) * 1000), 0);
+    const execution = music.length === items.length ? musicMs + (items.length * 5000) : 1800000 + musicMs;
+    return execution + 5000;
+};
+
+module.exports = {command, response, timeout};
