@@ -2,22 +2,32 @@
 @import "../../css/units.css";
 
 .connections {
-    height: 100%;
-    padding: 2.5rem;
-    overflow: auto;
+    /* The selected tab is a flex child with no definite height. Fill its bounds
+       without letting the robot list increase the tab's intrinsic height. */
+    position: absolute;
+    inset: 0;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 1.25rem;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
     color: $text-primary;
     background: linear-gradient(180deg, #f1fbff 0%, $ui-white 55%);
 }
 
 .connections h2 {
-    margin: 0.5rem 0 2rem;
-    text-align: center;
-    font-size: 1.75rem;
+    margin: 0;
+    text-align: left;
+    font-size: 1.25rem;
 }
 
-.heading-icon {
-    text-align: center;
-    font-size: 3.5rem;
+.robots-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
 }
 
 .robot-list {
@@ -25,7 +35,7 @@
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: 1rem;
     max-width: 50rem;
-    margin: auto;
+    margin: 0;
 }
 
 .robot-card {
@@ -43,7 +53,10 @@
 }
 
 .robot-icon {
-    font-size: 3rem;
+    display: block;
+    width: 6rem;
+    height: 6rem;
+    object-fit: contain;
 }
 
 .status-dot {
@@ -117,7 +130,7 @@
 
 .empty-state {
     max-width: 28rem;
-    margin: auto;
+    margin: 0;
     padding: 2rem;
     border: 2px dashed $motion-primary;
     border-radius: 1rem;
@@ -143,7 +156,7 @@
 
 .connection-controls {
     max-width: 50rem;
-    margin: 0 auto 2rem;
+    margin: 0 0 1.5rem;
     padding: 1rem;
     border: 1px solid $ui-black-transparent;
     border-radius: 0.75rem;
@@ -152,9 +165,17 @@
 }
 
 .connection-controls select {
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
-    margin: 0.5rem;
-    padding: 0.4rem;
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $text-primary;
+    font: inherit;
+    font-size: 0.85rem;
 }
 
 .connection-actions {
@@ -164,14 +185,59 @@
     margin: 0.75rem 0;
 }
 
-.connection-actions button {
+.connection-controls button,
+.debug-panel button {
+    min-height: 2.25rem;
     padding: 0.5rem 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $motion-tertiary;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.25;
     cursor: pointer;
 }
 
+.connection-controls button:hover:not(:disabled),
+.debug-panel button:hover:not(:disabled) {
+    border-color: $motion-primary;
+    background: $ui-primary;
+}
+
+.connection-controls button:focus-visible,
+.connection-controls select:focus-visible,
+.debug-panel button:focus-visible,
+.debug-panel summary:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+
+.connection-controls button:disabled,
+.connection-controls select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.connection-controls .primary-action {
+    border-color: $motion-primary;
+    background: $motion-primary;
+    color: $ui-white;
+}
+
+.connection-controls .primary-action:hover:not(:disabled) {
+    background: $motion-tertiary;
+    border-color: $motion-tertiary;
+}
+
 .debug-panel pre {
-    max-height: 18rem;
-    overflow: auto;
+    height: min(18rem, 40vh);
+    overflow-x: auto;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    border: 1px solid $ui-black-transparent;
+    padding: 0.5rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-size: 0.75rem;
@@ -180,4 +246,193 @@
 .robot-uuid {
     font-size: 0.75rem;
     overflow-wrap: anywhere;
+}
+
+.segmented {
+    display: inline-flex;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.4rem;
+    overflow: hidden;
+}
+.connection-controls .segmented button {
+    border: 0;
+    border-radius: 0;
+    padding: 0.45rem 1rem;
+}
+.connection-controls .segmented button[aria-checked="true"],
+.connection-controls .segmented button[aria-checked="true"]:hover {
+    background: $motion-primary;
+    color: $ui-white;
+}
+.debug-panel {
+    max-width: 50rem;
+    margin: 1.5rem 0 0;
+    padding: 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.75rem;
+    background: $ui-white;
+}
+
+.connections,
+.debug-panel pre {
+    scrollbar-width: auto;
+    scrollbar-color: #7a8492 #edf0f3;
+}
+
+.connections::-webkit-scrollbar,
+.debug-panel pre::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.connections::-webkit-scrollbar-track,
+.debug-panel pre::-webkit-scrollbar-track {
+    background: #edf0f3;
+}
+
+.connections::-webkit-scrollbar-thumb,
+.debug-panel pre::-webkit-scrollbar-thumb {
+    border: 2px solid #edf0f3;
+    border-radius: 6px;
+    background: #7a8492;
+}
+
+.connection-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.connection-light {
+    flex-shrink: 0;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.05);
+}
+
+.online {
+    background: #2f9e44;
+}
+
+.offline {
+    background: #d32f2f;
+}
+
+.searching {
+    background: #e6a117;
+    animation: connection-pulse 1.6s ease-in-out infinite;
+}
+
+.expert-toggle {
+    border: 1px solid $ui-black-transparent;
+    border-radius: 1.25rem;
+    padding: 0.45rem 1rem;
+    background: $ui-white;
+    color: $motion-tertiary;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.expert-toggle:hover,
+.expert-toggle[aria-expanded="true"] {
+    background: $ui-primary;
+    border-color: $motion-primary;
+}
+
+.expert-toggle:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+
+.expert-panel {
+    margin-top: 1rem;
+    border-top: 1px solid $ui-black-transparent;
+    padding-top: 1rem;
+}
+
+@keyframes connection-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .searching { animation: none; }
+}
+
+.expert-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.settings-section {
+    padding: 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-primary;
+}
+
+.device-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 32rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.settings-section p {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+}
+
+.settings-section .connection-help {
+    max-width: 42rem;
+    color: $text-primary-transparent;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+.debug-panel summary {
+    color: $motion-tertiary;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.debug-panel p,
+.debug-panel label {
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.debug-panel input {
+    accent-color: $motion-primary;
+    margin-inline-end: 0.5rem;
+}
+
+.action-error {
+    max-width: 50rem;
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #d32f2f;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $text-primary;
+    font-size: 0.85rem;
 }
