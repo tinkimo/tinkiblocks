@@ -84,8 +84,8 @@
     gap: 0.4rem;
 }
 .image-list canvas {
-    width: 80px;
-    height: 59px;
+    width: 64px;
+    height: 70px;
     image-rendering: pixelated;
 }
 .workspace {
@@ -137,10 +137,10 @@
     max-width: 100%;
 }
 .canvas {
-    width: 320px;
+    width: 256px;
     height: auto;
     max-width: 100%;
-    aspect-ratio: 160 / 118;
+    aspect-ratio: 128 / 140;
     border: 0;
     outline: 1px solid $ui-black-transparent;
     background: white;
@@ -185,8 +185,8 @@
     box-shadow: 0 0.5rem 2rem $ui-black-transparent;
 }
 .import-panel canvas {
-    width: 160px;
-    height: 118px;
+    width: 128px;
+    height: 140px;
 }
 @media (max-width: 700px) {
     .gallery {

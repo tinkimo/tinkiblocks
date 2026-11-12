@@ -208,7 +208,7 @@ export default defineMessages({
     },
     canvas: {
         id: 'gui.images.canvas',
-        defaultMessage: 'Drawing canvas, 160 by 118 pixels',
+        defaultMessage: 'Drawing canvas, 128 by 140 pixels',
         description: 'Image editor: canvas'
     },
     importImage: {
@@ -314,7 +314,7 @@ export default defineMessages({
     },
     nativeSize: {
         id: 'gui.images.nativeSize',
-        defaultMessage: '160 × 118 pixels',
+        defaultMessage: '128 × 140 pixels',
         description: 'Image editor: nativeSize'
     },
     rgb: {

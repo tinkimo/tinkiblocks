@@ -1,5 +1,5 @@
-export const WIDTH = 160;
-export const HEIGHT = 118;
+export const WIDTH = 128;
+export const HEIGHT = 140;
 export const HISTORY_LIMIT = 30;
 export const point = (event, bounds) => ({
     x: Math.max(0, Math.min(WIDTH - 1, Math.floor(((event.clientX - bounds.left) * WIDTH) / bounds.width))),

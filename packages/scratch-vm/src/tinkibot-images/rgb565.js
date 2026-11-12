@@ -2,7 +2,7 @@ const {WIDTH, HEIGHT, BYTE_LENGTH} = require('./collection');
 
 /**
  * Encode row-major, big-endian RGB565 words without a file header.
- * @param {Uint8Array} pixels Native 160 by 118 RGB888 image.
+ * @param {Uint8Array} pixels Native 128 by 140 RGB888 image.
  * @returns {Uint8Array} Firmware-compatible RGB565 bytes.
  */
 const encode = pixels => {

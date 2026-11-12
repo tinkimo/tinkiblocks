@@ -38,11 +38,11 @@ const editor = () => {
 };
 
 test('pointer mapping respects display scaling, fractional positions and clamped boundaries', () => {
-    const bounds = {left: 20, top: 40, width: 320, height: 236};
+    const bounds = {left: 20, top: 40, width: 256, height: 280};
     expect(point({clientX: 22, clientY: 42}, bounds)).toEqual({x: 1, y: 1});
-    expect(point({clientX: 339.9, clientY: 275.9}, bounds)).toEqual({x: 159, y: 117});
-    expect(point({clientX: -5, clientY: 1000}, bounds)).toEqual({x: 0, y: 117});
-    expect(point({clientX: 100, clientY: 59}, {left: 20, top: 0, width: 160, height: 118}))
+    expect(point({clientX: 275.9, clientY: 319.9}, bounds)).toEqual({x: 127, y: 139});
+    expect(point({clientX: -5, clientY: 1000}, bounds)).toEqual({x: 0, y: 139});
+    expect(point({clientX: 100, clientY: 59}, {left: 20, top: 0, width: 128, height: 140}))
         .toEqual({x: 80, y: 59});
 });
 test('pencil/brush interpolate continuous lines and eraser paints the background exactly', () => {
@@ -80,7 +80,7 @@ test('copy, cut and move preserve exact RGB pixels and clip at edges', () => {
     pasteRegion(data, clip, {x: 10, y: 10});
     expect(Array.from(colourAt(data, 5, 5))).toEqual([255, 255, 255]);
     expect(Array.from(colourAt(data, 11, 11))).toEqual([17, 99, 201]);
-    expect(() => pasteRegion(data, clip, {x: 159, y: 117})).not.toThrow();
+    expect(() => pasteRegion(data, clip, {x: 127, y: 139})).not.toThrow();
 });
 test('RGBA round-trip preserves all RGB values and flattens transparency onto the chosen background', () => {
     const data = Uint8Array.from({length: WIDTH * HEIGHT * 3}, (_, index) => index % 256);
@@ -99,23 +99,23 @@ test('text rasterises only opaque glyph pixels in the selected colour', () => {
     expect(Array.from(colourAt(data, 1, 0))).toEqual([255, 255, 255]);
 });
 test('import has explicit contain and crop strategies at native dimensions', () => {
-    const image = {width: 320, height: 118};
+    const image = {width: 256, height: 140};
     expect(importCanvas(image, 'contain', [255, 255, 255]).length).toBe(WIDTH * HEIGHT * 3);
-    expect(context.drawImage).toHaveBeenLastCalledWith(image, 0, 29.5, 160, 59);
+    expect(context.drawImage).toHaveBeenLastCalledWith(image, 0, 35, 128, 70);
     importCanvas(image, 'crop', [255, 255, 255]);
-    expect(context.drawImage).toHaveBeenLastCalledWith(image, -80, 0, 320, 118);
+    expect(context.drawImage).toHaveBeenLastCalledWith(image, -64, 0, 256, 140);
 });
 test('editor works offline, renders LCD icon and fixed canvases, and manages images', () => {
     const {getByRole, getByLabelText, vm} = editor();
     expect(getByRole('button', {name: 'New image'})).toBeEnabled();
     fireEvent.click(getByRole('button', {name: 'New image'}));
-    const canvas = getByLabelText('Drawing canvas, 160 by 118 pixels');
-    expect(canvas).toHaveAttribute('width', '320');
-    expect(canvas).toHaveAttribute('height', '236');
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    expect(canvas).toHaveAttribute('width', '256');
+    expect(canvas).toHaveAttribute('height', '280');
     expect(getByLabelText('Robot preview')).toHaveAttribute('width', '128');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('height', '150');
+    expect(getByLabelText('Robot preview')).toHaveAttribute('height', '140');
     expect(getByRole('button', {name: 'Upload to Robot'})).toBeDisabled();
-    expect(vm.projectImages.get().pixels.length).toBe(160 * 118 * 3);
+    expect(vm.projectImages.get().pixels.length).toBe(128 * 140 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));
     expect(vm.projectImages.images.length).toBe(2);
     const name = getByLabelText('Image filename');

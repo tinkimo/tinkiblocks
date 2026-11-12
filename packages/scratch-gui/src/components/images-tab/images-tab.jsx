@@ -40,8 +40,8 @@ const Thumbnail = ({pixels}) => {
     }, [pixels]);
     return (<canvas
         ref={canvas}
-        width={160}
-        height={118}
+        width={WIDTH}
+        height={HEIGHT}
         aria-hidden
     />);
 };
@@ -94,14 +94,7 @@ const ImagesTab = ({vm}) => {
             const context = target.getContext('2d');
             context.imageSmoothingEnabled = false;
             context.clearRect(0, 0, target.width, target.height);
-            if (target === preview.current) {
-                // Match the firmware's upright 128 × 150 application viewport.
-                context.fillStyle = '#000000';
-                context.fillRect(0, 0, target.width, target.height);
-                context.drawImage(source, 0, 28, 128, 94);
-            } else {
-                context.drawImage(source, 0, 0, target.width, target.height);
-            }
+            context.drawImage(source, 0, 0, target.width, target.height);
         }
         const context = canvas.current.getContext('2d');
         context.setLineDash([]);
@@ -507,8 +500,8 @@ const ImagesTab = ({vm}) => {
                         <div>
                             <canvas
                                 ref={canvas}
-                                width={320}
-                                height={236}
+                                width={WIDTH * 2}
+                                height={HEIGHT * 2}
                                 className={styles.canvas}
                                 tabIndex={0}
                                 aria-label={label('canvas')}

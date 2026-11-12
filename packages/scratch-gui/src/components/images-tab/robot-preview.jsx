@@ -4,7 +4,7 @@ import {useIntl} from 'react-intl';
 import messages from './messages';
 import styles from './robot-preview.css';
 
-// Portrait LCD: 128 × 160, including ten status rows. Artwork fits at 128 × 94.
+// Portrait LCD: 128 × 160, including twenty status rows. Artwork uses the remaining 128 × 140.
 const RobotPreview = forwardRef(({nickname}, ref) => {
     const intl = useIntl();
     const id = useId();
@@ -227,7 +227,7 @@ const RobotPreview = forwardRef(({nickname}, ref) => {
                     x="76"
                     y="80"
                     width="128"
-                    height="10"
+                    height="20"
                     fill="#233c69"
                 />
                 <text
@@ -264,7 +264,7 @@ const RobotPreview = forwardRef(({nickname}, ref) => {
             <canvas
                 ref={ref}
                 width={128}
-                height={150}
+                height={140}
                 className={styles.screen}
                 aria-label={intl.formatMessage(messages.preview)}
             />

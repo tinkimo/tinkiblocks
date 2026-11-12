@@ -8,11 +8,10 @@ only while selected, so its keyboard shortcuts do not capture Code-tab keys.
 
 `packages/scratch-gui/src/components/images-tab/` contains the React editor,
 localized labels, styling, screen icon and pure RGB pixel operations. The model
-is always 160 × 118 RGB888, with a 320 × 236 nearest-neighbour drawing canvas and
-128 × 150 upright robot preview. The landscape artwork fits inside the portrait
-LCD at 128 × 94, with 28 black rows above and below; the status strip remains
-above the application area. Source images and native PNG exports remain
-160 × 118. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
+is always 128 × 140 RGB888, with a 256 × 280 nearest-neighbour drawing canvas and
+128 × 140 robot preview beneath the existing 20-pixel status bar. The robot LCD
+stays at its normal 128 × 160 portrait orientation. Native PNG exports preserve
+all 128 × 140 artwork pixels. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
 image editing, image actions and export/upload controls have labeled groups.
 There is no pixel grid control.
 
@@ -76,7 +75,7 @@ exports do not include project images. Scratch targets and assets are unchanged.
 ## Robot format and upload
 
 `rgb565.js` converts to the existing headerless, row-major big-endian RGB565
-format, 37,760 bytes. Only upload quantizes RGB888 to the hardware's RGB565; project
+format, 35,840 bytes. Only upload quantizes RGB888 to the hardware's RGB565; project
 storage and PNG export preserve the original colours. Upload and project saving
 are independent. Display/preload menus dynamically combine built-in names with
 current project filenames; uploads use `<name>.rgb565` under `/files/user/`.
@@ -103,14 +102,15 @@ robot's storage validation.
 
 ## Firmware and compatibility
 
-The checked-out robot firmware defaults to portrait 128 × 160 with a 20-pixel
-status strip. Its companion change recognizes 37,760-byte editor images and keeps
-portrait rotation with a compact 10-pixel status strip, exposing a 128 × 150
-application viewport. It contains the source artwork upright at 128 × 94 with
-black letterboxing. Status and dialog restoration respect this viewport. Deploy
-the companion firmware update to fix physical screen orientation.
-Legacy portrait RGB565 files keep their existing rendering path. The on-disk RGB565
-word format and TFP protocol have not changed.
+The robot firmware defaults to portrait 128 × 160 with a 20-pixel status strip.
+Editor uploads are 35,840-byte, 128 × 140 RGB565 application images. The loader
+reads them directly below the existing status bar without changing rotation,
+status height, scaling or cropping. Legacy full-screen portrait assets keep their
+existing rendering path. The RGB565 word format and TFP protocol are unchanged.
+
+Earlier landscape draft projects (160 × 118) are fitted upright into the new
+portrait canvas on load using nearest-neighbour sampling and white padding.
+Their IDs, names and selection remain intact; new saves use portrait dimensions.
 
 **Modem prerequisite:** older text-only Tinkimodem firmware cannot forward TFP.
 The consolidated byte-safe Web Serial gateway now implements that forwarding in
@@ -148,17 +148,17 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 * GUI: all 48 unit suites passed (339 tests, one existing skip; 15 snapshots).
   The editor's 18 focused tests also pass independently.
-* VM: all 65 image checks passed. The full unit run reported 2,860 passing
+* VM: all 73 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the
   unchanged VM source; it is independent of the image editor.
-* Proxy: all 217 unittest tests passed, including upload cancellation cleanup.
-* Robot firmware: all 558 unittest tests passed.
+* Proxy: all 218 unittest tests passed, including upload cancellation cleanup.
+* Robot firmware: all 557 unittest tests passed.
 * VM build and GUI development/production/standalone builds completed. New image
   modules pass their focused lint checks. Translation source extraction completed.
 * Real Chromium testing covered icon alignment, canvas dimensions, drawing,
   undo/redo, native PNG export without grid pixels, import preview, multiple
   images, saving an `.sb3`, reloading the application and reopening that project,
   retained pixels and responsive aspect ratio. Portrait preview checks cover
-  upright asymmetric artwork, firmware-matched letterboxing and compact groups.
+  upright asymmetric artwork, native pixels below the existing status bar and compact groups.
   Physical robot/modem testing is still required.

@@ -10,6 +10,29 @@ const fs = require('fs');
 const path = require('path');
 if (!global.crypto) global.crypto = webcrypto;
 
+test('portrait images match the unchanged robot application viewport', t => {
+    const images = new ImageCollection();
+    const image = images.create();
+    t.equal(image.pixels.length, 128 * 140 * 3);
+    t.same([images.serialize().images[0].width, images.serialize().images[0].height], [128, 140]);
+    t.equal(rgb565(image.pixels).length, 35840);
+    t.end();
+});
+test('landscape draft projects migrate upright and retain IDs and selection', t => {
+    const image = new ImageCollection().create('top');
+    const pixels = Buffer.alloc(160 * 118 * 3);
+    for (let y = 0; y < 118; y++) {
+        for (let x = 0; x < 160; x++) pixels.set(y < 59 ? [255, 0, 0] : [0, 0, 255], (y * 160 + x) * 3);
+    }
+    const restored = ImageCollection.restore({version: 1, selectedId: image.id,
+        images: [{id: image.id, name: image.name, width: 160, height: 118, rgb: pixels.toString('base64')}]});
+    t.equal(restored.selectedId, image.id);
+    t.equal(restored.get().id, image.id);
+    t.equal(restored.get().pixels.length, 128 * 140 * 3);
+    t.same(Array.from(restored.get().pixels.slice(23 * 128 * 3, 23 * 128 * 3 + 3)), [255, 0, 0]);
+    t.same(Array.from(restored.get().pixels.slice(116 * 128 * 3, 116 * 128 * 3 + 3)), [0, 0, 255]);
+    t.end();
+});
 test('image CRUD keeps stable IDs, unique names and independent buffers', t => {
     let changes = 0;
     const images = new ImageCollection(() => changes++);
@@ -106,7 +129,7 @@ test('RGB565 matches big-endian firmware words without changing original RGB', t
     const pixels = new Uint8Array(BYTE_LENGTH);
     pixels.set([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
     const encoded = rgb565(pixels);
-    t.equal(encoded.length, 160 * 118 * 2);
+    t.equal(encoded.length, 128 * 140 * 2);
     t.same(Array.from(encoded.slice(0, 8)), [248, 0, 7, 224, 0, 31, 255, 255]);
     t.equal(pixels[0], 255);
     t.end();

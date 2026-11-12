@@ -1,8 +1,8 @@
 const {Buffer} = require('buffer');
 const uuid = require('uuid');
 
-const WIDTH = 160;
-const HEIGHT = 118;
+const WIDTH = 128;
+const HEIGHT = 140;
 const BYTE_LENGTH = WIDTH * HEIGHT * 3;
 const MAX_IMAGES = 64;
 const validId = id => /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
@@ -98,10 +98,12 @@ class ImageCollection {
         }
         const usedNames = new Set();
         for (const image of data.images) {
+            const legacy = image && image.width === 160 && image.height === 118;
+            const byteLength = legacy ? 160 * 118 * 3 : BYTE_LENGTH;
             if (!image || typeof image.id !== 'string' || !validId(image.id) ||
-                collection.images.some(item => item.id === image.id) || image.width !== WIDTH ||
-                image.height !== HEIGHT || typeof image.rgb !== 'string' ||
-                image.rgb.length !== BYTE_LENGTH * 4 / 3 || !/^[A-Za-z0-9+/]+$/.test(image.rgb)) {
+                collection.images.some(item => item.id === image.id) ||
+                (!legacy && (image.width !== WIDTH || image.height !== HEIGHT)) || typeof image.rgb !== 'string' ||
+                image.rgb.length !== byteLength * 4 / 3 || !/^[A-Za-z0-9+/]+$/.test(image.rgb)) {
                 throw new Error('Invalid project image asset');
             }
             if (typeof image.name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(image.name)) {
@@ -115,8 +117,23 @@ class ImageCollection {
                 name = base.slice(0, 64 - ending.length) + ending;
             }
             collection.validateName(name);
-            const pixels = new Uint8Array(Buffer.from(image.rgb, 'base64'));
-            if (pixels.length !== BYTE_LENGTH) throw new Error('Invalid project image pixels');
+            let pixels = new Uint8Array(Buffer.from(image.rgb, 'base64'));
+            if (pixels.length !== byteLength) throw new Error('Invalid project image pixels');
+            if (legacy) {
+                // Contain draft landscape artwork upright inside the native portrait canvas.
+                const portrait = new Uint8Array(BYTE_LENGTH).fill(255);
+                const height = Math.floor(118 * WIDTH / 160);
+                const top = Math.floor((HEIGHT - height) / 2);
+                for (let y = 0; y < height; y++) {
+                    const sourceY = Math.floor((y + 0.5) * 118 / height);
+                    for (let x = 0; x < WIDTH; x++) {
+                        const sourceX = Math.floor((x + 0.5) * 160 / WIDTH);
+                        const source = ((sourceY * 160) + sourceX) * 3;
+                        portrait.set(pixels.subarray(source, source + 3), (((y + top) * WIDTH) + x) * 3);
+                    }
+                }
+                pixels = portrait;
+            }
             collection.images.push({id: image.id, name, pixels});
             usedNames.add(name);
         }

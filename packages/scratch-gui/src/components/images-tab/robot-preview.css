@@ -12,9 +12,9 @@
 .screen {
     position: absolute;
     left: 27.142857%;
-    top: 28.125%;
+    top: 31.25%;
     width: 45.714286%;
-    height: 46.875%;
+    height: 43.75%;
     image-rendering: pixelated;
     background: white;
 }
