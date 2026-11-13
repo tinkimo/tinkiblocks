@@ -1,0 +1,271 @@
+@import "../../css/colors.css";
+
+.editor {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+    background: $ui-primary;
+    color: $text-primary;
+    font-size: 0.85rem;
+}
+.editor button,
+.editor input,
+.editor select {
+    font: inherit;
+}
+.editor button {
+    min-height: 2.3rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: $ui-white;
+    color: $text-primary;
+    cursor: pointer;
+}
+.editor button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+.editor button:hover:not(:disabled),
+.editor button[aria-pressed="true"],
+.editor button[aria-selected="true"] {
+    border-color: $motion-primary;
+    background-color: $ui-tertiary;
+    box-shadow: 0 0 0 1px $motion-primary;
+}
+.editor button:focus-visible,
+.editor canvas:focus-visible,
+.editor input:focus-visible,
+.editor select:focus-visible {
+    outline: 3px solid $motion-primary;
+    outline-offset: 2px;
+}
+.editor input:not([type="color"]):not([type="checkbox"]),
+.editor select {
+    max-width: 12rem;
+    padding: 0.35rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.35rem;
+}
+.gallery {
+    width: 9rem;
+    flex: 0 0 9rem;
+    padding: 0.75rem;
+    background: $ui-white;
+    border-right: 1px solid $ui-black-transparent;
+    overflow: auto;
+}
+.gallery h2 {
+    font-size: 1rem;
+}
+.gallery > button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+.gallery p,
+.workspace p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+.image-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin: 0.75rem 0;
+}
+.image-list button {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    overflow-wrap: anywhere;
+    gap: 0.4rem;
+}
+.image-list canvas {
+    width: 64px;
+    height: 70px;
+    image-rendering: pixelated;
+}
+.workspace {
+    padding: 1rem;
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    position: relative;
+}
+.row,
+.tools,
+.palette {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+.tools button {
+    font-size: 0.8rem;
+}
+.tools button span {
+    font-size: 1.1rem;
+}
+.palette > button {
+    width: 1.75rem;
+    min-height: 1.75rem;
+    border: 1px solid #999;
+    padding: 0;
+}
+.palette label {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+.palette input {
+    padding: 0;
+    width: 2.3rem;
+    height: 2rem;
+}
+.canvases {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+.canvases > div:first-child {
+    max-width: 100%;
+}
+.canvas {
+    width: 256px;
+    height: auto;
+    max-width: 100%;
+    aspect-ratio: 128 / 140;
+    border: 0;
+    outline: 1px solid $ui-black-transparent;
+    background: white;
+    image-rendering: pixelated;
+    touch-action: none;
+    cursor: crosshair;
+    display: block;
+}
+.preview {
+    flex: 0 0 auto;
+    width: 306px;
+    max-width: 100%;
+    border: 1px solid $ui-black-transparent;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: $ui-white;
+}
+.preview h3 {
+    font-size: 0.8rem;
+    margin-top: 0;
+}
+.error {
+    color: #b91c1c;
+}
+.empty {
+    margin: 3rem auto;
+    max-width: 22rem;
+}
+.import-panel {
+    width: fit-content;
+    max-width: 760px;
+    position: sticky;
+    bottom: 0;
+    padding: 1rem;
+    border: 2px solid $motion-primary;
+    border-radius: 0.75rem;
+    background: $ui-white;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 0.5rem 2rem $ui-black-transparent;
+}
+.import-panel canvas {
+    width: 128px;
+    height: 140px;
+}
+@media (max-width: 700px) {
+    .gallery {
+        flex-basis: 7rem;
+        width: 7rem;
+        padding: 0.5rem;
+    }
+    .workspace {
+        padding: 0.6rem;
+    }
+}
+
+.control-group {
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: 0;
+    min-width: 0;
+    background: $ui-white;
+}
+.control-group legend {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0 0.3rem;
+}
+.group-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.tools {
+    align-items: flex-start;
+}
+.tools .control-group {
+    flex: 0 1 252px;
+    width: 252px;
+    max-width: 100%;
+}
+.tools .control-group:last-child {
+    flex-basis: 128px;
+    width: 128px;
+}
+.filename {
+    flex: 0 1 30rem;
+    min-width: 0;
+}
+.filename label {
+    font-weight: 600;
+}
+.filename p {
+    margin: 0.3rem 0;
+    max-width: 35rem;
+}
+.filename input[aria-invalid="true"] {
+    border: 2px solid #b91c1c !important;
+}
+.filename .error {
+    font-weight: 600;
+}
+
+.control-group > button + button {
+    margin-inline-start: 0.4rem;
+}
+
+.content {
+    width: 100%;
+    max-width: 760px;
+}
+.image-header {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.file-actions {
+    width: fit-content;
+    max-width: 100%;
+}
+.canvases {
+    gap: 1.5rem;
+}

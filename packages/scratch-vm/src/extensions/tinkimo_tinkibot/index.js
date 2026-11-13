@@ -50,6 +50,7 @@ class TinkibotBlocks {
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         this.runtime.removeTinkibotRobot = this.removeRobot.bind(this);
+        this.runtime.uploadTinkibotImage = this.uploadImage.bind(this);
         this.connectionManager = new ConnectionManager({
             connect: () => this._connectProxy(),
             send: payload => this._proxySocket.send(JSON.stringify(payload)),
@@ -842,6 +843,10 @@ class TinkibotBlocks {
                 ...info.menus.mosaic_options.items
             ])]
         };
+        this._builtinImageOptions = info.menus.image_options.items;
+        this._builtinPreloadImages = info.menus.preload_image_options.items;
+        info.menus.image_options.items = 'getProjectImageOptions';
+        info.menus.preload_image_options.items = 'getProjectPreloadImageOptions';
         info.blocks = info.blocks.map(block => {
             if (block === '---') return block;
             return Object.assign({}, block, {
@@ -959,6 +964,11 @@ class TinkibotBlocks {
     }
 
     _handleRobotMessage (response) {
+        if (response.event === 'image_upload_progress' && response['client-uuid'] === this._clientUuid &&
+            this._pendingResponse && response['request-id'] === this._pendingResponse.requestId) {
+            if (this._imageProgress) this._imageProgress(response.progress);
+            return;
+        }
         if (response.event === 'connected_robots') {
             this._setConnectedRobots(response.robots || response.nicknames, true);
         } else if (response.event === 'robot_connected') {
@@ -1244,6 +1254,58 @@ class TinkibotBlocks {
                 reject(error);
             });
         });
+    }
+
+    getProjectImageOptions () {
+        const images = this.runtime.tinkibotImages;
+        return [...new Set([...(this._builtinImageOptions || []),
+            ...(images ? images.images.map(image => image.name) : [])])];
+    }
+
+    getProjectPreloadImageOptions () {
+        return [...new Set([...(this._builtinPreloadImages || []), ...this.getProjectImageOptions()])];
+    }
+
+    async uploadImage (image, progress = () => {}) {
+        if (this._imageUploading) throw new Error('An image upload is already in progress');
+        this._imageUploading = true;
+        try {
+            return await this._uploadImage(image, progress);
+        } finally {
+            this._imageUploading = false;
+        }
+    }
+
+    async _uploadImage (image, progress) {
+        const {encode} = require('../../tinkibot-images/rgb565');
+        const {Buffer} = require('buffer');
+        const bytes = encode(image.pixels);
+        const name = `${image.name}.rgb565`;
+        if (this.connectionManager.method === 'local-proxy') {
+            this._imageProgress = progress;
+            try {
+                progress(0);
+                await this._sendCommand({command: 'upload_image',
+                    filename: name,
+                    data: Buffer.from(bytes).toString('base64')});
+                progress(100);
+            } finally {
+                this._imageProgress = null;
+            }
+            return;
+        }
+        this._queuedCommands++;
+        const operation = this._commandQueue.then(async () => {
+            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false);
+            if (!robot) throw new Error('Claim a connected robot in Connections before uploading');
+            const {upload} = require('../../tinkibot-images/serial-upload');
+            await upload(this.connectionManager, robot, name, bytes, progress);
+        });
+        const tracked = operation.finally(() => {
+            this._queuedCommands--;
+        });
+        this._commandQueue = tracked.catch(() => {});
+        return tracked;
     }
 
     _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null) {

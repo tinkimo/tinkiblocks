@@ -13,6 +13,7 @@ const ExtensionManager = require('./extension-support/extension-manager');
 const log = require('./util/log');
 const MathUtil = require('./util/math-util');
 const Runtime = require('./engine/runtime');
+const {ImageCollection} = require('./tinkibot-images/collection');
 const StringUtil = require('./util/string-util');
 const formatMessage = require('format-message');
 
@@ -43,6 +44,7 @@ class VirtualMachine extends EventEmitter {
          * @type {!Runtime}
          */
         this.runtime = new Runtime();
+        this.resetProjectImages();
         centralDispatch.setService('runtime', this.runtime).catch(e => {
             log.error(`Failed to register runtime service: ${JSON.stringify(e)}`);
         });
@@ -214,9 +216,41 @@ class VirtualMachine extends EventEmitter {
     }
 
     /**
-     * Clear out current running project data.
+     * Restore self-contained project images without marking a load as an edit.
+     * @param {object} data Versioned image metadata, absent for older projects.
      */
-    clear () {
+    resetProjectImages (data) {
+        this.runtime.tinkibotImages = ImageCollection.restore(data, () => {
+            this.runtime.emitProjectChanged();
+            this.emit('TINKIBOT_IMAGES_CHANGED');
+        });
+        this.emit('TINKIBOT_IMAGES_CHANGED');
+    }
+
+    /** @returns {ImageCollection} Images owned by the currently loaded project. */
+    get projectImages () {
+        return this.runtime.tinkibotImages;
+    }
+
+    /**
+     * Upload a snapshot independently of saving the project.
+     * @param {string} id Persistent image ID.
+     * @param {function(number): void} progress Upload percentage callback.
+     * @returns {Promise<void>} Resolves after verified transfer completion.
+     */
+    uploadProjectImage (id, progress) {
+        if (!this.runtime.uploadTinkibotImage) return Promise.reject(new Error('Robot extension is unavailable'));
+        const image = this.projectImages.get(id);
+        return this.runtime.uploadTinkibotImage(image, progress);
+    }
+
+    /**
+     * Clear the current project and cancel older loads unless called by deserialization.
+     * @param {boolean} preserveLoad Keep the active load generation.
+     */
+    clear (preserveLoad = false) {
+        if (!preserveLoad) this._projectLoadId = (this._projectLoadId || 0) + 1;
+        this.resetProjectImages();
         this.runtime.dispose();
         this.editingTarget = null;
         this.emitTargetsUpdate(false /* Don't emit project change */);
@@ -299,6 +333,8 @@ class VirtualMachine extends EventEmitter {
      * @returns {!Promise} Promise that resolves after targets are installed.
      */
     loadProject (input) {
+        const loadId = (this._projectLoadId || 0) + 1;
+        this._projectLoadId = loadId;
         if (typeof input === 'object' && !(input instanceof ArrayBuffer) &&
           !ArrayBuffer.isView(input)) {
             // If the input is an object and not any ArrayBuffer
@@ -343,8 +379,14 @@ class VirtualMachine extends EventEmitter {
             });
 
         return validationPromise
-            .then(validatedInput => this.deserializeProject(validatedInput[0], validatedInput[1]))
-            .then(() => this.runtime.handleProjectLoaded())
+            .then(validatedInput => {
+                if (loadId !== this._projectLoadId) throw new Error('Project load superseded');
+                return this.deserializeProject(validatedInput[0], validatedInput[1], loadId);
+            })
+            .then(() => {
+                if (loadId !== this._projectLoadId) throw new Error('Project load superseded');
+                return this.runtime.handleProjectLoaded();
+            })
             .catch(error => {
                 // Intentionally rejecting here (want errors to be handled by caller)
                 if (Object.prototype.hasOwnProperty.call(error, 'validationError')) {
@@ -476,11 +518,15 @@ class VirtualMachine extends EventEmitter {
      * Load a project from a Scratch JSON representation.
      * @param {string} projectJSON JSON string representing a project.
      * @param {?JSZip} zip Optional zipped project containing assets to be loaded.
+     * @param {number} loadId Current project load generation.
      * @returns {Promise} Promise that resolves after the project has loaded
      */
-    deserializeProject (projectJSON, zip) {
+    deserializeProject (projectJSON, zip, loadId = this._projectLoadId) {
+        const images = projectJSON.meta && projectJSON.meta.tinkibotImages;
+        ImageCollection.restore(images);
         // Clear the current runtime
-        this.clear();
+        this.clear(true);
+        this.resetProjectImages(images);
 
         if (typeof performance !== 'undefined') {
             performance.mark('scratch-vm-deserialize-start');
@@ -502,6 +548,7 @@ class VirtualMachine extends EventEmitter {
         };
         return deserializePromise()
             .then(({targets, extensions}) => {
+                if (loadId !== this._projectLoadId) throw new Error('Project load superseded');
                 if (typeof performance !== 'undefined') {
                     performance.mark('scratch-vm-deserialize-end');
                     performance.measure('scratch-vm-deserialize',

@@ -179,7 +179,7 @@ test('framing: fragmented UTF-8, multiple lines, binary and overflow recovery', 
         {kind: 'text', text: '+lime.OK get nickname Citroné'}, {kind: 'text', text: 'second'}
     ]);
     t.same(framer.feed(new Uint8Array([0, 8, 10, 255, 0, 111, 107, 10])),
-        [{kind: 'binary', bytes: 3}, {kind: 'text', text: 'ok'}]);
+        [{kind: 'binary', bytes: 3, data: new Uint8Array([8, 10, 255])}, {kind: 'text', text: 'ok'}]);
     t.same(framer.feed(bytes(`${'x'.repeat(25000)}\nvalid\n`)),
         [{kind: 'overflow'}, {kind: 'text', text: 'valid'}]);
     t.end();
