@@ -75,7 +75,8 @@ exports do not include project images. Scratch targets and assets are unchanged.
 ## Robot format and upload
 
 `rgb565.js` converts to the existing headerless, row-major big-endian RGB565
-format, 35,840 bytes. Only upload quantizes RGB888 to the hardware's RGB565; project
+format, 40,960 bytes (128 × 160). The first 140 rows contain the artwork;
+the final 20 rows are black padding clipped by the existing application view. Only upload quantizes RGB888 to the hardware's RGB565; project
 storage and PNG export preserve the original colours. Upload and project saving
 are independent. Display/preload menus dynamically combine built-in names with
 current project filenames; uploads use `<name>.rgb565` under `/files/user/`.
@@ -103,10 +104,14 @@ robot's storage validation.
 ## Firmware and compatibility
 
 The robot firmware defaults to portrait 128 × 160 with a 20-pixel status strip.
-Editor uploads are 35,840-byte, 128 × 140 RGB565 application images. The loader
-reads them directly below the existing status bar without changing rotation,
-status height, scaling or cropping. Legacy full-screen portrait assets keep their
-existing rendering path. The RGB565 word format and TFP protocol are unchanged.
+Editor uploads use the existing full-screen 40,960-byte RGB565 file format:
+128 × 140 artwork pixels first, followed by 20 black padding rows. The unchanged
+loader validates 128 × 160, then clips drawing to the 140-row application view.
+Padding goes at the end, not before the artwork: the display manager already
+positions application pixels beneath the status bar. No rotation, status height,
+scaling or firmware update is needed for these files. Re-upload previously sent
+35,840-byte files to replace them with compatible padded files. The companion
+firmware loader additionally supports those earlier short draft files.
 
 Earlier landscape draft projects (160 × 118) are fitted upright into the new
 portrait canvas on load using nearest-neighbour sampling and white padding.
@@ -148,7 +153,7 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 * GUI: all 48 unit suites passed (339 tests, one existing skip; 15 snapshots).
   The editor's 18 focused tests also pass independently.
-* VM: all 73 image checks passed. The full unit run reported 2,860 passing
+* VM: all 74 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the
   unchanged VM source; it is independent of the image editor.

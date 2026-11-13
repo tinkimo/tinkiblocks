@@ -15,7 +15,7 @@ test('portrait images match the unchanged robot application viewport', t => {
     const image = images.create();
     t.equal(image.pixels.length, 128 * 140 * 3);
     t.same([images.serialize().images[0].width, images.serialize().images[0].height], [128, 140]);
-    t.equal(rgb565(image.pixels).length, 35840);
+    t.equal(rgb565(image.pixels).length, 40960);
     t.end();
 });
 test('landscape draft projects migrate upright and retain IDs and selection', t => {
@@ -129,7 +129,8 @@ test('RGB565 matches big-endian firmware words without changing original RGB', t
     const pixels = new Uint8Array(BYTE_LENGTH);
     pixels.set([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
     const encoded = rgb565(pixels);
-    t.equal(encoded.length, 128 * 140 * 2);
+    t.equal(encoded.length, 128 * 160 * 2);
+    t.ok(encoded.slice(128 * 140 * 2).every(value => value === 0), 'unused trailing rows are padded');
     t.same(Array.from(encoded.slice(0, 8)), [248, 0, 7, 224, 0, 31, 255, 255]);
     t.equal(pixels[0], 255);
     t.end();

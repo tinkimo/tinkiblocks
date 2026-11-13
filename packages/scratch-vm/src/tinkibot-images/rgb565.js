@@ -7,7 +7,9 @@ const {WIDTH, HEIGHT, BYTE_LENGTH} = require('./collection');
  */
 const encode = pixels => {
     if (pixels.length !== BYTE_LENGTH) throw new Error('Invalid image dimensions');
-    const output = new Uint8Array((WIDTH * HEIGHT) * 2);
+    // The existing loader validates a full 128 × 160 file, then clips to the
+    // 140-row application view. Keep artwork first and pad unused trailing rows.
+    const output = new Uint8Array((WIDTH * 160) * 2);
     for (let index = 0; index < (WIDTH * HEIGHT); index++) {
         const word = (((pixels[index * 3] >> 3) << 11) |
             ((pixels[(index * 3) + 1] >> 2) << 5)) | (pixels[(index * 3) + 2] >> 3);
