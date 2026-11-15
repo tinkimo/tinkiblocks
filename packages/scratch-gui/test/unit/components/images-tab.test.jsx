@@ -20,6 +20,7 @@ beforeEach(() => {
         putImageData: jest.fn(), drawImage: jest.fn(), clearRect: jest.fn(), fillRect: jest.fn(),
         beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(), stroke: jest.fn(),
         setLineDash: jest.fn(), strokeRect: jest.fn(), fillText: jest.fn(),
+        measureText: value => ({width: value.length * 5}),
         getImageData: () => ({data: new Uint8ClampedArray(WIDTH * HEIGHT * 4)})};
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context);
     HTMLCanvasElement.prototype.setPointerCapture = jest.fn();
@@ -222,4 +223,98 @@ test('Paint-style shape fill toggles the drawing mode without duplicate tools', 
     fireEvent.click(getByRole('button', {name: 'Ellipse', exact: true}));
     expect(getByRole('checkbox', {name: 'Fill shape'})).toBeChecked();
     expect(getByText(/Drag to draw an oval/)).toBeVisible();
+});
+
+test('text is typed on the image, finishes as one undo step, and Escape discards a draft', () => {
+    window.PointerEvent = MouseEvent;
+    const {getByRole, getByLabelText, queryByRole, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'Text', exact: true}));
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    const original = new Uint8Array(vm.projectImages.get().pixels);
+    const glyph = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    glyph[3] = 255;
+    context.getImageData = () => ({data: glyph});
+    fireEvent.pointerDown(canvas, {clientX: 20, clientY: 20, button: 0});
+    const input = getByRole('textbox', {name: 'Text on image'});
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue('');
+    fireEvent.change(input, {target: {value: 'Hello\nrobot'}});
+    expect(vm.projectImages.get().pixels).toEqual(original);
+    fireEvent.keyDown(input, {key: 'Enter', ctrlKey: true});
+    expect(queryByRole('textbox', {name: 'Text on image'})).toBeNull();
+    expect(vm.projectImages.get().pixels).not.toEqual(original);
+    fireEvent.click(getByRole('button', {name: 'Undo', exact: true}));
+    expect(vm.projectImages.get().pixels).toEqual(original);
+    expect(getByRole('button', {name: 'Undo', exact: true})).toBeDisabled();
+    fireEvent.pointerDown(canvas, {clientX: 40, clientY: 40, button: 0});
+    const cancelled = getByRole('textbox', {name: 'Text on image'});
+    fireEvent.change(cancelled, {target: {value: 'Cancel me'}});
+    fireEvent.keyDown(cancelled, {key: 'Escape'});
+    expect(vm.projectImages.get().pixels).toEqual(original);
+    expect(queryByRole('textbox', {name: 'Text on image'})).toBeNull();
+});
+
+test('text wraps at the picture edge and preserves explicit new lines', () => {
+    text(buffer(), 'ABC\nD', {x: WIDTH - 10, y: 0}, [0, 0, 0], 8);
+    expect(context.fillText.mock.calls).toEqual([
+        ['AB', WIDTH - 10, 0], ['C', WIDTH - 10, 10], ['D', WIDTH - 10, 20]
+    ]);
+});
+
+test('text formatting keeps the draft open and clicking outside applies it', () => {
+    window.PointerEvent = MouseEvent;
+    const {getByRole, getByLabelText, queryByRole, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'Text', exact: true}));
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    const glyph = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    glyph[3] = 255;
+    context.getImageData = () => ({data: glyph});
+    fireEvent.pointerDown(canvas, {clientX: 10, clientY: 10, button: 0});
+    const input = getByRole('textbox', {name: 'Text on image'});
+    fireEvent.change(input, {target: {value: 'Blue'}});
+    const colour = getByLabelText('Drawing colour');
+    fireEvent.blur(input, {relatedTarget: colour});
+    fireEvent.change(colour, {target: {value: '#3b82f6'}});
+    expect(getByRole('textbox', {name: 'Text on image'})).toHaveValue('Blue');
+    fireEvent.pointerDown(document.body);
+    expect(queryByRole('textbox', {name: 'Text on image'})).toBeNull();
+    expect(Array.from(vm.projectImages.get().pixels.slice(0, 3))).toEqual([59, 130, 246]);
+});
+
+test('a loaded project discards a text draft belonging to the previous project', () => {
+    window.PointerEvent = MouseEvent;
+    const {getByRole, getByLabelText, queryByRole, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'Text', exact: true}));
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    fireEvent.pointerDown(canvas, {clientX: 10, clientY: 10, button: 0});
+    fireEvent.change(getByRole('textbox', {name: 'Text on image'}), {target: {value: 'Old project'}});
+    act(() => {
+        vm.projectImages = new ImageCollection();
+        vm.projectImages.create();
+        vm.emit('TINKIBOT_IMAGES_CHANGED');
+    });
+    expect(queryByRole('textbox', {name: 'Text on image'})).toBeNull();
+    expect(vm.projectImages.get().pixels).toEqual(buffer());
+});
+
+test('leaving the Images tab finishes text before the editor unmounts', () => {
+    window.PointerEvent = MouseEvent;
+    const {getByRole, getByLabelText, unmount, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'Text', exact: true}));
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    const glyph = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    glyph[3] = 255;
+    context.getImageData = () => ({data: glyph});
+    fireEvent.pointerDown(canvas, {clientX: 10, clientY: 10, button: 0});
+    fireEvent.change(getByRole('textbox', {name: 'Text on image'}), {target: {value: 'Keep me'}});
+    unmount();
+    expect(Array.from(vm.projectImages.get().pixels.slice(0, 3))).toEqual([0, 0, 0]);
 });

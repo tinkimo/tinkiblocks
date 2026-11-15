@@ -1,9 +1,19 @@
 import {defineMessages} from 'react-intl';
 
 export default defineMessages({
+    inlineText: {
+        id: 'gui.images.inlineText',
+        defaultMessage: 'Text on image',
+        description: 'Accessible label for typing directly on the drawing canvas'
+    },
+    finishText: {
+        id: 'gui.images.finishText',
+        defaultMessage: 'Done',
+        description: 'Finish editing and apply the text to the image'
+    },
     textHelp: {
         id: 'gui.images.textHelp',
-        defaultMessage: 'Type your text below, then click the picture to place it.',
+        defaultMessage: 'Click and type. Enter adds a line. Click outside or Ctrl+Enter to finish. Esc cancels.',
         description: 'Instructions for placing text on an image'
     },
     pencilHelp: {

@@ -395,3 +395,30 @@
     margin: 0;
     max-width: 32rem;
 }
+
+.canvas-frame {
+    position: relative;
+    width: 256px;
+    max-width: 100%;
+    container-type: inline-size;
+}
+.inline-text {
+    position: absolute;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 1px dashed $motion-primary;
+    background: transparent;
+    /* Canvas draws the glyphs; the textarea supplies caret, selection and native editing. */
+    color: transparent;
+    font-family: monospace;
+    letter-spacing: normal;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    resize: none;
+    overflow: hidden;
+}
+.inline-text:focus { outline: 1px dashed $motion-primary; }
+.inline-text::selection { background: rgba(76, 151, 255, 0.25); }

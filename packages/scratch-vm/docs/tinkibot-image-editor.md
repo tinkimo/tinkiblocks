@@ -32,6 +32,14 @@ Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
 rectangle and ellipse, thresholded monospace text, colour sampling, region
 copy/cut/paste/move, palette and custom colour input work without a robot.
 Dragging interpolates strokes; shapes and text preview before committing.
+The A/Text tool opens a focused text box directly on the image. Typing previews
+native pixels on the canvas and robot screen; Enter inserts a line and text wraps
+at the picture edge. Font size and colour remain editable while the box is open.
+Done, Ctrl/Cmd-Enter, clicking outside, export/upload or leaving the Images tab
+finishes the text as one undo step. Escape discards it. Loading another project
+clears the old draft. Text boxes and carets are overlays and never enter PNG or
+robot pixels; finished text is flattened into the existing RGB model.
+
 Ctrl/Cmd-Z, Shift-Z/Y, C/X/V and arrow-key selection movement are scoped to the
 editor. Inputs retain native text-editing shortcuts. Pointer cancellation restores
 the uncommitted image. Undo history persists across image/tab switches, holds
@@ -157,8 +165,8 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 ### Results in the implementation environment
 
-* GUI: all 48 unit suites passed (340 tests, one existing skip; 15 snapshots).
-  The editor's 19 focused tests also pass independently.
+* GUI: all 48 unit suites passed (345 tests, one existing skip; 15 snapshots).
+  The editor's 24 focused tests also pass independently.
 * VM: all 74 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the

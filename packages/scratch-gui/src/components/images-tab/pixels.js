@@ -146,7 +146,22 @@ export const text = (pixels, value, origin, colour, size) => {
     context.font = `${size}px monospace`;
     context.textBaseline = 'top';
     context.fillStyle = '#000000';
-    context.fillText(value, origin.x, origin.y);
+    const width = WIDTH - origin.x;
+    const lineHeight = Math.ceil(size * 1.2);
+    let y = origin.y;
+    for (const paragraph of value.split('\n')) {
+        let row = '';
+        for (const character of paragraph) {
+            if (row && context.measureText(row + character).width > width) {
+                context.fillText(row, origin.x, y);
+                y += lineHeight;
+                row = '';
+            }
+            row += character;
+        }
+        context.fillText(row, origin.x, y);
+        y += lineHeight;
+    }
     const data = context.getImageData(0, 0, WIDTH, HEIGHT).data;
     for (let index = 0; index < (WIDTH * HEIGHT); index++) {
         if (data[(index * 4) + 3] >= 128) pixels.set(colour, index * 3);

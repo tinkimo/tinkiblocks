@@ -46,12 +46,15 @@ const ImagesTab = ({vm}) => {
     const [background, setBackground] = useState('#ffffff');
     const [size, setSize] = useState(5);
     const [fontSize, setFontSize] = useState(12);
-    const [words, setWords] = useState(intl.formatMessage(messages.initialText));
+    const [textDraft, setTextDraft] = useState(null);
     const [nameInvalid, setNameInvalid] = useState(false);
     const [error, setError] = useState('');
     const [upload, setUpload] = useState(null);
     const [imported, setImported] = useState(null);
     const [fit, setFit] = useState('contain');
+    const textInput = useRef(null);
+    const textDraftRef = useRef(null);
+    const finishTextRef = useRef(null);
     const canvas = useRef(null);
     const preview = useRef(null);
     const root = useRef(null);
@@ -116,6 +119,48 @@ const ImagesTab = ({vm}) => {
         }
         collection.update(current.id, data);
     };
+    const updateTextDraft = draft => {
+        textDraftRef.current = draft;
+        setTextDraft(draft);
+    };
+    const draftPixels = draft => {
+        const data = new Uint8Array(draft.base);
+        text(data, draft.value, draft.origin, rgb(colour), fontSize);
+        return data;
+    };
+    const finishText = (apply = true, updateState = true) => {
+        const draft = textDraftRef.current;
+        if (!draft) return;
+        textDraftRef.current = null;
+        if (updateState) setTextDraft(null);
+        if (!current || draft.collection !== collection || draft.id !== current.id ||
+            vm.projectImages !== collection) return;
+        if (apply && draft.value) commit(draftPixels(draft));
+        pixels.current = new Uint8Array(current.pixels);
+        if (updateState) paint(pixels.current);
+    };
+    // Outside-click and unmount handlers need the latest draft and formatting.
+    finishTextRef.current = finishText;
+    useEffect(() => {
+        const finishOutside = event => {
+            if (root.current && !root.current.contains(event.target)) finishTextRef.current();
+        };
+        document.addEventListener('pointerdown', finishOutside, true);
+        document.addEventListener('focusin', finishOutside, true);
+        return () => {
+            document.removeEventListener('pointerdown', finishOutside, true);
+            document.removeEventListener('focusin', finishOutside, true);
+            finishTextRef.current(true, false);
+        };
+    }, []);
+    useEffect(() => {
+        if (textDraft) textInput.current.focus();
+    }, [Boolean(textDraft)]);
+    useEffect(() => {
+        if (textDraft && current && textDraft.collection === collection && textDraft.id === current.id) {
+            paint(draftPixels(textDraft));
+        }
+    }, [textDraft, colour, fontSize]);
     useEffect(() => {
         alive.current = true;
         const changed = () => refresh(value => value + 1);
@@ -131,6 +176,7 @@ const ImagesTab = ({vm}) => {
     useEffect(() => {
         gesture.current = null;
         selection.current = null;
+        updateTextDraft(null);
         pixels.current = current ? new Uint8Array(current.pixels) : null;
         paint(pixels.current);
         setImported(null);
@@ -176,14 +222,7 @@ const ImagesTab = ({vm}) => {
         if (!current) return;
         const at = point(event, canvas.current.getBoundingClientRect());
         const drag = gesture.current;
-        if (!drag) {
-            if (tool === 'text') {
-                const data = new Uint8Array(current.pixels);
-                text(data, words, at, rgb(colour), fontSize);
-                paint(data);
-            }
-            return;
-        }
+        if (!drag) return;
         if (['pencil', 'brush', 'eraser'].includes(drag.tool)) {
             line(pixels.current, drag.last, at, rgb(drag.tool === 'eraser' ? background : colour),
                 drag.tool === 'pencil' ? 1 : size);
@@ -198,8 +237,7 @@ const ImagesTab = ({vm}) => {
             } else selection.current = region(drag.start, at);
         } else {
             pixels.current = new Uint8Array(drag.base);
-            if (drag.tool === 'text') text(pixels.current, words, at, rgb(colour), fontSize);
-            else shape(pixels.current, drag.tool, drag.start, at, rgb(colour), size);
+            shape(pixels.current, drag.tool, drag.start, at, rgb(colour), size);
         }
         drag.last = at;
         paint(pixels.current);
@@ -207,6 +245,18 @@ const ImagesTab = ({vm}) => {
     const down = event => {
         if (!current || event.button > 0) return;
         event.preventDefault();
+        if (tool === 'text') {
+            finishText();
+            const at = point(event, canvas.current.getBoundingClientRect());
+            selection.current = null;
+            updateTextDraft({id: current.id,
+                collection,
+                base: new Uint8Array(current.pixels),
+                value: '',
+                origin: {x: Math.min(at.x, WIDTH - Math.ceil(fontSize * 0.7)),
+                    y: Math.min(at.y, HEIGHT - Math.ceil(fontSize * 1.2))}});
+            return;
+        }
         canvas.current.focus();
         canvas.current.setPointerCapture(event.pointerId);
         const start = point(event, canvas.current.getBoundingClientRect());
@@ -322,7 +372,9 @@ const ImagesTab = ({vm}) => {
     const button = (key, action, disabled = false) => (
         <button
             type="button"
-            onClick={() => attempt(action)}
+            onClick={() => {
+                finishText(); attempt(action);
+            }}
             disabled={disabled}
             title={messages[`${key}Help`] ? label(`${key}Help`) : label(key)}
         >{label(key)}</button>
@@ -335,6 +387,10 @@ const ImagesTab = ({vm}) => {
         <section
             className={styles.editor}
             ref={root}
+            onPointerDownCapture={event => {
+                if (textDraftRef.current && event.target !== canvas.current &&
+                    !event.target.closest('[data-text-format], textarea')) finishText();
+            }}
             onKeyDown={shortcut}
             onKeyUp={event => event.stopPropagation()}
         >
@@ -416,6 +472,7 @@ const ImagesTab = ({vm}) => {
                                             aria-pressed={tool === item || tool === `${item}Filled`}
                                             title={label(`${item}Help`)}
                                             onClick={() => {
+                                                finishText();
                                                 cancel();
                                                 setTool(filledShapes && ['rectangle', 'ellipse'].includes(item) ?
                                                     `${item}Filled` : item);
@@ -461,20 +518,25 @@ const ImagesTab = ({vm}) => {
                                 {[1, 3, 5, 9, 15].map(value => <option key={value}>{value}</option>)}
                             </select></label> : null}
                         {tool === 'text' ? <React.Fragment>
-                            <label>{label('textValue')} <input
-                                value={words}
-                                maxLength={100}
-                                onChange={event => setWords(event.target.value)}
-                            /></label>
-                            <label>{label('fontSize')} <select
+                            <label data-text-format>{label('fontSize')} <select
                                 value={fontSize}
                                 onChange={event => setFontSize(Number(event.target.value))}
                             >
                                 {[8, 10, 12, 16, 24, 32].map(value => <option key={value}>{value}</option>)}
                             </select></label>
+                            {textDraft ? <button
+                                type="button"
+                                data-text-format
+                                onClick={() => {
+                                    finishText(); canvas.current.focus();
+                                }}
+                            >{label('finishText')}</button> : null}
                         </React.Fragment> : null}
                     </div>
-                    <fieldset className={`${styles.controlGroup} ${styles.colourPanel}`}>
+                    <fieldset
+                        data-text-format
+                        className={`${styles.controlGroup} ${styles.colourPanel}`}
+                    >
                         <legend>{label('palette')}</legend>
                         <div className={styles.colourWells}>
                             <label><input
@@ -503,22 +565,55 @@ const ImagesTab = ({vm}) => {
                     </fieldset>
                     <div className={styles.canvases}>
                         <div>
-                            <canvas
-                                ref={canvas}
-                                width={WIDTH * 2}
-                                height={HEIGHT * 2}
-                                className={styles.canvas}
-                                tabIndex={0}
-                                aria-label={label('canvas')}
-                                onPointerDown={down}
-                                onPointerMove={move}
-                                onPointerUp={up}
-                                onPointerCancel={cancel}
-                                onLostPointerCapture={cancel}
-                                onPointerLeave={() => {
-                                    if (!gesture.current) paint(current.pixels);
-                                }}
-                            />
+                            <div className={styles.canvasFrame}>
+                                <canvas
+                                    ref={canvas}
+                                    width={WIDTH * 2}
+                                    height={HEIGHT * 2}
+                                    className={styles.canvas}
+                                    tabIndex={0}
+                                    aria-label={label('canvas')}
+                                    onPointerDown={down}
+                                    onPointerMove={move}
+                                    onPointerUp={up}
+                                    onPointerCancel={cancel}
+                                    onLostPointerCapture={cancel}
+                                    onPointerLeave={() => {
+                                        if (!gesture.current && !textDraftRef.current) paint(current.pixels);
+                                    }}
+                                />
+                                {textDraft ? <textarea
+                                    ref={textInput}
+                                    aria-label={label('inlineText')}
+                                    className={styles.inlineText}
+                                    value={textDraft.value}
+                                    maxLength={1000}
+                                    spellCheck={false}
+                                    style={{left: `${textDraft.origin.x / WIDTH * 100}%`,
+                                        top: `${textDraft.origin.y / HEIGHT * 100}%`,
+                                        width: `${(WIDTH - textDraft.origin.x) / WIDTH * 100}%`,
+                                        height: `${(HEIGHT - textDraft.origin.y) / HEIGHT * 100}%`,
+                                        fontSize: `calc(${fontSize} * 100cqw / ${WIDTH})`,
+                                        lineHeight: Math.ceil(fontSize * 1.2) / fontSize,
+                                        caretColor: colour}}
+                                    onChange={event => updateTextDraft({...textDraft, value: event.target.value})}
+                                    onBlur={event => {
+                                        if (!event.relatedTarget ||
+                                        !event.relatedTarget.closest('[data-text-format]')) {
+                                            finishText();
+                                        }
+                                    }}
+                                    onKeyDown={event => {
+                                        event.stopPropagation();
+                                        if (event.key === 'Escape') {
+                                            event.preventDefault(); finishText(false); canvas.current.focus();
+                                        } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) &&
+                                        !event.nativeEvent.isComposing) {
+                                            event.preventDefault(); finishText(); canvas.current.focus();
+                                        }
+                                    }}
+                                /> : null}
+                            </div>
                             <p>{tool === 'select' ? label('selectionHint') : label('nativeSize')}</p>
                         </div>
                         <div className={styles.preview}><h3>{label('preview')}</h3>
