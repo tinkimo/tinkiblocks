@@ -395,7 +395,7 @@ export default defineMessages({
     },
     savedHint: {
         id: 'gui.images.savedHint',
-        defaultMessage: 'Images are saved with your project. Uploading is separate.',
+        defaultMessage: 'Images are saved with your project. They sync when you load it or connect a claimed robot.',
         description: 'Image editor: savedHint'
     },
     tools: {

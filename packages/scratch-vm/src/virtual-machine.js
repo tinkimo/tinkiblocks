@@ -15,6 +15,7 @@ const MathUtil = require('./util/math-util');
 const Runtime = require('./engine/runtime');
 const {ImageCollection} = require('./tinkibot-images/collection');
 const migrateImageBlocks = require('./tinkibot-images/migrate-blocks');
+const ImageSync = require('./tinkibot-images/sync');
 const StringUtil = require('./util/string-util');
 const formatMessage = require('format-message');
 
@@ -45,6 +46,7 @@ class VirtualMachine extends EventEmitter {
          * @type {!Runtime}
          */
         this.runtime = new Runtime();
+        this.imageSync = new ImageSync(this.runtime);
         this.resetProjectImages();
         centralDispatch.setService('runtime', this.runtime).catch(e => {
             log.error(`Failed to register runtime service: ${JSON.stringify(e)}`);
@@ -235,6 +237,7 @@ class VirtualMachine extends EventEmitter {
             this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
         }
         this.emit('TINKIBOT_IMAGES_CHANGED');
+        this.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
     }
 
     /** @returns {ImageCollection} Images owned by the currently loaded project. */
@@ -248,9 +251,12 @@ class VirtualMachine extends EventEmitter {
      * @param {function(number): void} progress Upload percentage callback.
      * @returns {Promise<void>} Resolves after verified transfer completion.
      */
-    uploadProjectImage (id, progress) {
+    async uploadProjectImage (id, progress) {
         if (!this.runtime.uploadTinkibotImage) return Promise.reject(new Error('Robot extension is unavailable'));
-        const image = this.projectImages.get(id);
+        const collection = this.projectImages;
+        await this.imageSync.wait();
+        if (collection !== this.projectImages) throw new Error('Project changed before image upload');
+        const image = collection.get(id);
         return this.runtime.uploadTinkibotImage(image, progress);
     }
 

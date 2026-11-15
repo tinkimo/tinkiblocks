@@ -8,9 +8,10 @@ const {FileSender, decode} = require('./tfp');
  * @param {string} name Safe destination basename.
  * @param {Uint8Array} bytes Encoded image file.
  * @param {function(number): void} progress Upload percentage callback.
+ * @param {object} context Optional current-project guard; cancellation packets still pass.
  * @returns {Promise<void>} Resolves only after verified completion.
  */
-const upload = async (manager, robot, name, bytes, progress) => {
+const upload = async (manager, robot, name, bytes, progress, context) => {
     if (!manager.apiReady || manager.method !== 'web-serial' || manager.uploadChannel) {
         throw new Error('USB connection is not ready for an upload');
     }
@@ -56,6 +57,9 @@ const upload = async (manager, robot, name, bytes, progress) => {
         },
         send: frame => {
             if (closed) return Promise.reject(closed);
+            if (context && !context.valid() && decode(frame.slice(1, -1)).kind !== 9) {
+                return Promise.reject(new Error('Image synchronisation superseded'));
+            }
             if (frame.length > channel.capacity) return Promise.reject(new Error('TFP frame exceeds capacity'));
             return manager.transport.write(frame);
         },

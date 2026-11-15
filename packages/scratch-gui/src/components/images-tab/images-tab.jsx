@@ -8,6 +8,7 @@ import styles from './images-tab.css';
 import FilenameField from './filename-field';
 import RobotPreview from './robot-preview';
 import ToolIcon from './tool-icon';
+import ImageSyncStatus from '../image-sync-status/image-sync-status';
 import {WIDTH, HEIGHT, HISTORY_LIMIT, point, rgb, hex, colourAt, line, fill, shape, region,
     copyRegion, pasteRegion, eraseRegion, imageCanvas, text, importCanvas} from './pixels';
 
@@ -48,6 +49,8 @@ const ImagesTab = ({vm}) => {
     const [fontSize, setFontSize] = useState(12);
     const [textDraft, setTextDraft] = useState(null);
     const [nameInvalid, setNameInvalid] = useState(false);
+    const [syncBusy, setSyncBusy] = useState(['clearing', 'uploading'].includes(
+        (vm.runtime.tinkibotImageSync || {}).phase));
     const [error, setError] = useState('');
     const [upload, setUpload] = useState(null);
     const [imported, setImported] = useState(null);
@@ -167,10 +170,13 @@ const ImagesTab = ({vm}) => {
         vm.on('TINKIBOT_IMAGES_CHANGED', changed);
         const robots = () => refresh(value => value + 1);
         vm.runtime.on('TINKIBOT_CONNECTED_ROBOTS_CHANGED', robots);
+        const syncChanged = state => setSyncBusy(['clearing', 'uploading'].includes(state.phase));
+        vm.runtime.on('TINKIBOT_IMAGE_SYNC_CHANGED', syncChanged);
         return () => {
             alive.current = false;
             vm.removeListener('TINKIBOT_IMAGES_CHANGED', changed);
             vm.runtime.removeListener('TINKIBOT_CONNECTED_ROBOTS_CHANGED', robots);
+            vm.runtime.removeListener('TINKIBOT_IMAGE_SYNC_CHANGED', syncChanged);
         };
     }, [vm]);
     useEffect(() => {
@@ -426,6 +432,7 @@ const ImagesTab = ({vm}) => {
                 <p>{label('savedHint')}</p>
             </aside>
             <main className={styles.workspace}>
+                <ImageSyncStatus runtime={vm.runtime} />
                 {current ? <div className={styles.content}>
                     <div className={styles.imageHeader}>
                         <FilenameField
@@ -621,7 +628,7 @@ const ImagesTab = ({vm}) => {
                             <legend>{label('fileActions')}</legend>
                             {button('exportImage', exportImage)}
                             {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
-                                !paired || nameInvalid || Boolean(upload && upload.busy))}
+                                !paired || nameInvalid || syncBusy || Boolean(upload && upload.busy))}
                         </fieldset>
                         <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
                             <legend>{label('imageActions')}</legend>
@@ -685,6 +692,7 @@ ImagesTab.propTypes = {
             remove: PropTypes.func.isRequired
         }).isRequired,
         runtime: PropTypes.shape({
+            tinkibotImageSync: PropTypes.shape({phase: PropTypes.string}),
             tinkibotConnectedRobots: PropTypes.arrayOf(PropTypes.shape({claimState: PropTypes.string})),
             on: PropTypes.func.isRequired,
             removeListener: PropTypes.func.isRequired

@@ -51,6 +51,7 @@ class TinkibotBlocks {
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         this.runtime.removeTinkibotRobot = this.removeRobot.bind(this);
         this.runtime.uploadTinkibotImage = this.uploadImage.bind(this);
+        this.runtime.resetTinkibotImages = this._resetImages.bind(this);
         this.connectionManager = new ConnectionManager({
             connect: () => this._connectProxy(),
             send: payload => this._proxySocket.send(JSON.stringify(payload)),
@@ -62,6 +63,7 @@ class TinkibotBlocks {
         this.connectionManager.on('message', response => this._handleRobotMessage(response));
         this.connectionManager.on('ready', () => {
             this._connected = true;
+            if (this.runtime.imageSync) this.runtime.imageSync.connectionReady();
         });
         this.connectionManager.on('disconnected', error => {
             this._connected = false;
@@ -72,6 +74,7 @@ class TinkibotBlocks {
             this._setConnectedRobots(this._connectedRobots.map(robot => ({...robot, connected: false})));
         });
         this.runtime.tinkibotConnectionManager = this.connectionManager;
+        this.runtime.emit('TINKIBOT_IMAGE_SYNC_TRANSPORT_READY');
         if (typeof window !== 'undefined' && typeof WebSocket !== 'undefined') {
             this.connectionManager.start().catch(error => this.connectionManager.log('error', error.message));
         }
@@ -1250,7 +1253,7 @@ class TinkibotBlocks {
         if (!pending) return;
         this._pendingResponse = null;
         if (pending.timeout) clearTimeout(pending.timeout);
-        if (notify) this._notifyCommandError(error);
+        if (notify && !pending.silent) this._notifyCommandError(error);
         pending.reject(error);
     }
 
@@ -1295,17 +1298,42 @@ class TinkibotBlocks {
         return [...new Set([...(this._builtinPreloadImages || []), ...this.getUserImageNames()])];
     }
 
-    async uploadImage (image, progress = () => {}) {
+    async _resetImages (robot, token, valid) {
+        const {reset} = require('../../tinkibot-images/sync-reset');
+        const context = {botUuid: robot.botUuid, valid, sync: true};
+        try {
+            await reset(command => this._sendCommand(command, 'reset_images', null, null, context),
+                token, this._clientUuid, valid);
+        } catch (error) {
+            if (/unknown|unavailable|unsupported/i.test(error.message)) {
+                throw new Error(formatMessage({
+                    id: 'tinkibot.imageSyncFirmwareRequired',
+                    default: 'Image sync needs updated robot firmware and proxy or modem software.',
+                    description: 'An older robot or gateway cannot prepare project images'
+                }));
+            }
+            throw error;
+        }
+    }
+
+    async uploadImage (image, progress = () => {}, context) {
+        if (!context && this.runtime.imageSync && this.runtime.imageSync.busy) await this.runtime.imageSync.wait();
+        if (!context) {
+            const collection = this.runtime.tinkibotImages;
+            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false);
+            context = {botUuid: robot && robot.botUuid, valid: () => collection === this.runtime.tinkibotImages};
+        }
+        if (!context.valid()) throw new Error('Image synchronisation superseded');
         if (this._imageUploading) throw new Error('An image upload is already in progress');
         this._imageUploading = true;
         try {
-            return await this._uploadImage(image, progress);
+            return await this._uploadImage(image, progress, context);
         } finally {
             this._imageUploading = false;
         }
     }
 
-    async _uploadImage (image, progress) {
+    async _uploadImage (image, progress, context) {
         const {encode} = require('../../tinkibot-images/rgb565');
         const {Buffer} = require('buffer');
         const bytes = encode(image.pixels);
@@ -1316,7 +1344,7 @@ class TinkibotBlocks {
                 progress(0);
                 await this._sendCommand({command: 'upload_image',
                     filename: name,
-                    data: Buffer.from(bytes).toString('base64')});
+                    data: Buffer.from(bytes).toString('base64')}, 'upload_image', null, null, context);
                 progress(100);
             } finally {
                 this._imageProgress = null;
@@ -1325,10 +1353,12 @@ class TinkibotBlocks {
         }
         this._queuedCommands++;
         const operation = this._commandQueue.then(async () => {
-            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false);
+            if (!context.valid()) throw new Error('Image synchronisation superseded');
+            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false &&
+                (!context.botUuid || item.botUuid === context.botUuid));
             if (!robot) throw new Error('Claim a connected robot in Connections before uploading');
             const {upload} = require('../../tinkibot-images/serial-upload');
-            await upload(this.connectionManager, robot, name, bytes, progress);
+            await upload(this.connectionManager, robot, name, bytes, progress, context);
         });
         const tracked = operation.finally(() => {
             this._queuedCommands--;
@@ -1337,11 +1367,18 @@ class TinkibotBlocks {
         return tracked;
     }
 
-    _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null) {
+    _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null, context) {
+        if (!context && this.runtime.imageSync && this.runtime.imageSync.busy) {
+            return this.runtime.imageSync.wait().then(() =>
+                this._sendCommand(command, responseCommand, bundlePlan, sourceThread, {}));
+        }
         this._queuedCommands++;
         const operation = this._commandQueue.then(async () => {
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
-            const robot = this._connectedRobots.find(connectedRobot => connectedRobot.claimState === 'paired');
+            if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
+            const candidates = this._connectedRobots.filter(connectedRobot => connectedRobot.claimState === 'paired' &&
+                (!context || !context.botUuid || connectedRobot.botUuid === context.botUuid));
+            const robot = candidates.find(candidate => candidate.connected !== false) || candidates[0];
             if (!robot) {
                 const message = formatMessage({
                     id: 'tinkibot.robotClaimRequired',
@@ -1364,9 +1401,15 @@ class TinkibotBlocks {
                 await this.connect();
             }
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
+            if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
+            if (context && context.botUuid && !this._connectedRobots.some(item => item.botUuid === context.botUuid &&
+                item.claimState === 'paired' && item.connected !== false)) {
+                throw new Error('Robot changed during image sync');
+            }
             return new Promise((resolve, reject) => {
                 const requestId = uuid.v4();
                 const pending = {command: responseCommand,
+                    silent: Boolean(context && context.sync),
                     requestId,
                     resolve,
                     reject,
@@ -1470,11 +1513,20 @@ class TinkibotBlocks {
     }
 
     preload_image (args, util) {
-        return this._bundler.run('preload_image', args, util);
+        return this._runImageAction('preload_image', args, util);
+    }
+
+    _runImageAction (opcode, args, util) {
+        const sync = this.runtime.imageSync;
+        if (sync && this.getUserImageNames().includes(args.IMAGE)) {
+            const captured = util && {thread: util.thread, sequencer: util.sequencer};
+            return sync.wait().then(() => this._bundler.run(opcode, args, captured));
+        }
+        return this._bundler.run(opcode, args, util);
     }
 
     display_user_image (args, util) {
-        return this._bundler.run('display_user_image', args, util);
+        return this._runImageAction('display_user_image', args, util);
     }
 
     display_image (args, util) {

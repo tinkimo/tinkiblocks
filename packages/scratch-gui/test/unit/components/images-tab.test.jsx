@@ -318,3 +318,21 @@ test('leaving the Images tab finishes text before the editor unmounts', () => {
     unmount();
     expect(Array.from(vm.projectImages.get().pixels.slice(0, 3))).toEqual([0, 0, 0]);
 });
+
+
+test('manual upload waits while automatic project image restore is active', () => {
+    const view = editor();
+    act(() => {
+        view.vm.projectImages.create();
+        view.vm.runtime.tinkibotConnectedRobots = [{botUuid: 'robot', claimState: 'paired', connected: true}];
+        view.vm.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED');
+        view.vm.runtime.tinkibotImageSync = {phase: 'clearing', robot: 'lime'};
+        view.vm.runtime.emit('TINKIBOT_IMAGE_SYNC_CHANGED', view.vm.runtime.tinkibotImageSync);
+    });
+    expect(view.getByRole('button', {name: 'Upload to Robot'})).toBeDisabled();
+    act(() => {
+        view.vm.runtime.tinkibotImageSync = {phase: 'ready', robot: 'lime'};
+        view.vm.runtime.emit('TINKIBOT_IMAGE_SYNC_CHANGED', view.vm.runtime.tinkibotImageSync);
+    });
+    expect(view.getByRole('button', {name: 'Upload to Robot'})).toBeEnabled();
+});

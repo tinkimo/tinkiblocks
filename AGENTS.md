@@ -219,3 +219,8 @@ Review all changes and confirm:
 - **Build passes**: `npm run build` (or `npm run build` in the affected package) completes successfully.
 - **Tests pass**: `npm test` (or `npm test` in the affected package) completes with no failures.
 - **No lint errors**: `npm run test:lint` (or `npm run lint`) passes in the affected package.
+
+Project image restoration is coordinated by `packages/scratch-vm/src/tinkibot-images/sync.js`.
+Preserve project-generation guards, UUID-pinned transfers and claim checks when changing lifecycle events.
+The matching firmware/proxy/modem `reset_images` operation clears only uploaded user RGB565 files.
+See `packages/scratch-vm/docs/tinkibot-image-editor.md`.

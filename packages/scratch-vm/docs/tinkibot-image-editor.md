@@ -194,3 +194,23 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
   retained pixels and responsive aspect ratio. Portrait preview checks cover
   upright asymmetric artwork, native pixels below the existing status bar and compact groups.
   Physical robot/modem testing is still required.
+
+## Automatic project image sync
+
+After a project finishes loading, or its active claimed robot connects, reconnects
+or changes, the editor clears that robot's uploaded images and restores all images
+from the current project. Loading an empty project clears uploaded images too.
+Built-in images and non-image files are preserved. No work is sent to unclaimed
+robots. Images and Connections show progress, failures and a Retry image sync
+action. Custom image commands and manual uploads wait until restoration finishes.
+
+The coordinator in `src/tinkibot-images/sync.js` serializes jobs and pins them to
+the project generation and robot UUID. Superseded jobs stop at transfer boundaries;
+the next job clears partial work before restoring its own snapshot. Edits during
+a restore restart with the latest snapshot. Ordinary edits after restoration
+still use Upload to Robot.
+
+Deploy the matching robot firmware and proxy or USB modem software: automatic
+sync uses the accepted-claim `reset_images` RPC before existing 40,960-byte image
+uploads. Older software reports a visible sync failure rather than leaving stale
+images silently available. Robot display rotation is unchanged.

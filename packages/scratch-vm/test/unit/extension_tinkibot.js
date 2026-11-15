@@ -658,6 +658,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
 
     const startedHats = [];
     const extension = new TinkibotBlocks({
+        emit: () => {},
         startHats: opcode => {
             startedHats.push(opcode);
             t.equal(extension.when_button_event({BUTTON: 'top-right', STATE: 'pressed'}), false);
