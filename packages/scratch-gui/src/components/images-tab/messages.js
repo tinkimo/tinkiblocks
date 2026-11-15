@@ -1,9 +1,100 @@
 import {defineMessages} from 'react-intl';
 
 export default defineMessages({
+    textHelp: {
+        id: 'gui.images.textHelp',
+        defaultMessage: 'Type your text below, then click the picture to place it.',
+        description: 'Instructions for placing text on an image'
+    },
+    pencilHelp: {
+        id: 'gui.images.pencilHelp',
+        defaultMessage: 'Drag to draw a thin, one-pixel line.',
+        description: 'Image editor: pencilHelp'
+    },
+    brushHelp: {
+        id: 'gui.images.brushHelp',
+        defaultMessage: 'Drag to paint. Choose Size to change the brush width.',
+        description: 'Image editor: brushHelp'
+    },
+    eraserHelp: {
+        id: 'gui.images.eraserHelp',
+        defaultMessage: 'Drag to erase using the paper colour. Choose Size to change the eraser width.',
+        description: 'Image editor: eraserHelp'
+    },
+    fillHelp: {
+        id: 'gui.images.fillHelp',
+        defaultMessage: 'Click an area to fill connected pixels of the same colour.',
+        description: 'Image editor: fillHelp'
+    },
+    pickerHelp: {
+        id: 'gui.images.pickerHelp',
+        defaultMessage: 'Click the picture to use that pixel’s colour for drawing.',
+        description: 'Image editor: pickerHelp'
+    },
+    selectHelp: {
+        id: 'gui.images.selectHelp',
+        defaultMessage: 'Drag a box around an area, then drag inside it to move it. Use Cut, Copy or Paste below.',
+        description: 'Image editor: selectHelp'
+    },
+    lineHelp: {
+        id: 'gui.images.lineHelp',
+        defaultMessage: 'Drag from the start to the end of a straight line.',
+        description: 'Image editor: lineHelp'
+    },
+    rectangleHelp: {
+        id: 'gui.images.rectangleHelp',
+        defaultMessage: 'Drag to draw a rectangle. Turn on Fill shape for a solid rectangle.',
+        description: 'Image editor: rectangleHelp'
+    },
+    ellipseHelp: {
+        id: 'gui.images.ellipseHelp',
+        defaultMessage: 'Drag to draw an oval. Hold and drag farther to make it larger.',
+        description: 'Image editor: ellipseHelp'
+    },
+    undoHelp: {
+        id: 'gui.images.undoHelp',
+        defaultMessage: 'Undo the last change.',
+        description: 'Image editor: undoHelp'
+    },
+    redoHelp: {
+        id: 'gui.images.redoHelp',
+        defaultMessage: 'Redo the change you undid.',
+        description: 'Image editor: redoHelp'
+    },
+    clearHelp: {
+        id: 'gui.images.clearHelp',
+        defaultMessage: 'Replace the whole picture with the paper colour. This can be undone.',
+        description: 'Image editor: clearHelp'
+    },
+    cutHelp: {
+        id: 'gui.images.cutHelp',
+        defaultMessage: 'Copy the selected area and replace it with the paper colour.',
+        description: 'Image editor: cutHelp'
+    },
+    copyHelp: {
+        id: 'gui.images.copyHelp',
+        defaultMessage: 'Copy the selected area.',
+        description: 'Image editor: copyHelp'
+    },
+    pasteHelp: {
+        id: 'gui.images.pasteHelp',
+        defaultMessage: 'Paste the copied area into the picture.',
+        description: 'Image editor: pasteHelp'
+    },
+    fillShape: {
+        id: 'gui.images.fillShape',
+        defaultMessage: 'Fill shape',
+        description: 'Image editor: fillShape'
+    },
+    paperHelp: {
+        id: 'gui.images.paperHelp',
+        defaultMessage: 'Paper colour is used by Eraser and Clear image. Changing it does not recolour the picture.',
+        description: 'Image editor: paperHelp'
+    },
+
     drawTools: {
         id: 'gui.images.drawTools',
-        defaultMessage: 'Draw',
+        defaultMessage: 'Tools',
         description: 'Image editor: drawTools'
     },
     shapeTools: {
@@ -138,17 +229,17 @@ export default defineMessages({
     },
     picker: {
         id: 'gui.images.picker',
-        defaultMessage: 'Pick colour',
+        defaultMessage: 'Colour picker',
         description: 'Image editor: picker'
     },
     select: {
         id: 'gui.images.select',
-        defaultMessage: 'Select / move',
+        defaultMessage: 'Select',
         description: 'Image editor: select'
     },
     size: {
         id: 'gui.images.size',
-        defaultMessage: 'Brush / eraser size',
+        defaultMessage: 'Size',
         description: 'Image editor: size'
     },
     fontSize: {
@@ -168,7 +259,7 @@ export default defineMessages({
     },
     background: {
         id: 'gui.images.background',
-        defaultMessage: 'Background colour',
+        defaultMessage: 'Paper colour',
         description: 'Image editor: background'
     },
     undo: {
@@ -183,7 +274,7 @@ export default defineMessages({
     },
     clear: {
         id: 'gui.images.clear',
-        defaultMessage: 'Clear',
+        defaultMessage: 'Clear image',
         description: 'Image editor: clear'
     },
     copy: {
@@ -304,7 +395,7 @@ export default defineMessages({
     },
     palette: {
         id: 'gui.images.palette',
-        defaultMessage: 'Colour palette',
+        defaultMessage: 'Colours',
         description: 'Image editor: palette'
     },
     importFailed: {

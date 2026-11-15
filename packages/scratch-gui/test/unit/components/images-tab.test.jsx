@@ -135,7 +135,7 @@ test('undo/redo and project switching preserve isolation', () => {
     const {getByRole, vm} = editor();
     fireEvent.click(getByRole('button', {name: 'New image'}));
     act(() => { vm.projectImages.get().pixels.fill(0); vm.emit('TINKIBOT_IMAGES_CHANGED'); });
-    fireEvent.click(getByRole('button', {name: 'Clear'}));
+    fireEvent.click(getByRole('button', {name: 'Clear image'}));
     expect(vm.projectImages.get().pixels[0]).toBe(255);
     fireEvent.click(getByRole('button', {name: 'Undo'}));
     expect(vm.projectImages.get().pixels[0]).toBe(0);
@@ -161,7 +161,7 @@ test('upload feedback uses the selected image and surfaces failures', async () =
 test('controls are grouped by purpose and the grid control is removed', () => {
     const {getByRole, queryByRole} = editor();
     fireEvent.click(getByRole('button', {name: 'New image'}));
-    for (const name of ['Draw', 'Shapes', 'Select & pick', 'Edit image', 'Selection', 'Image actions', 'Export & upload']) {
+    for (const name of ['Tools', 'Shapes', 'Selection', 'Colours', 'Image actions', 'Export & upload']) {
         expect(getByRole('group', {name})).toBeVisible();
     }
     expect(queryByRole('checkbox', {name: 'Pixel grid'})).toBeNull();
@@ -207,4 +207,19 @@ test('reopening the same project clears a stale filename draft and its error', (
     });
     expect(getByLabelText('Image filename')).toHaveValue('image1');
     expect(queryByRole('alert')).toBeNull();
+});
+
+
+test('Paint-style shape fill toggles the drawing mode without duplicate tools', () => {
+    const {getByRole, queryByRole, getByText} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'Rectangle', exact: true}));
+    expect(getByRole('button', {name: 'Rectangle', exact: true})).toHaveAttribute('aria-pressed', 'true');
+    expect(queryByRole('button', {name: 'Filled rectangle', exact: true})).toBeNull();
+    fireEvent.click(getByRole('checkbox', {name: 'Fill shape'}));
+    expect(getByRole('button', {name: 'Rectangle', exact: true})).toHaveAttribute('aria-pressed', 'true');
+    expect(getByRole('checkbox', {name: 'Fill shape'})).toBeChecked();
+    fireEvent.click(getByRole('button', {name: 'Ellipse', exact: true}));
+    expect(getByRole('checkbox', {name: 'Fill shape'})).toBeChecked();
+    expect(getByText(/Drag to draw an oval/)).toBeVisible();
 });

@@ -13,7 +13,13 @@ is always 128 × 140 RGB888, with a 256 × 280 nearest-neighbour drawing canvas 
 stays at its normal 128 × 160 portrait orientation. Native PNG exports preserve
 all 128 × 140 artwork pixels. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
 image editing, image actions and export/upload controls have labeled groups.
-There is no pixel grid control.
+There is no pixel grid control. The Paint-style ribbon groups Selection (with
+Cut/Copy/Paste), Tools and Shapes using consistent SVG icons and visible names.
+Rectangle and Ellipse share a Fill shape option rather than separate filled
+buttons. Undo/Redo/Clear image sit above the ribbon; active-tool instructions
+and relevant size/text controls appear below it. Colours have separate drawing
+and paper wells, a compact swatch grid and an explanation that paper colour is
+used by Eraser and Clear image without recolouring existing pixels.
 
 The preview sits inside a clean vector illustration of the yellow robot top,
 with a tall raised centre cover, silver button mounts, black switches, corner
@@ -151,8 +157,8 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 ### Results in the implementation environment
 
-* GUI: all 48 unit suites passed (339 tests, one existing skip; 15 snapshots).
-  The editor's 18 focused tests also pass independently.
+* GUI: all 48 unit suites passed (340 tests, one existing skip; 15 snapshots).
+  The editor's 19 focused tests also pass independently.
 * VM: all 74 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the
