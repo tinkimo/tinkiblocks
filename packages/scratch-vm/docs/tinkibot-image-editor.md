@@ -13,6 +13,7 @@ is always 128 × 140 RGB888, with a 256 × 280 nearest-neighbour drawing canvas 
 stays at its normal 128 × 160 portrait orientation. Native PNG exports preserve
 all 128 × 140 artwork pixels. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
 image editing, image actions and export/upload controls have labeled groups.
+Duplicate and Delete sit beneath the canvas beside Export and Upload.
 There is no pixel grid control. The Paint-style ribbon groups Selection (with
 Cut/Copy/Paste), Tools and Shapes using consistent SVG icons and visible names.
 Rectangle and Ellipse share a Fill shape option rather than separate filled

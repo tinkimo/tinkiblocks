@@ -433,14 +433,6 @@ const ImagesTab = ({vm}) => {
                             image={current}
                             onValidityChange={setNameInvalid}
                         />
-                        <fieldset className={styles.controlGroup}>
-                            <legend>{label('imageActions')}</legend>
-                            {button('duplicate', () => collection.create(null, current.pixels),
-                                collection.images.length >= 64)}
-                            {button('deleteImage', () => {
-                                if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
-                            })}
-                        </fieldset>
                     </div>
                     <div className={styles.quickActions}>
                         {button('undo', () => undo(false), !history.undo.length)}
@@ -624,12 +616,22 @@ const ImagesTab = ({vm}) => {
                             />
                         </div>
                     </div>
-                    <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
-                        <legend>{label('fileActions')}</legend>
-                        {button('exportImage', exportImage)}
-                        {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
-                            !paired || nameInvalid || Boolean(upload && upload.busy))}
-                    </fieldset>
+                    <div className={styles.row}>
+                        <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
+                            <legend>{label('fileActions')}</legend>
+                            {button('exportImage', exportImage)}
+                            {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
+                                !paired || nameInvalid || Boolean(upload && upload.busy))}
+                        </fieldset>
+                        <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
+                            <legend>{label('imageActions')}</legend>
+                            {button('duplicate', () => collection.create(null, current.pixels),
+                                collection.images.length >= 64)}
+                            {button('deleteImage', () => {
+                                if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
+                            })}
+                        </fieldset>
+                    </div>
                     {upload && upload.busy ? (
                         <div role="status">
                             <progress
