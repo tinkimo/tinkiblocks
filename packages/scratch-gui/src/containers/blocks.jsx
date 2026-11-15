@@ -19,7 +19,7 @@ import {BLOCKS_DEFAULT_SCALE, STAGE_DISPLAY_SIZES} from '../lib/layout-constants
 import DropAreaHOC from '../lib/drop-area-hoc.jsx';
 import DragConstants from '../lib/drag-constants';
 import defineDynamicBlock from '../lib/define-dynamic-block';
-import updateUserImageBlocks from '../lib/user-image-blocks';
+import updateUserImageBlocks, {styleUserImageBlocks} from '../lib/user-image-blocks';
 import {DEFAULT_MODE, getColorsForMode, colorModeMap} from '../lib/settings/color-mode';
 import {CAT_BLOCKS_THEME} from '../lib/settings/theme';
 import {
@@ -300,6 +300,8 @@ class Blocks extends React.Component {
 
         this.workspace.updateToolbox(this.props.toolboxXML);
         this.workspace.getToolbox().runAfterRerender(() => {
+            styleUserImageBlocks(this.workspace);
+            styleUserImageBlocks(this.workspace.getFlyout().getWorkspace());
             const newCategoryScrollPosition = this.workspace
                 .getFlyout()
                 .getCategoryScrollPosition(selectedCategoryName);

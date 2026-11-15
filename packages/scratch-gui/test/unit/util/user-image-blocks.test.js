@@ -4,6 +4,7 @@ test('placed user-image blocks disable when empty and recover with a valid filen
     let value = 'deleted-image';
     const block = {
         type: 'tinkibotDisplay_display_user_image',
+        getSvgRoot: () => null,
         getFieldValue: jest.fn(() => value),
         setFieldValue: jest.fn(next => { value = next; }),
         setDisabledReason: jest.fn()

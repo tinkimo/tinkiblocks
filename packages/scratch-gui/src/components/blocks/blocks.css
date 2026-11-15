@@ -104,3 +104,22 @@
     min-width: auto;
     min-height: auto;
 }
+
+/* An unavailable user-image block keeps its category colour; only text is muted. */
+.blocks :global(.tinkiblocks-user-image.blocklyDisabled) > :global(.blocklyPath) {
+    fill: var(--user-image-colour);
+    fill-opacity: 1;
+    stroke-opacity: 1;
+}
+.blocks :global(.tinkiblocks-user-image.blocklyDisabled) :global(.blocklyText) {
+    fill: #b8b8b8;
+}
+.blocks :global(.tinkiblocks-user-image.blocklyDisabled) :global(.blocklyEditableField) > rect,
+.blocks :global(.tinkiblocks-user-image.blocklyDisabled) :global(.blocklyEditableField) > :global(.blocklyPath) {
+    fill: var(--user-image-secondary);
+    fill-opacity: 1;
+}
+/* Blockly forces dropdown text white; override only this disabled block. */
+.blocks :global(.tinkiblocks-user-image.blocklyDisabled) :global(.blocklyDropdownText) {
+    fill: #b8b8b8 !important;
+}

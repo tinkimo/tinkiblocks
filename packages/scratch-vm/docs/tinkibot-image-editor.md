@@ -95,7 +95,8 @@ storage and PNG export preserve the original colours. Upload and project saving
 are independent. Display has a separate “display my image” command whose
 dropdown contains only
 current project filenames. It is disabled with “no images” when the gallery is
-empty, including existing workspace instances. Creating images re-enables it;
+empty, including existing workspace instances. Disabled custom-image blocks keep
+their normal category colour while the label and dropdown text turn grey. Creating images re-enables it;
 renaming/removing images refreshes the dropdown and repairs missing selections.
 Literal user-image choices in older project scripts migrate to the new block
 on load, preserving block IDs and connections. Built-in choices and reporter
@@ -176,7 +177,7 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 ### Results in the implementation environment
 
-* GUI: all 49 unit suites passed (346 tests, one existing skip; 15 snapshots).
+* GUI: all 50 unit suites passed (347 tests, one existing skip; 15 snapshots).
   The editor's 24 focused tests also pass independently.
 * VM: all 100 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
