@@ -92,8 +92,19 @@ exports do not include project images. Scratch targets and assets are unchanged.
 format, 40,960 bytes (128 × 160). The first 140 rows contain the artwork;
 the final 20 rows are black padding clipped by the existing application view. Only upload quantizes RGB888 to the hardware's RGB565; project
 storage and PNG export preserve the original colours. Upload and project saving
-are independent. Display/preload menus dynamically combine built-in names with
-current project filenames; uploads use `<name>.rgb565` under `/files/user/`.
+are independent. Display has a separate “display my image” command whose
+dropdown contains only
+current project filenames. It is disabled with “no images” when the gallery is
+empty, including existing workspace instances. Creating images re-enables it;
+renaming/removing images refreshes the dropdown and repairs missing selections.
+Literal user-image choices in older project scripts migrate to the new block
+on load, preserving block IDs and connections. Built-in choices and reporter
+inputs remain unchanged. The original display-image dropdown contains only
+built-ins. Preload continues
+to include both built-ins and project filenames. Empty/stale user-image values
+are no-ops and cannot send robot commands. Filename changes refresh block
+metadata; pixel edits do not rebuild the toolbox. Image uploads use
+`<name>.rgb565` under `/files/user/`.
 
 Upload requires one connected robot claimed by this client. It shares the existing
 command queue and prevents concurrent image uploads. Transport switching uses the
@@ -165,9 +176,9 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 
 ### Results in the implementation environment
 
-* GUI: all 48 unit suites passed (345 tests, one existing skip; 15 snapshots).
+* GUI: all 49 unit suites passed (346 tests, one existing skip; 15 snapshots).
   The editor's 24 focused tests also pass independently.
-* VM: all 74 image checks passed. The full unit run reported 2,860 passing
+* VM: all 100 image checks passed. The full unit run reported 2,860 passing
   checks and three failures in existing `project_changed_state.js` costume tests.
   The same missing-renderer `createSVGSkin` failure was reproduced with the
   unchanged VM source; it is independent of the image editor.

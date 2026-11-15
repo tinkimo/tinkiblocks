@@ -14,6 +14,7 @@ const log = require('./util/log');
 const MathUtil = require('./util/math-util');
 const Runtime = require('./engine/runtime');
 const {ImageCollection} = require('./tinkibot-images/collection');
+const migrateImageBlocks = require('./tinkibot-images/migrate-blocks');
 const StringUtil = require('./util/string-util');
 const formatMessage = require('format-message');
 
@@ -222,8 +223,17 @@ class VirtualMachine extends EventEmitter {
     resetProjectImages (data) {
         this.runtime.tinkibotImages = ImageCollection.restore(data, () => {
             this.runtime.emitProjectChanged();
-            this.emit('TINKIBOT_IMAGES_CHANGED');
+            this._notifyProjectImageChanges();
         });
+        this._notifyProjectImageChanges();
+    }
+
+    _notifyProjectImageChanges () {
+        const names = JSON.stringify(this.runtime.tinkibotImages.images.map(image => image.name));
+        if (names !== this._projectImageMenuNames) {
+            this._projectImageMenuNames = names;
+            this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
+        }
         this.emit('TINKIBOT_IMAGES_CHANGED');
     }
 
@@ -527,6 +537,7 @@ class VirtualMachine extends EventEmitter {
         // Clear the current runtime
         this.clear(true);
         this.resetProjectImages(images);
+        migrateImageBlocks(projectJSON, this.projectImages.images.map(image => image.name));
 
         if (typeof performance !== 'undefined') {
             performance.mark('scratch-vm-deserialize-start');

@@ -42,6 +42,11 @@ module.exports = {
         encode: value => `preload:image ${value.file}`
     },
     display_image: display,
+    display_user_image: {
+        payload: (args, extension) => (extension.getUserImageNames().includes(args.IMAGE) ?
+            display.payload(args) : null),
+        encode: display.encode
+    },
     display_letter: display,
     display_number: display,
     write_text: {

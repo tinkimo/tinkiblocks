@@ -188,19 +188,42 @@ test('TFP errors cancel the transfer and never report success', async t => {
 });
 
 
-test('image menus update from the current project without replacing built-in entries', t => {
+test('user images have a separate disabled-empty display block and menu', t => {
     const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
     const runtime = {emit: () => {}, tinkibotImages: new ImageCollection()};
     const extension = new Tinkibot(runtime);
-    extension.getInfos();
+    const block = () => extension.getInfos().find(info => info.id === 'tinkibotDisplay')
+        .blocks.find(info => info.opcode === 'display_user_image');
+    t.equal(block().disabled, true);
+    t.same(extension.getUserImageOptions(), [{text: 'no images', value: '__no_images__'}]);
     t.ok(extension.getProjectImageOptions().includes('logo'));
     const image = runtime.tinkibotImages.create('rainbow');
-    t.ok(extension.getProjectImageOptions().includes('rainbow'));
+    t.equal(block().disabled, false);
+    t.same(extension.getUserImageOptions(), ['rainbow']);
+    t.notOk(extension.getProjectImageOptions().includes('rainbow'));
     t.ok(extension.getProjectPreloadImageOptions().includes('rainbow'));
     runtime.tinkibotImages.rename(image.id, 'sunshine');
-    t.notOk(extension.getProjectImageOptions().includes('rainbow'));
-    t.ok(extension.getProjectImageOptions().includes('sunshine'));
+    t.same(extension.getUserImageOptions(), ['sunshine']);
+    runtime.tinkibotImages.remove(image.id);
+    t.equal(block().disabled, true);
+    t.equal(block().arguments.IMAGE.defaultValue, '__no_images__');
     t.end();
+});
+
+test('user image commands cannot send the empty or stale menu value', async t => {
+    const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
+    const runtime = {emit: () => {}, tinkibotImages: new ImageCollection()};
+    const extension = new Tinkibot(runtime);
+    const commands = [];
+    extension._sendCommand = command => { commands.push(command); return Promise.resolve(); };
+    await extension.display_user_image({IMAGE: '__no_images__'});
+    t.equal(commands.length, 0);
+    const image = runtime.tinkibotImages.create('my-picture');
+    await extension.display_user_image({IMAGE: image.name});
+    t.same(commands, [{command: 'display_image', image: 'my-picture'}]);
+    runtime.tinkibotImages.remove(image.id);
+    await extension.display_user_image({IMAGE: 'my-picture'});
+    t.equal(commands.length, 1);
 });
 
 test('a superseded project load cannot restore another project image collection', async t => {
@@ -269,5 +292,61 @@ test('filenames use lowercase letters, numbers and hyphens; restored images keep
     t.equal(restored.get(second.id).name, 'sunny-day-2');
     t.same(restored.get(first.id).pixels, first.pixels);
     t.equal(restored.selectedId, saved.selectedId);
+    t.end();
+});
+
+test('the toolbox disables the empty user image block and refreshes its default', async t => {
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    await vm.extensionManager.loadExtensionURL('tinkibot');
+    const xml = () => vm.runtime.getBlocksXML().find(category => category.id === 'tinkibotDisplay').xml;
+    t.match(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
+    t.match(xml(), /<field name="IMAGE">__no_images__<\/field>/);
+    const image = vm.projectImages.create('my-picture');
+    await vm.extensionManager.refreshBlocks();
+    t.notMatch(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
+    t.match(xml(), /<field name="IMAGE">my-picture<\/field>/);
+    vm.projectImages.remove(image.id);
+    await vm.extensionManager.refreshBlocks();
+    t.match(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
+});
+
+test('image pixels do not rebuild the toolbox, but image filenames do', t => {
+    const vm = new VM();
+    let updates = 0;
+    vm.runtime.on('TOOLBOX_EXTENSIONS_NEED_UPDATE', () => updates++);
+    const image = vm.projectImages.create('first');
+    t.equal(updates, 1);
+    vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH));
+    t.equal(updates, 1);
+    vm.projectImages.rename(image.id, 'second');
+    t.equal(updates, 2);
+    vm.projectImages.remove(image.id);
+    t.equal(updates, 3);
+    vm.clear();
+    t.end();
+});
+
+test('old literal user-image blocks migrate while built-ins and reporter inputs stay intact', t => {
+    const migrate = require('../../src/tinkibot-images/migrate-blocks');
+    const block = {opcode: 'tinkibotDisplay_display_image', next: 'next', parent: null,
+        inputs: {IMAGE: [1, 'menu']}, fields: {}, topLevel: true, x: 30, y: 40};
+    const menu = {opcode: 'tinkibotDisplay_menu_image_options', parent: 'display', shadow: true,
+        fields: {image_options: ['my-picture', null]}};
+    const project = {targets: [{blocks: {display: block, menu,
+        builtin: {...block, inputs: {IMAGE: [1, 'builtinMenu']}},
+        builtinMenu: {...menu, parent: 'builtin', fields: {image_options: ['logo', null]}},
+        reporter: {...block, inputs: {IMAGE: [3, 'reporter-id', 'reporterMenu']}},
+        reporterMenu: {...menu, parent: 'reporter'}}}]};
+    migrate(project, ['my-picture']);
+    t.equal(block.opcode, 'tinkibotDisplay_display_user_image');
+    t.same(block.fields, {IMAGE: ['my-picture', null]});
+    t.same(block.inputs, {});
+    t.equal(block.next, 'next');
+    t.same([block.x, block.y], [30, 40]);
+    t.notOk(project.targets[0].blocks.menu);
+    t.equal(project.targets[0].blocks.builtin.opcode, 'tinkibotDisplay_display_image');
+    t.equal(project.targets[0].blocks.reporter.opcode, 'tinkibotDisplay_display_image');
+    t.ok(project.targets[0].blocks.reporterMenu);
     t.end();
 });

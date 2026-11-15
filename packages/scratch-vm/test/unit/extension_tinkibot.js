@@ -100,7 +100,7 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
         Sounds: ['playNoteForBeats', 'playDrumForBeats', 'restForBeats', 'setTempo', 'changeTempo',
             'volume', 'play_sound', 'preload_audio'],
-        Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+        Display: ['display_image', 'display_user_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'backlight', 'preload_image', 'clear']
     });
     t.strictSame(infos.map(info => info.color1), ['#B832D0', '#A52A50', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
@@ -708,7 +708,8 @@ test('Tinkibot preload blocks provide combined media menus', t => {
         arguments: {AUDIO: {type: 'string', menu: 'sound_options'}}
     });
     const menus = display.menus;
-    t.equal(menus.image_options.items, 'getProjectImageOptions');
+    t.strictSame(menus.image_options.items, extension.getProjectImageOptions());
+    t.equal(menus.user_image_options.items, 'getUserImageOptions');
     t.equal(menus.preload_image_options.items, 'getProjectPreloadImageOptions');
     t.strictSame(extension.getProjectPreloadImageOptions(), [...new Set([
         ...extension.getProjectImageOptions(), ...menus.letter_options.items,

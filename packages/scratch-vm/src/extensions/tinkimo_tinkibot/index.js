@@ -125,7 +125,7 @@ class TinkibotBlocks {
                 default: 'Display',
                 description: 'Name of the Tinkibot Display category.'
             }), [
-                'display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+                'display_image', 'display_user_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
                 'background_colour', 'backlight', 'preload_image', 'clear'
             ])
         ];
@@ -372,6 +372,23 @@ class TinkibotBlocks {
                             defaultValue: 'logo',
                             menu: "image_options"
                         },
+                    }
+                },
+                {
+                    opcode: 'display_user_image',
+                    blockType: BlockType.COMMAND,
+                    disabled: !this.getUserImageNames().length,
+                    text: formatMessage({
+                        id: 'tinkibot.displayUserImage',
+                        default: 'display my image [IMAGE]',
+                        description: 'Display an image created in the project Images tab'
+                    }),
+                    arguments: {
+                        IMAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: this.getUserImageNames()[0] || '__no_images__',
+                            menu: 'user_image_options'
+                        }
                     }
                 },
                 {
@@ -845,7 +862,7 @@ class TinkibotBlocks {
         };
         this._builtinImageOptions = info.menus.image_options.items;
         this._builtinPreloadImages = info.menus.preload_image_options.items;
-        info.menus.image_options.items = 'getProjectImageOptions';
+        info.menus.user_image_options = {acceptReporters: false, items: 'getUserImageOptions'};
         info.menus.preload_image_options.items = 'getProjectPreloadImageOptions';
         info.blocks = info.blocks.map(block => {
             if (block === '---') return block;
@@ -1257,13 +1274,25 @@ class TinkibotBlocks {
     }
 
     getProjectImageOptions () {
+        return [...(this._builtinImageOptions || [])];
+    }
+
+    getUserImageNames () {
         const images = this.runtime.tinkibotImages;
-        return [...new Set([...(this._builtinImageOptions || []),
-            ...(images ? images.images.map(image => image.name) : [])])];
+        return images ? images.images.map(image => image.name) : [];
+    }
+
+    getUserImageOptions () {
+        const names = this.getUserImageNames();
+        return names.length ? names : [{text: formatMessage({
+            id: 'tinkibot.noUserImages',
+            default: 'no images',
+            description: 'Empty dropdown when the project has no user-created images'
+        }), value: '__no_images__'}];
     }
 
     getProjectPreloadImageOptions () {
-        return [...new Set([...(this._builtinPreloadImages || []), ...this.getProjectImageOptions()])];
+        return [...new Set([...(this._builtinPreloadImages || []), ...this.getUserImageNames()])];
     }
 
     async uploadImage (image, progress = () => {}) {
@@ -1442,6 +1471,10 @@ class TinkibotBlocks {
 
     preload_image (args, util) {
         return this._bundler.run('preload_image', args, util);
+    }
+
+    display_user_image (args, util) {
+        return this._bundler.run('display_user_image', args, util);
     }
 
     display_image (args, util) {
