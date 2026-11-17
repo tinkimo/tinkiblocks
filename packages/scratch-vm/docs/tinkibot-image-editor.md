@@ -207,8 +207,8 @@ action. Custom image commands and manual uploads wait until restoration finishes
 
 The coordinator in `src/tinkibot-images/sync.js` serializes jobs and pins them to
 the project generation and robot UUID. Superseded jobs stop at transfer boundaries;
-the next job clears partial work before restoring its own snapshot. Edits during
-a restore restart with the latest snapshot. Ordinary edits after restoration
+the next job clears partial work before restoring its own snapshot. Each restore captures a fixed snapshot before any transfer starts. The editor is
+blocked until the operation completes or a stopped failure is acknowledged. Ordinary edits after restoration
 still use Upload to Robot.
 
 Deploy the matching robot firmware and proxy or USB modem software: automatic
@@ -229,3 +229,30 @@ Leaving the Images tab with any new or edited image that still needs upload show
 an alert explaining Upload to Robot and the display my image block. Pending text
 is committed before checking. The ready status also shows an upload reminder
 while edits are pending; selecting images alone does not mark them changed.
+
+
+## Blocking project restoration
+
+The existing sync coordinator owns each automatic restoration's UUID, target,
+private image snapshot, attempt number and acknowledged completion index. Capture
+filenames and independent RGB buffers when the operation is requested, including
+when another interrupted transfer must settle first. Do not rebuild its queue
+from the live collection. Normal manual uploads remain independent.
+
+The GUI mounts the standard styled Modal as “Uploading project images” for the
+whole operation. It displays the current .rgb565 filename, acknowledged count and
+available transfer progress. ReactModal traps focus and hides the app from
+assistive technology; the workspace is inert and document shortcuts/outside
+clicks are blocked. VM image mutations, green flag, project loading/export and
+ordinary robot requests also reject during the lock. Modal focus cannot commit
+pending editor text or filenames into a restoration snapshot.
+
+Failure keeps the filename/error visible and the workspace locked. Retry resumes
+at the failed snapshot image without clearing or repeating acknowledged uploads.
+Close is available only after the active transfer has settled. There is no Cancel
+button while transferring: the transports do not provide a common acknowledged
+cancellation API. Disconnect and internal disposal/unmount invalidate callbacks,
+stop further files and keep the VM locked until the current promise settles.
+Late progress from failed/completed attempts cannot reopen the dialog. On success
+or safe close, interaction, inert/ARIA attributes, document listeners and focus
+are restored. Project data and the robot protocol are unchanged.

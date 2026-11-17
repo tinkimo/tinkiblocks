@@ -1,0 +1,158 @@
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import PropTypes from 'prop-types';
+import {FormattedMessage, useIntl} from 'react-intl';
+import Modal from '../modal/modal.jsx';
+import Button from '../button/button.jsx';
+import styles from './project-image-upload-modal.css';
+
+const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
+    const intl = useIntl();
+    const [state, setState] = useState(runtime.tinkibotImageSync);
+    const body = useRef(null);
+    const wasBlocking = useRef(Boolean(state && state.blocking));
+    const previousFocus = useRef(document.activeElement);
+    const blocking = Boolean(state && state.blocking);
+    const failed = state && state.phase === 'error';
+    const retry = useCallback(() => runtime.imageSync.retry(), [runtime]);
+    const close = useCallback(() => runtime.imageSync.close(), [runtime]);
+    useEffect(() => {
+        const update = next => {
+            if (next.blocking && !wasBlocking.current) previousFocus.current = document.activeElement;
+            wasBlocking.current = Boolean(next.blocking);
+            setState(next);
+        };
+        runtime.on('TINKIBOT_IMAGE_SYNC_CHANGED', update);
+        runtime.imageSync.request();
+        update(runtime.tinkibotImageSync);
+        return () => {
+            runtime.removeListener('TINKIBOT_IMAGE_SYNC_CHANGED', update);
+            if (runtime.imageSync.blocking) runtime.imageSync.interrupt('Project upload view closed');
+        };
+    }, [runtime]);
+    useEffect(() => {
+        if (!blocking) return () => {};
+        const workspace = workspaceRef.current;
+        const inert = workspace.getAttribute('inert');
+        const busy = workspace.getAttribute('aria-busy');
+        workspace.setAttribute('inert', '');
+        workspace.setAttribute('aria-busy', 'true');
+        // Document shortcuts and synthetic clicks must not bypass the modal overlay.
+        const blockOutside = event => {
+            const dialog = body.current && body.current.closest('[role="dialog"]');
+            const shortcut = event.type === 'keydown' && (event.ctrlKey || event.metaKey);
+            if (shortcut || !dialog || !dialog.contains(event.target)) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }
+        };
+        const events = ['keydown', 'click', 'pointerdown', 'dblclick', 'drop', 'paste', 'cut', 'wheel', 'touchmove'];
+        for (const name of events) document.addEventListener(name, blockOutside, {capture: true, passive: false});
+        return () => {
+            if (inert === null) workspace.removeAttribute('inert');
+            else workspace.setAttribute('inert', inert);
+            if (busy === null) workspace.removeAttribute('aria-busy');
+            else workspace.setAttribute('aria-busy', busy);
+            for (const name of events) document.removeEventListener(name, blockOutside, true);
+            if (previousFocus.current && previousFocus.current.isConnected) previousFocus.current.focus();
+        };
+    }, [blocking, workspaceRef]);
+    useEffect(() => {
+        if (!blocking) return;
+        // ReactModal opens its portal after mounting this component.
+        const dialog = body.current && body.current.closest('[role="dialog"]');
+        if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    }, [blocking, state && state.phase]);
+    if (!blocking) return null;
+    return (
+        <Modal
+            aria={{modal: true}}
+            className={styles.modal}
+            contentLabel={intl.formatMessage({
+                id: 'gui.projectImageUpload.title',
+                defaultMessage: 'Uploading project images',
+                description: 'Title of the blocking project image restore dialog'
+            })}
+            hideCloseButton={!failed}
+            isRtl={isRtl}
+            onRequestClose={failed ? close : null}
+        >
+            <div
+                ref={body}
+                className={styles.body}
+            >
+                <div
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                >
+                    {state.phase === 'clearing' ? <FormattedMessage
+                        id="gui.projectImageUpload.preparing"
+                        defaultMessage="Preparing the robot for this project's images…"
+                        description="Progress while old uploaded files are cleared"
+                    /> : state.phase === 'stopping' ? <FormattedMessage
+                        id="gui.projectImageUpload.stopping"
+                        defaultMessage="Waiting for the active transfer to stop safely…"
+                        description="The workspace stays blocked until an interrupted transfer settles"
+                    /> : <p>{state.filename}</p>}
+                    <p>
+                        <FormattedMessage
+                            id="gui.projectImageUpload.count"
+                            defaultMessage="{completed} of {total} images completed"
+                            description="Robot-acknowledged images completed out of the fixed snapshot total"
+                            values={{completed: state.completed, total: state.total}}
+                        />
+                    </p>
+                </div>
+                {!failed && state.phase === 'uploading' ? <progress
+                    max={100}
+                    value={state.progress}
+                    aria-label={intl.formatMessage({
+                        id: 'gui.projectImageUpload.progress',
+                        defaultMessage: 'Current image upload progress',
+                        description: 'Accessible label of the image transfer progress bar'
+                    })}
+                /> : null}
+                {failed ? <React.Fragment>
+                    <p role="alert">{state.error}</p>
+                    <div className={styles.buttons}>
+                        <Button
+                            disabled={!state.canRetry}
+                            aria-disabled={!state.canRetry}
+                            onClick={retry}
+                        >
+                            <FormattedMessage
+                                id="gui.projectImageUpload.retry"
+                                defaultMessage="Retry"
+                                description="Retry only the failed image and remaining snapshot"
+                            />
+                        </Button>
+                        <Button onClick={close}>
+                            <FormattedMessage
+                                id="gui.projectImageUpload.close"
+                                defaultMessage="Close"
+                                description="Dismiss a stopped, failed upload and restore workspace interaction"
+                            />
+                        </Button>
+                    </div>
+                </React.Fragment> : null}
+            </div>
+        </Modal>
+    );
+};
+ProjectImageUploadModal.propTypes = {
+    isRtl: PropTypes.bool,
+    workspaceRef: PropTypes.shape({current: PropTypes.instanceOf(Element)}).isRequired,
+    runtime: PropTypes.shape({
+        tinkibotImageSync: PropTypes.shape({blocking: PropTypes.bool, phase: PropTypes.string}),
+        on: PropTypes.func.isRequired,
+        removeListener: PropTypes.func.isRequired,
+        imageSync: PropTypes.shape({
+            request: PropTypes.func.isRequired,
+            retry: PropTypes.func.isRequired,
+            close: PropTypes.func.isRequired,
+            interrupt: PropTypes.func.isRequired,
+            blocking: PropTypes.bool
+        }).isRequired
+    }).isRequired
+};
+export default ProjectImageUploadModal;

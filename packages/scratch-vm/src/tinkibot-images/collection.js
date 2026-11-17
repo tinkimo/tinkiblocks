@@ -10,19 +10,22 @@ const validName = name => /^[a-z0-9][a-z0-9-]{0,63}$/.test(name);
 
 /** Lossless RGB project data; independent of a browser canvas or robot connection. */
 class ImageCollection {
-    constructor (changed = () => {}) {
+    constructor (changed = () => {}, beforeChange = () => {}) {
         this.images = [];
         this.selectedId = null;
         this.changed = changed;
+        this.beforeChange = beforeChange;
     }
 
     select (id) {
+        this.beforeChange();
         if (!this.images.some(image => image.id === id)) throw new Error('Unknown image');
         this.selectedId = id;
         this.changed();
     }
 
     create (name, pixels = new Uint8Array(BYTE_LENGTH).fill(255)) {
+        this.beforeChange();
         if (this.images.length >= MAX_IMAGES) throw new Error('Image limit reached (64)');
         if (!name) {
             const usedNames = new Set(this.images.map(image => image.name.toLowerCase()));
@@ -56,6 +59,7 @@ class ImageCollection {
     }
 
     rename (id, name) {
+        this.beforeChange();
         this.validateName(name, id);
         this.get(id).name = name;
         this.changed();
@@ -68,12 +72,14 @@ class ImageCollection {
     }
 
     update (id, pixels) {
+        this.beforeChange();
         if (pixels.length !== BYTE_LENGTH) throw new Error('Invalid image dimensions');
         this.get(id).pixels = new Uint8Array(pixels);
         this.changed();
     }
 
     remove (id) {
+        this.beforeChange();
         this.get(id);
         this.images = this.images.filter(image => image.id !== id);
         if (this.selectedId === id) this.selectedId = this.images.length ? this.images[0].id : null;
@@ -90,8 +96,8 @@ class ImageCollection {
                 rgb: Buffer.from(image.pixels).toString('base64')}))};
     }
 
-    static restore (data, changed) {
-        const collection = new ImageCollection(changed);
+    static restore (data, changed, beforeChange) {
+        const collection = new ImageCollection(changed, beforeChange);
         if (!data) return collection;
         if (data.version !== 1 || !Array.isArray(data.images) || data.images.length > MAX_IMAGES) {
             throw new Error('Invalid project image collection');

@@ -228,3 +228,9 @@ See `packages/scratch-vm/docs/tinkibot-image-editor.md`.
 The custom-image dropdown uses the coordinator's confirmed upload records, not the raw project image list.
 Keep upload availability ephemeral and scoped to the project/robot; edits replace immutable pixel buffers.
 The Images tab commits text and warns about pending uploads when it unmounts.
+
+Automatic restoration uses a fixed per-operation image snapshot and the existing
+project-image-upload-modal. Never resnapshot edits into an active job. Image
+mutations and ordinary robot requests are locked while the dialog is active;
+only acknowledged files advance completion, and Retry resumes the failed index.
+Internal interruption must settle the active transfer before releasing the lock.

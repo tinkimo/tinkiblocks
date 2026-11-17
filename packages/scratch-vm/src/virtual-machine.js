@@ -47,6 +47,9 @@ class VirtualMachine extends EventEmitter {
          */
         this.runtime = new Runtime();
         this.imageSync = new ImageSync(this.runtime);
+        this.runtime.on('TINKIBOT_IMAGE_SYNC_CHANGED', state => {
+            if (!state.blocking) this.emit('TINKIBOT_IMAGES_CHANGED');
+        });
         this.runtime.on('TINKIBOT_IMAGE_UPLOADS_CHANGED', () => {
             this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
             this.emit('TINKIBOT_IMAGES_CHANGED');
@@ -189,6 +192,7 @@ class VirtualMachine extends EventEmitter {
      * "Green flag" handler - start all threads starting with a green flag.
      */
     greenFlag () {
+        this.imageSync.assertInteractive();
         this.runtime.greenFlag();
     }
 
@@ -230,7 +234,7 @@ class VirtualMachine extends EventEmitter {
         this.runtime.tinkibotImages = ImageCollection.restore(data, () => {
             this.runtime.emitProjectChanged();
             this._notifyProjectImageChanges();
-        });
+        }, () => this.imageSync.assertInteractive());
         this._notifyProjectImageChanges();
     }
 
@@ -256,6 +260,7 @@ class VirtualMachine extends EventEmitter {
      * @returns {Promise<void>} Resolves after verified transfer completion.
      */
     async uploadProjectImage (id, progress) {
+        this.imageSync.assertInteractive();
         if (!this.runtime.uploadTinkibotImage) return Promise.reject(new Error('Robot extension is unavailable'));
         const collection = this.projectImages;
         await this.imageSync.wait();
@@ -362,6 +367,8 @@ class VirtualMachine extends EventEmitter {
      * @returns {!Promise} Promise that resolves after targets are installed.
      */
     loadProject (input) {
+        if (this.imageSync.blocking) return Promise.reject(new Error(
+            'Wait for project image uploading to finish'));
         const loadId = (this._projectLoadId || 0) + 1;
         this._projectLoadId = loadId;
         if (typeof input === 'object' && !(input instanceof ArrayBuffer) &&
@@ -450,6 +457,8 @@ class VirtualMachine extends EventEmitter {
      * @returns {string} Project in a Scratch 3.0 JSON representation.
      */
     saveProjectSb3 () {
+        if (this.imageSync.blocking) return Promise.reject(new Error(
+            'Wait for project image uploading to finish'));
         const soundDescs = serializeSounds(this.runtime);
         const costumeDescs = serializeCostumes(this.runtime);
         const projectJson = this.toJSON();

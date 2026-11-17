@@ -4,7 +4,7 @@ import {useIntl} from 'react-intl';
 import messages from './messages';
 import styles from './images-tab.css';
 
-const FilenameField = ({collection, image, onValidityChange}) => {
+const FilenameField = ({collection, image, onValidityChange, isLocked}) => {
     const intl = useIntl();
     const [value, setValue] = useState(image.name);
     const [error, setError] = useState('');
@@ -31,8 +31,9 @@ const FilenameField = ({collection, image, onValidityChange}) => {
         validate(next);
     }, [collection, validate]);
     const commit = useCallback(() => {
+        if (isLocked && isLocked()) return;
         if (validate(value) && value !== image.name) collection.rename(image.id, value);
-    }, [collection, image.id, image.name, validate, value]);
+    }, [collection, image.id, image.name, validate, value, isLocked]);
     const keyDown = useCallback(event => {
         if (event.key === 'Enter') event.target.blur();
     }, []);
@@ -62,6 +63,7 @@ const FilenameField = ({collection, image, onValidityChange}) => {
     );
 };
 FilenameField.propTypes = {
+    isLocked: PropTypes.func,
     collection: PropTypes.shape({
         normalizeName: PropTypes.func.isRequired,
         validateName: PropTypes.func.isRequired,

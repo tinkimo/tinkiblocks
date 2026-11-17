@@ -410,3 +410,58 @@ test('old literal user-image blocks migrate while built-ins and reporter inputs 
     t.ok(project.targets[0].blocks.reporterMenu);
     t.end();
 });
+
+
+test('modal restoration blocks image mutations, project controls and green flag until terminal', async t => {
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    let release;
+    vm.runtime.resetTinkibotImages = async () => new Promise(resolve => { release = resolve; });
+    vm.runtime.uploadTinkibotImage = async () => {};
+    const image = vm.projectImages.create('saved');
+    vm.runtime.tinkibotConnectedRobots = [{botUuid: 'robot', nickname: 'lime', claimState: 'paired'}];
+    vm.runtime.emit('PROJECT_LOADED');
+    t.throws(() => vm.projectImages.create('late'), /uploading/);
+    t.throws(() => vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH)), /uploading/);
+    t.throws(() => vm.projectImages.rename(image.id, 'late'), /uploading/);
+    t.throws(() => vm.projectImages.remove(image.id), /uploading/);
+    t.throws(() => vm.greenFlag(), /uploading/);
+    await t.rejects(vm.loadProject('{}'), /uploading/);
+    await t.rejects(vm.saveProjectSb3(), /uploading/);
+    release();
+    await vm.imageSync.wait();
+    t.doesNotThrow(() => vm.projectImages.create('after'));
+});
+
+test('normal robot requests cannot dispatch when a project restore starts during connection', async t => {
+    const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    const extension = new Tinkibot(vm.runtime);
+    extension._connectedRobots = [{botUuid: 'robot', nickname: 'lime', claimState: 'paired'}];
+    vm.runtime.tinkibotConnectedRobots = extension._connectedRobots;
+    vm.projectImages.create('saved');
+    let connect;
+    let began;
+    const connecting = new Promise(resolve => { began = resolve; });
+    extension.connect = async () => {
+        began();
+        await new Promise(resolve => { connect = resolve; });
+    };
+    let sent = 0;
+    extension._sendRobotRequest = () => { sent++; };
+    const command = extension._sendCommand({command: 'forward', distance: 10});
+    await connecting;
+    let restore;
+    vm.runtime.resetTinkibotImages = async () => new Promise(resolve => { restore = resolve; });
+    vm.runtime.uploadTinkibotImage = async () => {};
+    vm.runtime.emit('PROJECT_LOADED');
+    connect();
+    await t.rejects(command, /uploading/);
+    await t.rejects(extension.claimRobot('other'), /uploading/);
+    await t.rejects(extension.releaseRobot('robot'), /uploading/);
+    await t.rejects(extension.removeRobot('robot'), /uploading/);
+    restore();
+    await vm.imageSync.wait();
+    t.equal(sent, 0);
+});

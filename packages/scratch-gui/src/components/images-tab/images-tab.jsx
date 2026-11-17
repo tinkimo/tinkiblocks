@@ -135,6 +135,10 @@ const ImagesTab = ({vm}) => {
     const finishText = (apply = true, updateState = true) => {
         const draft = textDraftRef.current;
         if (!draft) return;
+        if (apply && vm.imageSync.blocking) {
+            if (!updateState) textDraftRef.current = null;
+            return;
+        }
         textDraftRef.current = null;
         if (updateState) setTextDraft(null);
         if (!current || draft.collection !== collection || draft.id !== current.id ||
@@ -146,7 +150,7 @@ const ImagesTab = ({vm}) => {
     // Outside-click and unmount handlers need the latest draft and formatting.
     finishTextRef.current = finishText;
     leaveWarningRef.current = () => {
-        if (vm.imageSync.pendingImages().length) window.alert(label('uploadBeforeLeaving'));
+        if (!vm.imageSync.blocking && vm.imageSync.pendingImages().length) window.alert(label('uploadBeforeLeaving'));
     };
     useEffect(() => {
         const finishOutside = event => {
@@ -441,6 +445,7 @@ const ImagesTab = ({vm}) => {
                 {current ? <div className={styles.content}>
                     <div className={styles.imageHeader}>
                         <FilenameField
+                            isLocked={() => vm.imageSync.blocking}
                             collection={collection}
                             image={current}
                             onValidityChange={setNameInvalid}

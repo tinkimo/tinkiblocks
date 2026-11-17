@@ -6,6 +6,7 @@ const ImageSync = require('../../src/tinkibot-images/sync');
 const robot = id => ({botUuid: id, nickname: id, claimState: 'paired'});
 const setup = () => {
     const runtime = new EventEmitter();
+    runtime.stopAll = () => {};
     runtime.tinkibotImages = new ImageCollection();
     runtime.tinkibotConnectedRobots = [];
     const calls = [];
@@ -101,6 +102,7 @@ test('project and robot switches never continue a stale upload list', async t =>
         }
     };
     h.runtime.emit('PROJECT_LOADED');
+    await Promise.resolve();
     h.runtime.emit('RUNTIME_DISPOSED');
     h.runtime.tinkibotImages = new ImageCollection();
     h.runtime.tinkibotImages.create('new-image');
@@ -161,30 +163,99 @@ test('an in-flight stale image settles before new-project cleanup and no old sec
     t.same(h.calls, [['reset', 'same'], ['upload', 'old-first'], ['reset', 'same'], ['upload', 'new-image']]);
 });
 
-test('edits made during sync restart from fresh pixels, but selection changes do not', async t => {
+test('one operation uploads its fixed snapshot exactly once and ignores later images', async t => {
     const h = setup();
     h.runtime.tinkibotConnectedRobots = [robot('one')];
-    const image = h.runtime.tinkibotImages.create('picture');
+    const first = h.runtime.tinkibotImages.create('first');
+    h.runtime.tinkibotImages.create('second');
     let release;
-    let first = true;
-    h.runtime.resetTinkibotImages = async () => {
-        if (first) {
-            first = false; await new Promise(resolve => {
-                release = resolve;
-            });
+    h.runtime.resetTinkibotImages = async () => new Promise(resolve => {
+        release = resolve;
+    });
+    h.runtime.emit('PROJECT_LOADED');
+    t.equal(h.sync.blocking, true);
+    await Promise.resolve();
+    h.runtime.tinkibotImages.update(first.id, new Uint8Array(first.pixels.length));
+    h.runtime.tinkibotImages.rename(first.id, 'changed');
+    h.runtime.tinkibotImages.create('late-image');
+    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
+    release();
+    await h.sync.wait();
+    t.same(h.calls, [['upload', 'one', 'first', 255], ['upload', 'one', 'second', 255]]);
+    t.equal(h.runtime.tinkibotImageSync.total, 2);
+    t.equal(h.runtime.tinkibotImageSync.completed, 2);
+    t.equal(h.sync.blocking, false);
+});
+
+test('retry resumes the failed snapshot without clearing or uploading completed images again', async t => {
+    const h = setup();
+    h.runtime.tinkibotConnectedRobots = [robot('one')];
+    h.runtime.tinkibotImages.create('first');
+    h.runtime.tinkibotImages.create('second');
+    let fail = true;
+    let staleProgress;
+    h.runtime.uploadTinkibotImage = async (image, progress) => {
+        h.calls.push(image.name);
+        if (image.name === 'second' && fail) {
+            staleProgress = progress;
+            throw new Error('storage full');
         }
     };
     h.runtime.emit('PROJECT_LOADED');
-    const generation = h.sync.generation;
-    h.runtime.tinkibotImages.select(image.id);
-    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
-    t.equal(h.sync.generation, generation);
-    h.runtime.tinkibotImages.update(image.id, new Uint8Array(image.pixels.length));
-    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
-    t.ok(h.sync.generation > generation);
-    release();
+    await t.rejects(h.sync.wait(), /storage full/);
+    t.equal(h.sync.blocking, true, 'failure stays modal until acknowledged');
+    t.equal(h.runtime.tinkibotImageSync.filename, 'second.rgb565');
+    t.equal(h.runtime.tinkibotImageSync.completed, 1);
+    staleProgress(98);
+    t.equal(h.runtime.tinkibotImageSync.phase, 'error', 'late progress cannot reopen a failed attempt');
+    fail = false;
+    h.sync.retry();
+    staleProgress(99);
+    t.equal(h.runtime.tinkibotImageSync.progress, 0, 'previous attempt callbacks cannot affect retry');
     await h.sync.wait();
-    t.same(h.calls, [['upload', 'one', 'picture', 0]]);
+    staleProgress(87);
+    t.equal(h.runtime.tinkibotImageSync.phase, 'ready');
+    t.same(h.calls, [['reset', 'one'], 'first', 'second', 'second']);
+    t.equal(h.sync.blocking, false);
+    t.equal(h.runtime.tinkibotImageSync.completed, 2);
+});
+
+test('disconnect and unmount wait for the active transfer to settle before unlocking', async t => {
+    for (const disconnect of [true, false]) {
+        const h = setup();
+        h.runtime.tinkibotConnectedRobots = [robot('one')];
+        h.runtime.tinkibotImages.create('first');
+        h.runtime.tinkibotImages.create('second');
+        let release;
+        let begin;
+        const began = new Promise(resolve => {
+            begin = resolve;
+        });
+        h.runtime.uploadTinkibotImage = async image => {
+            h.calls.push(image.name);
+            begin();
+            await new Promise(resolve => {
+                release = resolve;
+            });
+        };
+        h.runtime.emit('PROJECT_LOADED');
+        await began;
+        if (disconnect) {
+            h.runtime.tinkibotConnectedRobots = [];
+            h.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED');
+        } else h.sync.interrupt('Upload view closed');
+        t.equal(h.sync.blocking, true);
+        t.equal(h.sync.close(), false, 'cannot dismiss an active transfer');
+        release();
+        await h.sync.running;
+        t.same(h.calls, [['reset', 'one'], 'first']);
+        if (disconnect) {
+            t.equal(h.runtime.tinkibotImageSync.phase, 'error');
+            t.match(h.runtime.tinkibotImageSync.error, /disconnected/);
+            t.equal(h.sync.close(), true);
+        }
+        t.equal(h.sync.blocking, false);
+    }
 });
 
 test('reset polling preserves its token, handles busy, and rejects stale work', async t => {

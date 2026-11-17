@@ -360,3 +360,37 @@ test('manual upload waits while automatic project image restore is active', () =
     });
     expect(view.getByRole('button', {name: 'Upload to Robot'})).toBeEnabled();
 });
+
+test('modal focus changes do not commit a pending filename while uploads are blocked', () => {
+    const view = editor();
+    fireEvent.click(view.getByRole('button', {name: 'New image'}));
+    const field = view.getByLabelText('Image filename');
+    fireEvent.change(field, {target: {value: 'draft-name'}});
+    view.vm.imageSync.blocking = true;
+    fireEvent.blur(field);
+    expect(view.vm.projectImages.get().name).toBe('image1');
+    view.vm.imageSync.blocking = false;
+    fireEvent.blur(field);
+    expect(view.vm.projectImages.get().name).toBe('draft-name');
+});
+
+test('modal focus keeps a text draft uncommitted until editing is unlocked', () => {
+    window.PointerEvent = MouseEvent;
+    const view = editor();
+    fireEvent.click(view.getByRole('button', {name: 'New image'}));
+    fireEvent.click(view.getByRole('button', {name: 'Text', exact: true}));
+    const canvas = view.getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    const glyph = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    glyph[3] = 255;
+    context.getImageData = () => ({data: glyph});
+    fireEvent.pointerDown(canvas, {clientX: 10, clientY: 10, button: 0});
+    fireEvent.change(view.getByRole('textbox', {name: 'Text on image'}), {target: {value: 'Draft'}});
+    view.vm.imageSync.blocking = true;
+    fireEvent.focusIn(document.body);
+    expect(view.vm.projectImages.get().pixels[0]).toBe(255);
+    expect(view.getByRole('textbox', {name: 'Text on image'})).toHaveValue('Draft');
+    view.vm.imageSync.blocking = false;
+    fireEvent.focusIn(document.body);
+    expect(view.vm.projectImages.get().pixels[0]).toBe(0);
+});

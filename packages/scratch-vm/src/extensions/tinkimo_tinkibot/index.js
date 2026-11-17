@@ -1174,6 +1174,7 @@ class TinkibotBlocks {
     }
 
     async claimRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         const alreadyClaimingOrPaired = this._pendingClaims.size > 0 ||
             this._connectedRobots.some(connectedRobot => connectedRobot.botUuid !== botUuid &&
@@ -1181,6 +1182,7 @@ class TinkibotBlocks {
         if (!robot || robot.connected === false ||
             !['free', 'reserved', 'confirmable'].includes(robot.claimState) || alreadyClaimingOrPaired) return;
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingClaims.set(robot.botUuid, requestId);
         this._sendRobotRequest({
@@ -1193,9 +1195,11 @@ class TinkibotBlocks {
     }
 
     async releaseRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || !['paired', 'pending', 'reserved'].includes(robot.claimState)) return;
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingReleases.set(botUuid, requestId);
         this._sendRobotRequest({
@@ -1209,6 +1213,7 @@ class TinkibotBlocks {
     }
 
     async removeRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(item => item.botUuid === botUuid);
         if (!robot || robot.claimState === 'claimed' || this._pendingRemovals.has(botUuid)) return;
         if (robot.connected === false && (!this._connected || this.connectionManager.paused ||
@@ -1222,6 +1227,7 @@ class TinkibotBlocks {
             return;
         }
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingRemovals.set(botUuid, requestId);
         this._sendRobotRequest({'command': 'remove',
@@ -1316,7 +1322,7 @@ class TinkibotBlocks {
     }
 
     async uploadImage (image, progress = () => {}, context) {
-        if (!context && this.runtime.imageSync && this.runtime.imageSync.busy) await this.runtime.imageSync.wait();
+        if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         if (!context) {
             const collection = this.runtime.tinkibotImages;
             const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false);
@@ -1367,12 +1373,12 @@ class TinkibotBlocks {
     }
 
     _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null, context) {
-        if (!context && this.runtime.imageSync && this.runtime.imageSync.busy) {
-            return this.runtime.imageSync.wait().then(() =>
-                this._sendCommand(command, responseCommand, bundlePlan, sourceThread, {}));
+        if ((!context || !context.sync) && this.runtime.imageSync && this.runtime.imageSync.blocking) {
+            return Promise.reject(new Error('Wait for project image uploading to finish'));
         }
         this._queuedCommands++;
         const operation = this._commandQueue.then(async () => {
+            if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
             if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
             const candidates = this._connectedRobots.filter(connectedRobot => connectedRobot.claimState === 'paired' &&
@@ -1399,6 +1405,7 @@ class TinkibotBlocks {
             } else {
                 await this.connect();
             }
+            if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
             if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
             if (context && context.botUuid && !this._connectedRobots.some(item => item.botUuid === context.botUuid &&
@@ -1517,6 +1524,7 @@ class TinkibotBlocks {
 
     _runImageAction (opcode, args, util) {
         const sync = this.runtime.imageSync;
+        if (sync) sync.assertInteractive();
         if (sync && sync.busy && this.runtime.tinkibotImages.images.some(image => image.name === args.IMAGE)) {
             const captured = util && {thread: util.thread, sequencer: util.sequencer};
             return sync.wait().then(() => this._bundler.run(opcode, args, captured));

@@ -607,6 +607,7 @@ class Blocks extends React.Component {
         }
     }
     handleProjectImagesChanged (force = false) {
+        if (!this.props.vm.imageSync.projectReady || this.props.vm.imageSync.blocking) return;
         const names = this.props.vm.imageSync.uploadedNames();
         const signature = JSON.stringify(names);
         if (!force && signature === this._userImageBlockNames) return;

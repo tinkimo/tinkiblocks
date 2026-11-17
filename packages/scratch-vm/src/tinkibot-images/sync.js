@@ -1,6 +1,6 @@
 const uuid = require('uuid');
 
-/** Restore the active project's images to its currently claimed robot, one transfer at a time. */
+/** Restore a fixed project snapshot through the existing, sequential image uploader. */
 class ImageSync {
     constructor (runtime) {
         this.runtime = runtime;
@@ -9,8 +9,9 @@ class ImageSync {
         this.connectionEpoch = 0;
         this.generation = 0;
         this.key = null;
-        this.wanted = false;
+        this.wanted = null;
         this.running = null;
+        this.operation = null;
         this.uploaded = new Map();
         this.availableNames = '[]';
         runtime.imageSync = this;
@@ -26,15 +27,8 @@ class ImageSync {
         });
         runtime.on('TINKIBOT_CONNECTED_ROBOTS_CHANGED', () => this.request());
         runtime.on('TINKIBOT_IMAGE_SYNC_TRANSPORT_READY', () => this.request());
-        runtime.on('TINKIBOT_PROJECT_IMAGES_CHANGED', () => {
-            this.refreshAvailability();
-            if (!this.busy || !this.projectReady) return;
-            const images = runtime.tinkibotImages.images;
-            if (!this.observed || images.length !== this.observed.length || images.some((image, index) =>
-                image.id !== this.observed[index].id || image.name !== this.observed[index].name ||
-                image.pixels !== this.observed[index].pixels)) this.request(true);
-        });
-        this.status({phase: 'waiting', error: ''});
+        runtime.on('TINKIBOT_PROJECT_IMAGES_CHANGED', () => this.refreshAvailability());
+        this.status({phase: 'waiting', blocking: false, error: ''});
     }
 
     robot () {
@@ -57,6 +51,24 @@ class ImageSync {
         this.runtime.emit('TINKIBOT_IMAGE_SYNC_CHANGED', state);
     }
 
+    publish (operation, phase, update = {}) {
+        if (this.operation !== operation) return;
+        operation.phase = phase;
+        const image = operation.images[operation.completed];
+        this.status({operationId: operation.id,
+            blocking: true,
+            phase,
+            botUuid: operation.robot.botUuid,
+            robot: operation.robot.nickname,
+            image: image ? image.snapshot.name : '',
+            filename: image ? `${image.snapshot.name}.rgb565` : '',
+            completed: operation.completed,
+            total: operation.images.length,
+            progress: operation.progress,
+            canRetry: false,
+            ...update});
+    }
+
     connectionReady () {
         this.connectionEpoch++;
         this.request();
@@ -71,68 +83,143 @@ class ImageSync {
         this.generation++;
         this.uploaded.clear();
         this.refreshAvailability();
-        this.wanted = Boolean(key);
-        this.observed = this.runtime.tinkibotImages ?
-            this.runtime.tinkibotImages.images.map(image => ({...image})) : [];
         if (!key) {
-            this.status({phase: 'waiting', error: ''});
+            this.interrupt(this.projectReady ? 'Robot disconnected during project image upload' : 'Project changed',
+                !this.projectReady);
             return;
         }
+        const collection = this.runtime.tinkibotImages;
+        const operation = {
+            id: uuid.v4(),
+            key,
+            generation: this.generation,
+            collection,
+            robot: {...robot},
+            images: collection.images.map(image => ({source: {...image},
+                snapshot: {...image, pixels: new Uint8Array(image.pixels)}})),
+            completed: 0,
+            progress: 0,
+            cleared: false,
+            attempt: 0,
+            interruption: null
+        };
+        this.operation = operation;
+        this.wanted = operation;
+        this.publish(operation, 'clearing', {error: ''});
+        this.runtime.stopAll();
         this.start();
     }
 
     start () {
         if (!this.running && this.wanted) {
-            this.running = this.drain().finally(() => {
-                this.running = null;
-                this.start();
-            });
+            this.running = Promise.resolve().then(() => this.drain())
+                .finally(() => {
+                    this.running = null;
+                    this.start();
+                });
         }
     }
 
     async drain () {
         while (this.wanted) {
-            this.wanted = false;
-            const generation = this.generation;
-            const key = this.key;
-            const robot = this.robot();
-            const collection = this.runtime.tinkibotImages;
-            const valid = () => generation === this.generation && this.projectReady &&
-                this.runtime.tinkibotImages === collection && this.fingerprint(this.robot()) === key;
-            // Collection edits replace pixel buffers, so their identity tracks versions without scanning pixels.
-            const images = collection.images.map(image => ({...image}));
-            this.status({phase: 'clearing',
-                botUuid: robot.botUuid,
-                robot: robot.nickname,
-                total: images.length,
-                completed: 0,
-                image: '',
-                progress: 0,
-                error: ''});
+            const operation = this.wanted;
+            this.wanted = null;
+            const attempt = ++operation.attempt;
+            const valid = () => this.operation === operation && attempt === operation.attempt &&
+                !operation.interruption && this.projectReady && operation.generation === this.generation &&
+                operation.collection === this.runtime.tinkibotImages && this.key === operation.key &&
+                this.fingerprint(this.robot()) === operation.key;
             try {
-                const token = uuid.v4().replace(/-/g, '')
-                    .slice(0, 16);
-                await this.runtime.resetTinkibotImages(robot, token, valid);
-                if (!valid()) continue;
-                for (let index = 0; index < images.length && valid(); index++) {
-                    const image = images[index];
-                    this.status({phase: 'uploading', image: image.name, completed: index, progress: 0});
-                    const snapshot = {...image, pixels: new Uint8Array(image.pixels)};
-                    await this.runtime.uploadTinkibotImage(snapshot, progress => {
-                        if (valid() && progress !== this.runtime.tinkibotImageSync.progress) this.status({progress});
-                    }, {botUuid: robot.botUuid, valid, sync: true});
-                    this.recordUploaded(image, valid);
-                    if (valid()) this.status({completed: index + 1});
+                if (!valid()) throw new Error('Project image upload interrupted');
+                if (!operation.cleared) {
+                    const token = uuid.v4().replace(/-/g, '')
+                        .slice(0, 16);
+                    await this.runtime.resetTinkibotImages(operation.robot, token, valid);
+                    if (!valid()) throw new Error('Project image upload interrupted');
+                    // eslint-disable-next-line require-atomic-updates -- Only the serialized drain writes this flag.
+                    operation.cleared = true;
                 }
-                if (valid()) this.status({phase: 'ready', image: '', progress: 100});
+                // Only this operation's private snapshot supplies filenames, data and ordering.
+                while (operation.completed < operation.images.length) {
+                    if (!valid()) throw new Error('Project image upload interrupted');
+                    const image = operation.images[operation.completed];
+                    operation.progress = 0;
+                    this.publish(operation, 'uploading');
+                    await this.runtime.uploadTinkibotImage(image.snapshot, progress => {
+                        if (valid()) {
+                            operation.progress = progress;
+                            this.publish(operation, 'uploading');
+                        }
+                    }, {botUuid: operation.robot.botUuid, valid, sync: true});
+                    if (!valid()) throw new Error('Project image upload interrupted');
+                    this.recordUploaded(image.source, valid);
+                    operation.completed++;
+                }
+                operation.attempt++;
+                this.publish(operation, 'ready', {blocking: false, progress: 100, error: ''});
             } catch (error) {
-                if (valid()) this.status({phase: 'error', error: error.message});
+                if (this.operation !== operation) continue;
+                operation.attempt++;
+                if (operation.dismissOnSettle) {
+                    this.operation = null;
+                    this.status({phase: 'waiting', blocking: false, error: ''});
+                } else {
+                    this.publish(operation, 'error', {error: operation.interruption || error.message,
+                        canRetry: this.key === operation.key && this.fingerprint(this.robot()) === operation.key});
+                }
             }
         }
     }
 
     retry () {
-        this.request(true);
+        if (this.busy) return false;
+        const operation = this.operation;
+        if (operation && operation.phase === 'error' && this.key === operation.key &&
+            this.fingerprint(this.robot()) === operation.key) {
+            operation.interruption = null;
+            operation.progress = 0;
+            this.wanted = operation;
+            this.publish(operation, operation.cleared ? 'uploading' : 'clearing', {error: ''});
+            this.runtime.stopAll();
+            this.start();
+            return true;
+        }
+        return false;
+    }
+
+    close () {
+        if (this.busy || !this.operation || this.operation.phase !== 'error') return false;
+        this.status({blocking: false});
+        return true;
+    }
+
+    interrupt (reason, dismiss = true) {
+        this.generation++;
+        this.key = null;
+        this.wanted = null;
+        const operation = this.operation;
+        if (operation && this.blocking) {
+            operation.interruption = reason;
+            operation.dismissOnSettle = dismiss;
+            if (this.running) {
+                this.publish(operation, 'stopping');
+            } else if (dismiss) {
+                this.operation = null;
+                this.status({phase: 'waiting', blocking: false, error: ''});
+            } else {
+                this.publish(operation, 'error', {error: reason});
+            }
+        } else {
+            this.status({phase: 'waiting', blocking: false, error: ''});
+        }
+    }
+
+    get blocking () {
+        return Boolean(this.runtime.tinkibotImageSync.blocking);
+    }
+
+    assertInteractive () {
+        if (this.blocking) throw new Error('Wait for project image uploading to finish');
     }
 
     uploadedNames () {

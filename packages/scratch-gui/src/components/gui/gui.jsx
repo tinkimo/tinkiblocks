@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import omit from 'lodash.omit';
 import PropTypes from 'prop-types';
-import React, {useEffect, useCallback, useState} from 'react';
+import React, {useEffect, useCallback, useState, useRef} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import MediaQuery from 'react-responsive';
@@ -47,6 +47,7 @@ import codeIcon from './icon--code.svg';
 import costumesIcon from './icon--costumes.svg';
 import soundsIcon from './icon--sounds.svg';
 import DebugModal from '../debug-modal/debug-modal.jsx';
+import ProjectImageUploadModal from '../project-image-upload-modal/project-image-upload-modal.jsx';
 import {setPlatform} from '../../reducers/platform.js';
 import {setTheme} from '../../reducers/settings.js';
 import {PLATFORM} from '../../lib/platform.js';
@@ -216,6 +217,7 @@ const GUIComponent = props => {
     }
 
     const [connectionsChanged, setConnectionsChanged] = useState(false);
+    const workspaceRef = useRef(null);
 
     useEffect(() => {
         if (props.platform) {
@@ -290,6 +292,7 @@ const GUIComponent = props => {
         ) : (
             <ModalFocusProvider>
                 <Box
+                    componentRef={workspaceRef}
                     className={styles.pageWrapper}
                     dir={isRtl ? 'rtl' : 'ltr'}
                     {...componentProps}
@@ -652,6 +655,11 @@ const GUIComponent = props => {
                     </Box>
                     <DragLayer />
                 </Box>
+                <ProjectImageUploadModal
+                    isRtl={isRtl}
+                    runtime={vm.runtime}
+                    workspaceRef={workspaceRef}
+                />
             </ModalFocusProvider>
         );
     }}</MediaQuery>);
