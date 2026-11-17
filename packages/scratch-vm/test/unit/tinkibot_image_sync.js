@@ -19,6 +19,56 @@ const setup = () => {
     return {runtime, sync, calls};
 };
 
+test('only successfully uploaded current image versions are available', async t => {
+    const h = setup();
+    h.runtime.tinkibotConnectedRobots = [robot('one')];
+    const first = h.runtime.tinkibotImages.create('first');
+    h.runtime.emit('PROJECT_LOADED');
+    await h.sync.wait();
+    t.same(h.sync.uploadedNames(), ['first'], 'restoration records confirmed uploads');
+    const second = h.runtime.tinkibotImages.create('second');
+    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
+    t.same(h.sync.uploadedNames(), ['first'], 'new images stay out of the dropdown');
+    t.same(h.sync.pendingImages().map(image => image.name), ['second']);
+    const before = {...first};
+    h.runtime.tinkibotImages.update(first.id, new Uint8Array(first.pixels));
+    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
+    t.same(h.sync.uploadedNames(), [], 'edits are tracked even when pixels happen to match');
+    h.sync.recordUploaded(before, () => true);
+    t.same(h.sync.uploadedNames(), [], 'an older upload cannot mark a newer edit uploaded');
+    h.sync.recordUploaded({...first}, () => true);
+    t.same(h.sync.uploadedNames(), ['first']);
+    h.runtime.tinkibotImages.select(second.id);
+    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
+    t.same(h.sync.uploadedNames(), ['first'], 'selection alone does not require upload');
+    h.runtime.tinkibotImages.rename(first.id, 'renamed');
+    h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
+    t.same(h.sync.uploadedNames(), [], 'a new robot filename needs upload');
+    h.sync.recordUploaded({...first}, () => false);
+    t.same(h.sync.uploadedNames(), [], 'stale robot/project completion is ignored');
+});
+
+test('failed restoration only exposes images confirmed before the failure', async t => {
+    const h = setup();
+    h.runtime.tinkibotConnectedRobots = [robot('one')];
+    h.runtime.tinkibotImages.create('first');
+    h.runtime.tinkibotImages.create('second');
+    h.runtime.uploadTinkibotImage = async image => {
+        if (image.name === 'second') throw new Error('transfer failed');
+    };
+    h.runtime.emit('PROJECT_LOADED');
+    await t.rejects(h.sync.wait(), /transfer failed/);
+    t.same(h.sync.uploadedNames(), ['first']);
+    t.same(h.sync.pendingImages().map(image => image.name), ['second']);
+    h.runtime.tinkibotConnectedRobots = [robot('other')];
+    h.runtime.resetTinkibotImages = async () => {
+        throw new Error('not ready');
+    };
+    h.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED');
+    await t.rejects(h.sync.wait(), /not ready/);
+    t.same(h.sync.uploadedNames(), [], 'uploads to another robot cannot be reused');
+});
+
 test('loads project images after clearing and also clears empty projects on a claim', async t => {
     const h = setup();
     h.runtime.tinkibotImages.create('first');

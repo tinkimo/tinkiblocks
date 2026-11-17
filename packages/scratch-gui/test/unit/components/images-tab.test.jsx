@@ -25,6 +25,7 @@ beforeEach(() => {
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context);
     HTMLCanvasElement.prototype.setPointerCapture = jest.fn();
     window.confirm = jest.fn(() => true);
+    jest.spyOn(window, 'alert').mockImplementation(() => {});
 });
 afterEach(() => jest.restoreAllMocks());
 
@@ -32,6 +33,7 @@ const editor = () => {
     const vm = new EventEmitter();
     vm.runtime = new EventEmitter();
     vm.runtime.tinkibotConnectedRobots = [];
+    vm.imageSync = {pendingImages: () => []};
     vm.projectImages = new ImageCollection(() => vm.emit('TINKIBOT_IMAGES_CHANGED'));
     vm.uploadProjectImage = jest.fn(() => Promise.resolve());
     const view = render(<IntlProvider locale="en"><ImagesTab vm={vm} /></IntlProvider>);
@@ -306,6 +308,7 @@ test('a loaded project discards a text draft belonging to the previous project',
 test('leaving the Images tab finishes text before the editor unmounts', () => {
     window.PointerEvent = MouseEvent;
     const {getByRole, getByLabelText, unmount, vm} = editor();
+    vm.imageSync.pendingImages = () => vm.projectImages.images.filter(image => image.pixels[0] !== 255);
     fireEvent.click(getByRole('button', {name: 'New image'}));
     fireEvent.click(getByRole('button', {name: 'Text', exact: true}));
     const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
@@ -317,6 +320,27 @@ test('leaving the Images tab finishes text before the editor unmounts', () => {
     fireEvent.change(getByRole('textbox', {name: 'Text on image'}), {target: {value: 'Keep me'}});
     unmount();
     expect(Array.from(vm.projectImages.get().pixels.slice(0, 3))).toEqual([0, 0, 0]);
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Upload to Robot'));
+});
+
+test('leaving Images warns for new images but not when all images are uploaded or deleted', () => {
+    const view = editor();
+    view.vm.imageSync.pendingImages = () => view.vm.projectImages.images;
+    fireEvent.click(view.getByRole('button', {name: 'New image'}));
+    view.unmount();
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    window.alert.mockClear();
+    const uploaded = editor();
+    fireEvent.click(uploaded.getByRole('button', {name: 'New image'}));
+    uploaded.unmount();
+    expect(window.alert).not.toHaveBeenCalled();
+    const empty = editor();
+    empty.vm.imageSync.pendingImages = () => empty.vm.projectImages.images;
+    fireEvent.click(empty.getByRole('button', {name: 'New image'}));
+    fireEvent.click(empty.getByRole('button', {name: 'Delete', exact: true}));
+    empty.unmount();
+    expect(window.alert).not.toHaveBeenCalled();
 });
 
 

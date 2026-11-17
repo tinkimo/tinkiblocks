@@ -35,7 +35,12 @@ const ImageSyncStatus = ({runtime}) => {
                     value={state.progress}
                 />
             </React.Fragment> : null}
-            {state.phase === 'ready' ? <FormattedMessage
+            {state.phase === 'ready' && state.pending ? <FormattedMessage
+                id="gui.imageSync.pending"
+                defaultMessage="{count, plural, one {# image needs} other {# images need}} uploading before use."
+                description="New or edited images are unavailable in robot blocks until uploaded"
+                values={{count: state.pending}}
+            /> : state.phase === 'ready' ? <FormattedMessage
                 id="gui.imageSync.ready"
                 defaultMessage="Project images restored to {robot}."
                 description="All project images have been synchronised to the claimed robot"

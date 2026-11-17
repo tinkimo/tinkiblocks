@@ -224,3 +224,7 @@ Project image restoration is coordinated by `packages/scratch-vm/src/tinkibot-im
 Preserve project-generation guards, UUID-pinned transfers and claim checks when changing lifecycle events.
 The matching firmware/proxy/modem `reset_images` operation clears only uploaded user RGB565 files.
 See `packages/scratch-vm/docs/tinkibot-image-editor.md`.
+
+The custom-image dropdown uses the coordinator's confirmed upload records, not the raw project image list.
+Keep upload availability ephemeral and scoped to the project/robot; edits replace immutable pixel buffers.
+The Images tab commits text and warns about pending uploads when it unmounts.

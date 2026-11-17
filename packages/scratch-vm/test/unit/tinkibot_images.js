@@ -188,40 +188,96 @@ test('TFP errors cancel the transfer and never report success', async t => {
 });
 
 
-test('user images have a separate disabled-empty display block and menu', t => {
+const prepareImageUploads = async vm => {
+    const runtime = vm.runtime;
+    runtime.resetTinkibotImages = async () => {};
+    runtime.uploadTinkibotImage = async () => {};
+    runtime.tinkibotConnectedRobots = [{botUuid: 'robot', nickname: 'lime', claimState: 'paired'}];
+    runtime.emit('PROJECT_LOADED');
+    await vm.imageSync.wait();
+};
+
+test('manual uploads confirm the sent snapshot only after success', async t => {
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    await prepareImageUploads(vm);
+    const image = vm.projectImages.create('picture');
+    let begin;
+    let release;
+    const started = new Promise(resolve => { begin = resolve; });
+    vm.runtime.uploadTinkibotImage = async snapshot => {
+        t.not(snapshot.pixels, image.pixels, 'upload data is an independent snapshot');
+        begin();
+        await new Promise(resolve => { release = resolve; });
+    };
+    const upload = vm.uploadProjectImage(image.id);
+    await started;
+    t.same(vm.imageSync.uploadedNames(), [], 'an upload in flight is not available');
+    vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH));
+    release();
+    await upload;
+    t.same(vm.imageSync.uploadedNames(), [], 'editing during upload still needs another upload');
+    vm.runtime.uploadTinkibotImage = async () => { throw new Error('transfer failed'); };
+    await t.rejects(vm.uploadProjectImage(image.id), /transfer failed/);
+    t.same(vm.imageSync.uploadedNames(), []);
+    vm.runtime.uploadTinkibotImage = async () => {};
+    await vm.uploadProjectImage(image.id);
+    t.same(vm.imageSync.uploadedNames(), ['picture']);
+    t.same(vm.imageSync.pendingImages(), []);
+});
+
+test('user image menus only offer uploaded current versions', async t => {
     const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
-    const runtime = {emit: () => {}, tinkibotImages: new ImageCollection()};
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    const runtime = vm.runtime;
     const extension = new Tinkibot(runtime);
+    await prepareImageUploads(vm);
     const block = () => extension.getInfos().find(info => info.id === 'tinkibotDisplay')
         .blocks.find(info => info.opcode === 'display_user_image');
     t.equal(block().disabled, true);
     t.same(extension.getUserImageOptions(), [{text: 'no images', value: '__no_images__'}]);
     t.ok(extension.getProjectImageOptions().includes('logo'));
-    const image = runtime.tinkibotImages.create('rainbow');
+    const image = vm.projectImages.create('rainbow');
+    t.equal(block().disabled, true, 'creating an image does not upload it');
+    await vm.uploadProjectImage(image.id);
     t.equal(block().disabled, false);
     t.same(extension.getUserImageOptions(), ['rainbow']);
     t.notOk(extension.getProjectImageOptions().includes('rainbow'));
     t.ok(extension.getProjectPreloadImageOptions().includes('rainbow'));
-    runtime.tinkibotImages.rename(image.id, 'sunshine');
+    vm.projectImages.rename(image.id, 'sunshine');
+    t.same(extension.getUserImageNames(), []);
+    t.notOk(extension.getProjectPreloadImageOptions().includes('sunshine'));
+    await vm.uploadProjectImage(image.id);
     t.same(extension.getUserImageOptions(), ['sunshine']);
-    runtime.tinkibotImages.remove(image.id);
+    vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH));
+    t.same(extension.getUserImageNames(), [], 'editing removes the uploaded version from the menu');
+    vm.projectImages.remove(image.id);
     t.equal(block().disabled, true);
     t.equal(block().arguments.IMAGE.defaultValue, '__no_images__');
-    t.end();
 });
 
-test('user image commands cannot send the empty or stale menu value', async t => {
+test('user image commands cannot send empty, unuploaded, edited or deleted values', async t => {
     const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
-    const runtime = {emit: () => {}, tinkibotImages: new ImageCollection()};
-    const extension = new Tinkibot(runtime);
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    const extension = new Tinkibot(vm.runtime);
+    await prepareImageUploads(vm);
     const commands = [];
     extension._sendCommand = command => { commands.push(command); return Promise.resolve(); };
     await extension.display_user_image({IMAGE: '__no_images__'});
+    const image = vm.projectImages.create('my-picture');
+    await extension.display_user_image({IMAGE: image.name});
+    await extension.preload_image({IMAGE: image.name});
     t.equal(commands.length, 0);
-    const image = runtime.tinkibotImages.create('my-picture');
+    await vm.uploadProjectImage(image.id);
     await extension.display_user_image({IMAGE: image.name});
     t.same(commands, [{command: 'display_image', image: 'my-picture'}]);
-    runtime.tinkibotImages.remove(image.id);
+    vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH));
+    await extension.display_user_image({IMAGE: image.name});
+    await extension.preload_image({IMAGE: image.name});
+    t.equal(commands.length, 1);
+    vm.projectImages.remove(image.id);
     await extension.display_user_image({IMAGE: 'my-picture'});
     t.equal(commands.length, 1);
 });
@@ -302,7 +358,11 @@ test('the toolbox disables the empty user image block and refreshes its default'
     const xml = () => vm.runtime.getBlocksXML().find(category => category.id === 'tinkibotDisplay').xml;
     t.match(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
     t.match(xml(), /<field name="IMAGE">__no_images__<\/field>/);
+    await prepareImageUploads(vm);
     const image = vm.projectImages.create('my-picture');
+    await vm.extensionManager.refreshBlocks();
+    t.match(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
+    await vm.uploadProjectImage(image.id);
     await vm.extensionManager.refreshBlocks();
     t.notMatch(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
     t.match(xml(), /<field name="IMAGE">my-picture<\/field>/);

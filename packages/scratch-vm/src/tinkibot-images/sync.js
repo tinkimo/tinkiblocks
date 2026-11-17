@@ -11,6 +11,8 @@ class ImageSync {
         this.key = null;
         this.wanted = false;
         this.running = null;
+        this.uploaded = new Map();
+        this.availableNames = '[]';
         runtime.imageSync = this;
         runtime.retryTinkibotImageSync = () => this.retry();
         runtime.on('PROJECT_LOADED', () => {
@@ -25,6 +27,7 @@ class ImageSync {
         runtime.on('TINKIBOT_CONNECTED_ROBOTS_CHANGED', () => this.request());
         runtime.on('TINKIBOT_IMAGE_SYNC_TRANSPORT_READY', () => this.request());
         runtime.on('TINKIBOT_PROJECT_IMAGES_CHANGED', () => {
+            this.refreshAvailability();
             if (!this.busy || !this.projectReady) return;
             const images = runtime.tinkibotImages.images;
             if (!this.observed || images.length !== this.observed.length || images.some((image, index) =>
@@ -66,6 +69,8 @@ class ImageSync {
         if (!force && this.key === key) return;
         this.key = key;
         this.generation++;
+        this.uploaded.clear();
+        this.refreshAvailability();
         this.wanted = Boolean(key);
         this.observed = this.runtime.tinkibotImages ?
             this.runtime.tinkibotImages.images.map(image => ({...image})) : [];
@@ -94,7 +99,8 @@ class ImageSync {
             const collection = this.runtime.tinkibotImages;
             const valid = () => generation === this.generation && this.projectReady &&
                 this.runtime.tinkibotImages === collection && this.fingerprint(this.robot()) === key;
-            const images = collection.images.map(image => ({...image, pixels: new Uint8Array(image.pixels)}));
+            // Collection edits replace pixel buffers, so their identity tracks versions without scanning pixels.
+            const images = collection.images.map(image => ({...image}));
             this.status({phase: 'clearing',
                 botUuid: robot.botUuid,
                 robot: robot.nickname,
@@ -111,9 +117,11 @@ class ImageSync {
                 for (let index = 0; index < images.length && valid(); index++) {
                     const image = images[index];
                     this.status({phase: 'uploading', image: image.name, completed: index, progress: 0});
-                    await this.runtime.uploadTinkibotImage(image, progress => {
+                    const snapshot = {...image, pixels: new Uint8Array(image.pixels)};
+                    await this.runtime.uploadTinkibotImage(snapshot, progress => {
                         if (valid() && progress !== this.runtime.tinkibotImageSync.progress) this.status({progress});
                     }, {botUuid: robot.botUuid, valid, sync: true});
+                    this.recordUploaded(image, valid);
                     if (valid()) this.status({completed: index + 1});
                 }
                 if (valid()) this.status({phase: 'ready', image: '', progress: 100});
@@ -125,6 +133,43 @@ class ImageSync {
 
     retry () {
         this.request(true);
+    }
+
+    uploadedNames () {
+        if (!this.projectReady || !this.key || this.key !== this.fingerprint(this.robot())) return [];
+        return this.runtime.tinkibotImages.images.filter(image => {
+            const uploaded = this.uploaded.get(image.id);
+            return uploaded && uploaded.name === image.name && uploaded.pixels === image.pixels;
+        }).map(image => image.name);
+    }
+
+    pendingImages () {
+        const available = new Set(this.uploadedNames());
+        return this.runtime.tinkibotImages.images.filter(image => !available.has(image.name));
+    }
+
+    recordUploaded (image, valid) {
+        if (!valid()) return;
+        this.uploaded.set(image.id, {...image});
+        this.refreshAvailability();
+    }
+
+    refreshAvailability () {
+        const images = this.runtime.tinkibotImages ? this.runtime.tinkibotImages.images : [];
+        for (const [id, uploaded] of this.uploaded) {
+            if (!images.some(image => image.id === id && image.name === uploaded.name &&
+                image.pixels === uploaded.pixels)) this.uploaded.delete(id);
+        }
+        const names = this.uploadedNames();
+        const pending = images.length - names.length;
+        if (!this.runtime.tinkibotImageSync || pending !== this.runtime.tinkibotImageSync.pending) {
+            this.status({pending});
+        }
+        const signature = JSON.stringify(names);
+        if (signature !== this.availableNames) {
+            this.availableNames = signature;
+            this.runtime.emit('TINKIBOT_IMAGE_UPLOADS_CHANGED');
+        }
     }
 
     get busy () {

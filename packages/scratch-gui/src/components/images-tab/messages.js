@@ -393,6 +393,11 @@ export default defineMessages({
         defaultMessage: 'Drag to select an area, then drag inside it to move.',
         description: 'Image editor: selectionHint'
     },
+    uploadBeforeLeaving: {
+        id: 'gui.images.uploadBeforeLeaving',
+        defaultMessage: 'New or edited images need uploading. Use Upload to Robot before using them in blocks.',
+        description: 'Warning when leaving the Images tab with images that need uploading'
+    },
     savedHint: {
         id: 'gui.images.savedHint',
         defaultMessage: 'Images are saved with your project. They sync when you load it or connect a claimed robot.',

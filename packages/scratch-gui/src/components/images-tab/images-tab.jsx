@@ -58,6 +58,7 @@ const ImagesTab = ({vm}) => {
     const textInput = useRef(null);
     const textDraftRef = useRef(null);
     const finishTextRef = useRef(null);
+    const leaveWarningRef = useRef(null);
     const canvas = useRef(null);
     const preview = useRef(null);
     const root = useRef(null);
@@ -144,6 +145,9 @@ const ImagesTab = ({vm}) => {
     };
     // Outside-click and unmount handlers need the latest draft and formatting.
     finishTextRef.current = finishText;
+    leaveWarningRef.current = () => {
+        if (vm.imageSync.pendingImages().length) window.alert(label('uploadBeforeLeaving'));
+    };
     useEffect(() => {
         const finishOutside = event => {
             if (root.current && !root.current.contains(event.target)) finishTextRef.current();
@@ -154,6 +158,7 @@ const ImagesTab = ({vm}) => {
             document.removeEventListener('pointerdown', finishOutside, true);
             document.removeEventListener('focusin', finishOutside, true);
             finishTextRef.current(true, false);
+            leaveWarningRef.current();
         };
     }, []);
     useEffect(() => {
@@ -679,6 +684,7 @@ const ImagesTab = ({vm}) => {
 };
 ImagesTab.propTypes = {
     vm: PropTypes.shape({
+        imageSync: PropTypes.shape({pendingImages: PropTypes.func.isRequired}).isRequired,
         on: PropTypes.func.isRequired,
         removeListener: PropTypes.func.isRequired,
         uploadProjectImage: PropTypes.func.isRequired,

@@ -1281,8 +1281,7 @@ class TinkibotBlocks {
     }
 
     getUserImageNames () {
-        const images = this.runtime.tinkibotImages;
-        return images ? images.images.map(image => image.name) : [];
+        return this.runtime.imageSync ? this.runtime.imageSync.uploadedNames() : [];
     }
 
     getUserImageOptions () {
@@ -1290,7 +1289,7 @@ class TinkibotBlocks {
         return names.length ? names : [{text: formatMessage({
             id: 'tinkibot.noUserImages',
             default: 'no images',
-            description: 'Empty dropdown when the project has no user-created images'
+            description: 'Empty dropdown when no current project images have been uploaded to the robot'
         }), value: '__no_images__'}];
     }
 
@@ -1518,7 +1517,7 @@ class TinkibotBlocks {
 
     _runImageAction (opcode, args, util) {
         const sync = this.runtime.imageSync;
-        if (sync && this.getUserImageNames().includes(args.IMAGE)) {
+        if (sync && sync.busy && this.runtime.tinkibotImages.images.some(image => image.name === args.IMAGE)) {
             const captured = util && {thread: util.thread, sequencer: util.sequencer};
             return sync.wait().then(() => this._bundler.run(opcode, args, captured));
         }

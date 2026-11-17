@@ -97,15 +97,16 @@ are independent. Display has a separate “display my image” command whose
 dropdown contains only
 current project filenames. It is disabled with “no images” when the gallery is
 empty, including existing workspace instances. Disabled custom-image blocks keep
-their normal category colour while the label and dropdown text turn grey. Creating images re-enables it;
-renaming/removing images refreshes the dropdown and repairs missing selections.
+their normal category colour while the label and dropdown text turn grey. Successfully uploading an image enables it. New images, renames and edits remain
+unavailable until their current version is uploaded. Removing an image refreshes
+the dropdown and repairs missing selections.
 Literal user-image choices in older project scripts migrate to the new block
 on load, preserving block IDs and connections. Built-in choices and reporter
 inputs remain unchanged. The original display-image dropdown contains only
 built-ins. Preload continues
-to include both built-ins and project filenames. Empty/stale user-image values
-are no-ops and cannot send robot commands. Filename changes refresh block
-metadata; pixel edits do not rebuild the toolbox. Image uploads use
+to include both built-ins and uploaded project filenames. Empty/stale user-image values
+are no-ops and cannot send robot commands. Filename and upload-availability changes refresh block metadata. Editing an uploaded
+image removes it from the menu once; further pixel edits do not rebuild the toolbox. Image uploads use
 `<name>.rgb565` under `/files/user/`.
 
 Upload requires one connected robot claimed by this client. It shares the existing
@@ -214,3 +215,17 @@ Deploy the matching robot firmware and proxy or USB modem software: automatic
 sync uses the accepted-claim `reset_images` RPC before existing 40,960-byte image
 uploads. Older software reports a visible sync failure rather than leaving stale
 images silently available. Robot display rotation is unchanged.
+
+
+Upload availability belongs to the active project and claimed robot; it is not
+saved in project metadata. The sync coordinator records each confirmed upload's
+image ID, filename and immutable pixel-buffer identity. Tinkiblocks edits replace
+that buffer, so tracking needs no pixel comparisons or remote file reads. A
+changed filename or buffer requires upload again. Successful automatic restores
+and manual uploads both update the record; failed, pending or superseded uploads
+never mark newer edits available. Robot/project changes clear these records.
+
+Leaving the Images tab with any new or edited image that still needs upload shows
+an alert explaining Upload to Robot and the display my image block. Pending text
+is committed before checking. The ready status also shows an upload reminder
+while edits are pending; selecting images alone does not mark them changed.

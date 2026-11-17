@@ -47,6 +47,10 @@ class VirtualMachine extends EventEmitter {
          */
         this.runtime = new Runtime();
         this.imageSync = new ImageSync(this.runtime);
+        this.runtime.on('TINKIBOT_IMAGE_UPLOADS_CHANGED', () => {
+            this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
+            this.emit('TINKIBOT_IMAGES_CHANGED');
+        });
         this.resetProjectImages();
         centralDispatch.setService('runtime', this.runtime).catch(e => {
             log.error(`Failed to register runtime service: ${JSON.stringify(e)}`);
@@ -256,8 +260,17 @@ class VirtualMachine extends EventEmitter {
         const collection = this.projectImages;
         await this.imageSync.wait();
         if (collection !== this.projectImages) throw new Error('Project changed before image upload');
-        const image = collection.get(id);
-        return this.runtime.uploadTinkibotImage(image, progress);
+        const image = {...collection.get(id)};
+        const sync = this.imageSync;
+        const generation = sync.generation;
+        const key = sync.key;
+        const valid = () => collection === this.projectImages && generation === sync.generation &&
+            key === sync.fingerprint(sync.robot());
+        const context = {botUuid: sync.robot().botUuid, valid};
+        const result = await this.runtime.uploadTinkibotImage({...image, pixels: new Uint8Array(image.pixels)},
+            progress, context);
+        sync.recordUploaded(image, valid);
+        return result;
     }
 
     /**
