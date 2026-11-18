@@ -394,3 +394,53 @@ test('modal focus keeps a text draft uncommitted until editing is unlocked', () 
     fireEvent.focusIn(document.body);
     expect(view.vm.projectImages.get().pixels[0]).toBe(0);
 });
+
+test('import uses the shared modal with a live sketchpad preview, fit choice and safe dismissal', () => {
+    const ReactModal = require('react-modal');
+    const view = editor();
+    ReactModal.setAppElement(view.container);
+    const NativeImage = window.Image;
+    const oldCreate = URL.createObjectURL;
+    const oldRevoke = URL.revokeObjectURL;
+    let loaded;
+    window.Image = class {
+        constructor () {
+            this.width = 256; this.height = 140; loaded = this;
+        }
+    };
+    URL.createObjectURL = jest.fn(() => 'blob:import');
+    URL.revokeObjectURL = jest.fn();
+    try {
+        const open = () => {
+            fireEvent.change(view.container.querySelector('input[type="file"]'),
+                {target: {files: [new File(['image'], 'drawing.png', {type: 'image/png'})]}});
+            act(() => loaded.onload());
+        };
+        open();
+        const dialog = view.getByRole('dialog', {name: 'Import preview'});
+        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(view.container).toHaveAttribute('aria-hidden', 'true');
+        expect(view.getByRole('img', {name: /robot’s sketchpad/}).querySelector('canvas'))
+            .toHaveAttribute('width', '128');
+        expect(dialog.querySelector('img[aria-hidden="true"]')).toHaveAttribute('alt', '');
+        expect(view.vm.projectImages.images).toHaveLength(0);
+        fireEvent.change(view.getByLabelText('Image fit'), {target: {value: 'crop'}});
+        expect(context.drawImage).toHaveBeenCalledWith(loaded, -64, 0, 256, 140);
+        fireEvent.click(view.getByRole('button', {name: 'Add image'}));
+        expect(view.vm.projectImages.images).toHaveLength(1);
+        expect(view.queryByRole('dialog')).toBeNull();
+        open();
+        fireEvent.keyDown(view.getByRole('dialog'), {key: 'Escape', keyCode: 27});
+        expect(view.queryByRole('dialog')).toBeNull();
+        expect(view.vm.projectImages.images).toHaveLength(1);
+        expect(view.container).not.toHaveAttribute('aria-hidden');
+        open();
+        fireEvent.click(view.getByRole('button', {name: 'Cancel'}));
+        expect(view.queryByRole('dialog')).toBeNull();
+        expect(view.vm.projectImages.images).toHaveLength(1);
+    } finally {
+        window.Image = NativeImage;
+        URL.createObjectURL = oldCreate;
+        URL.revokeObjectURL = oldRevoke;
+    }
+});

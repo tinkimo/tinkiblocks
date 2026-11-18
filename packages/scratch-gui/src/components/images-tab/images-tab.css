@@ -169,25 +169,6 @@
     margin: 3rem auto;
     max-width: 22rem;
 }
-.import-panel {
-    width: fit-content;
-    max-width: 760px;
-    position: sticky;
-    bottom: 0;
-    padding: 1rem;
-    border: 2px solid $motion-primary;
-    border-radius: 0.75rem;
-    background: $ui-white;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    box-shadow: 0 0.5rem 2rem $ui-black-transparent;
-}
-.import-panel canvas {
-    width: 128px;
-    height: 140px;
-}
 @media (max-width: 700px) {
     .gallery {
         flex-basis: 7rem;

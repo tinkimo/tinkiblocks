@@ -8,6 +8,7 @@ import styles from './images-tab.css';
 import FilenameField from './filename-field';
 import RobotPreview from './robot-preview';
 import ToolIcon from './tool-icon';
+import ImageImportModal from './image-import-modal';
 import ImageSyncStatus from '../image-sync-status/image-sync-status';
 import {WIDTH, HEIGHT, HISTORY_LIMIT, point, rgb, hex, colourAt, line, fill, shape, region,
     copyRegion, pasteRegion, eraseRegion, imageCanvas, text, importCanvas} from './pixels';
@@ -307,6 +308,7 @@ const ImagesTab = ({vm}) => {
     };
     const shortcut = event => {
         event.stopPropagation();
+        if (imported) return;
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
         const key = event.key.toLowerCase();
         if (event.ctrlKey || event.metaKey) {
@@ -665,31 +667,22 @@ const ImagesTab = ({vm}) => {
                     role="alert"
                     className={styles.error}
                 >{error}</p> : null}
-                {imported ? <div
-                    className={styles.importPanel}
-                    role="dialog"
-                    aria-label={label('importTitle')}
-                >
-                    <h3>{label('importTitle')}</h3>
-                    <Thumbnail pixels={importPixels} />
-                    <label>{label('strategy')} <select
-                        value={fit}
-                        onChange={event => setFit(event.target.value)}
-                    >
-                        <option value="contain">{label('contain')}</option><option value="crop">{label('crop')}</option>
-                    </select></label>
-                    {button('add', () => {
+                {imported ? <ImageImportModal
+                    preview={<Thumbnail pixels={importPixels} />}
+                    fit={fit}
+                    onFitChange={setFit}
+                    onAdd={() => {
                         collection.create(null, importPixels); setImported(null);
-                    })}
-                    {button('cancel', () => setImported(null))}
-                </div> : null}
+                    }}
+                    onCancel={() => setImported(null)}
+                /> : null}
             </main>
         </section>
     );
 };
 ImagesTab.propTypes = {
     vm: PropTypes.shape({
-        imageSync: PropTypes.shape({pendingImages: PropTypes.func.isRequired}).isRequired,
+        imageSync: PropTypes.shape({pendingImages: PropTypes.func.isRequired, blocking: PropTypes.bool}).isRequired,
         on: PropTypes.func.isRequired,
         removeListener: PropTypes.func.isRequired,
         uploadProjectImage: PropTypes.func.isRequired,

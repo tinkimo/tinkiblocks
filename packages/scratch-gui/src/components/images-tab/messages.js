@@ -363,6 +363,16 @@ export default defineMessages({
         defaultMessage: 'Fill and crop edges',
         description: 'Image editor: crop'
     },
+    importHint: {
+        id: 'gui.images.importHint',
+        defaultMessage: 'See how your picture will look. Choose a fit, then add it to your images.',
+        description: 'Guidance beneath the robot sketchpad in the image import dialog'
+    },
+    importPreview: {
+        id: 'gui.images.importPreview',
+        defaultMessage: 'Preview of the imported image on the robot’s sketchpad',
+        description: 'Accessible label for the live image import preview'
+    },
     importTitle: {
         id: 'gui.images.importTitle',
         defaultMessage: 'Import preview',

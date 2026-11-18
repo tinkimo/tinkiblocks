@@ -240,3 +240,9 @@ Image compression is opt-in through the `rgb565-rle1` TFP negotiation token.
 Preserve raw fallback and unchanged TFP v1 packet metadata. Only smaller packed
 40,960-byte RGB565 images may use it; the robot must verify bounded expansion
 before COMPLETE and store raw bytes. See the image/file transfer documentation.
+
+
+Image import uses the shared Modal in `images-tab/image-import-modal.jsx`.
+Its robot/sketchpad artwork is decorative; keep the live native-size canvas on
+its paper so contain/crop previews always match the pixels added to the project.
+Do not allow image-editor shortcuts to mutate the current image while importing.

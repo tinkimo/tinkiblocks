@@ -308,3 +308,12 @@ expansion uses only existing `hashlib` and file APIs, without optional zlib/defl
 modules. Updated firmware is required to enable compression; old firmware retains
 raw uploads. The local WebSocket image API still accepts the same raw base64 data;
 compression is applied on the slower proxy-to-robot or browser-to-modem transfer.
+
+
+The image import preview uses the standard Tinkiblocks modal, header, close control
+and buttons. A matching yellow Tinkibot artist illustration holds a sketchpad with
+the actual imported image rendered live on its paper. Fit/crop updates that native
+128 × 140 preview; Add commits the shown pixels, while Cancel, Escape and the close
+control dismiss without adding an image. The modal traps focus and fits narrow
+screens. Decorative artwork is hidden from assistive technology; the live preview
+and fit selector are labelled. Editor drawing shortcuts are suspended during import.
