@@ -131,18 +131,19 @@ class FileSender {
         throw new Error('TFP response timed out');
     }
 
-    async upload (name, bytes, progress = () => {}) {
+    async upload (name, bytes, progress = () => {}, showComplete = true) {
         const filename = new TextEncoder().encode(name);
         if (filename.length < 1 || filename.length > 80 || /[/\\\0]|\.\./.test(name)) {
             throw new Error('Invalid upload filename');
         }
         if (this.channel.compression && name.endsWith('.rgb565')) bytes = await compress(bytes);
         const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-        const payload = new Uint8Array(1 + filename.length + 4 + digest.length);
+        const payload = new Uint8Array(1 + filename.length + 4 + digest.length + (showComplete ? 0 : 1));
         payload[0] = filename.length;
         payload.set(filename, 1);
         new DataView(payload.buffer).setUint32(1 + filename.length, bytes.length, true);
         payload.set(digest, 5 + filename.length);
+        if (!showComplete) payload[payload.length - 1] = 1;
         const start = encode(1, this.id, 0, payload);
         if (start.length > this.channel.capacity) throw new Error('Transport capacity is too small for filename');
         let chunk = 0;

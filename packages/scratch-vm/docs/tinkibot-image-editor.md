@@ -317,3 +317,26 @@ the actual imported image rendered live on its paper. Fit/crop updates that nati
 control dismiss without adding an image. The modal traps focus and fits narrow
 screens. Decorative artwork is hidden from assistive technology; the live preview
 and fit selector are labelled. Editor drawing shortcuts are suspended during import.
+
+
+### Batch upload completion screens
+
+TFP v1 START metadata may append one flags byte after the unchanged 32-byte file
+SHA-256. Omitted flags and zero retain the normal completion screen. Bit 0 (`1`)
+suppresses only the successful completion screen for an intermediate file; other
+bits and extra trailing bytes are invalid. Name length, size/hash locations, wire
+CRC, transfer identity, offsets and COMPLETE acknowledgement remain unchanged.
+Matching robot and modem firmware is required for this extension; old senders omit
+it and keep their original behavior.
+
+The robot still verifies size/hash, decompresses if applicable and durably commits
+before sending COMPLETE. Quiet success retains one transfer dialog/snapshot between
+files, with an UPLOADING view and no OK/Cancel action. The next file replaces that
+view immediately. The gap is coalesced within the normal render interval to avoid
+an extra full-screen redraw; an idle gap eventually restores the application using the normal
+dialog timeout. Errors, cancellation and physical overwrite confirmation are never
+suppressed. The final upload uses the normal completion screen and OK button.
+
+Project restoration sets this option from the fixed snapshot index. Retry retains
+the failed file's intermediate/final role. Manual single-image and console file
+uploads keep the normal completion screen.

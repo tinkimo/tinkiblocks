@@ -1349,6 +1349,7 @@ class TinkibotBlocks {
                 progress(0);
                 await this._sendCommand({command: 'upload_image',
                     filename: name,
+                    ...(context.showComplete === false ? {'show-complete': false} : {}),
                     data: Buffer.from(bytes).toString('base64')}, 'upload_image', null, null, context);
                 progress(100);
             } finally {

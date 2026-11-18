@@ -150,7 +150,12 @@ class ImageSync {
                             operation.progress = progress;
                             this.publish(operation, 'uploading');
                         }
-                    }, {botUuid: operation.robot.botUuid, valid, sync: true});
+                    }, {
+                        botUuid: operation.robot.botUuid,
+                        valid,
+                        sync: true,
+                        showComplete: operation.completed === operation.images.length - 1
+                    });
                     if (!valid()) throw new Error('Project image upload interrupted');
                     this.recordUploaded(image.source, valid);
                     operation.completed++;

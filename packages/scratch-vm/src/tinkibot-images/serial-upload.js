@@ -107,7 +107,7 @@ const upload = async (manager, robot, name, bytes, progress, context) => {
         await Promise.all([ready, manager.send(`${robot.nickname}.tfp:open ${nonce} 512 rgb565-rle1\n`)]);
         clearTimeout(negotiationTimer);
         negotiation = null;
-        await new FileSender(channel).upload(name, bytes, progress);
+        await new FileSender(channel).upload(name, bytes, progress, !context || context.showComplete !== false);
     } finally {
         clearTimeout(negotiationTimer);
         if (waiter) clearTimeout(waiter.timer);

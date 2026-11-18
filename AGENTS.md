@@ -246,3 +246,9 @@ Image import uses the shared Modal in `images-tab/image-import-modal.jsx`.
 Its robot/sketchpad artwork is decorative; keep the live native-size canvas on
 its paper so contain/crop previews always match the pixels added to the project.
 Do not allow image-editor shortcuts to mutate the current image while importing.
+
+
+Batch START metadata may append flags byte 1 to suppress only successful
+intermediate completion UI. Preserve default wire metadata and acknowledged commits;
+never suppress errors/overwrite prompts. Only the last fixed-snapshot image requests
+completion UI. See the file/image transfer documentation for rollout requirements.

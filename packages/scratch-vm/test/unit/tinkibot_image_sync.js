@@ -349,3 +349,22 @@ test('reconnect UI state prevents image sync until the live claim is confirmed',
     t.equal(extension._connectedRobots[0].claimStatus, 'accepted', 'proxy claim acceptance clears uncertainty');
     await vm.imageSync.wait();
 });
+
+
+test('only the last fixed-snapshot image requests a completion screen, including retry', async t => {
+    const h = setup();
+    h.runtime.tinkibotConnectedRobots = [robot('one')];
+    h.runtime.tinkibotImages.create('first'); h.runtime.tinkibotImages.create('second');
+    const completion = [];
+    let fail = true;
+    h.runtime.uploadTinkibotImage = async (image, progress, context) => {
+        completion.push([image.name, context.showComplete]);
+        if (image.name === 'second' && fail) { fail = false; throw new Error('retry last'); }
+    };
+    h.runtime.emit('PROJECT_LOADED');
+    await h.sync.running;
+    t.same(completion, [['first', false], ['second', true]]);
+    h.sync.retry(); await h.sync.running;
+    t.same(completion, [['first', false], ['second', true], ['second', true]]);
+    t.equal(h.runtime.tinkibotImageSync.phase, 'ready');
+});

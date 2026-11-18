@@ -330,6 +330,12 @@ test('USB upload negotiates one existing modem route and streams TFP acknowledge
     t.equal(packed.length, 516, 'confirmed capability enables smaller serial transfer');
     t.same(packed, Buffer.from(await require('../../src/tinkibot-images/compression').compress(new Uint8Array(40960))));
     t.equal(manager.uploadChannel, null);
+    const quietStart = wires.length;
+    await upload(manager, {nickname: 'lime', botUuid: 'robot'}, 'image1.rgb565', new Uint8Array(40960),
+        () => {}, {valid: () => true, showComplete: false});
+    const metadata = decode(wires[quietStart].slice(1, -1)).payload;
+    t.equal(metadata.length, 38 + metadata[0]);
+    t.equal(metadata[metadata.length - 1], 1, 'intermediate file requests no completion screen');
     manager.send = async () => {
         throw new Error('Modem unavailable');
     };
@@ -523,4 +529,22 @@ test('serial compression falls back with a fresh nonce and ignores late capabili
     t.equal(opens.length, 2);
     t.equal(received.length, 40960, 'unsupported peer receives the original raw file');
     t.equal(manager.uploadChannel, null);
+});
+
+test('proxy image uploads suppress completion only when the batch context asks', async t => {
+    const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    const extension = new Tinkibot(vm.runtime);
+    extension.connectionManager.method = 'local-proxy';
+    const commands = [];
+    extension._sendCommand = async command => { commands.push(command); };
+    const image = vm.projectImages.create('picture');
+    await extension._uploadImage(image, () => {}, {showComplete: false});
+    await extension._uploadImage(image, () => {}, {showComplete: true});
+    await extension._uploadImage(image, () => {}, {});
+    t.equal(commands[0]['show-complete'], false);
+    t.notOk(Object.hasOwn(commands[1], 'show-complete'));
+    t.notOk(Object.hasOwn(commands[2], 'show-complete'));
+    t.equal(commands[0].data, commands[1].data, 'completion UI does not change image bytes');
 });
