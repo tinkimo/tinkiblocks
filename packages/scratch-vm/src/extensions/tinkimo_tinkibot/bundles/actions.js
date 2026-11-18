@@ -38,10 +38,18 @@ module.exports = {
         encode: value => `preload:audio ${value.file}`
     },
     preload_image: {
-        payload: args => ({command: 'preload:image', file: args.IMAGE}),
+        payload: (args, extension) => (extension.runtime.tinkibotImages &&
+            extension.runtime.tinkibotImages.images.some(image => image.name === args.IMAGE) &&
+            !extension.getUserImageNames().includes(args.IMAGE) ?
+            null : {command: 'preload:image', file: args.IMAGE}),
         encode: value => `preload:image ${value.file}`
     },
     display_image: display,
+    display_user_image: {
+        payload: (args, extension) => (extension.getUserImageNames().includes(args.IMAGE) ?
+            display.payload(args) : null),
+        encode: display.encode
+    },
     display_letter: display,
     display_number: display,
     write_text: {

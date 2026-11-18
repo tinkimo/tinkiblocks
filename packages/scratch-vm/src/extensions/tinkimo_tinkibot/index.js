@@ -50,6 +50,8 @@ class TinkibotBlocks {
         this.runtime.claimTinkibotRobot = this.claimRobot.bind(this);
         this.runtime.releaseTinkibotRobot = this.releaseRobot.bind(this);
         this.runtime.removeTinkibotRobot = this.removeRobot.bind(this);
+        this.runtime.uploadTinkibotImage = this.uploadImage.bind(this);
+        this.runtime.resetTinkibotImages = this._resetImages.bind(this);
         this.connectionManager = new ConnectionManager({
             connect: () => this._connectProxy(),
             send: payload => this._proxySocket.send(JSON.stringify(payload)),
@@ -61,6 +63,7 @@ class TinkibotBlocks {
         this.connectionManager.on('message', response => this._handleRobotMessage(response));
         this.connectionManager.on('ready', () => {
             this._connected = true;
+            if (this.runtime.imageSync) this.runtime.imageSync.connectionReady();
         });
         this.connectionManager.on('disconnected', error => {
             this._connected = false;
@@ -71,6 +74,7 @@ class TinkibotBlocks {
             this._setConnectedRobots(this._connectedRobots.map(robot => ({...robot, connected: false})));
         });
         this.runtime.tinkibotConnectionManager = this.connectionManager;
+        this.runtime.emit('TINKIBOT_IMAGE_SYNC_TRANSPORT_READY');
         if (typeof window !== 'undefined' && typeof WebSocket !== 'undefined') {
             this.connectionManager.start().catch(error => this.connectionManager.log('error', error.message));
         }
@@ -124,7 +128,7 @@ class TinkibotBlocks {
                 default: 'Display',
                 description: 'Name of the Tinkibot Display category.'
             }), [
-                'display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+                'display_image', 'display_user_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
                 'background_colour', 'backlight', 'preload_image', 'clear'
             ])
         ];
@@ -371,6 +375,23 @@ class TinkibotBlocks {
                             defaultValue: 'logo',
                             menu: "image_options"
                         },
+                    }
+                },
+                {
+                    opcode: 'display_user_image',
+                    blockType: BlockType.COMMAND,
+                    disabled: !this.getUserImageNames().length,
+                    text: formatMessage({
+                        id: 'tinkibot.displayUserImage',
+                        default: 'display my image [IMAGE]',
+                        description: 'Display an image created in the project Images tab'
+                    }),
+                    arguments: {
+                        IMAGE: {
+                            type: ArgumentType.STRING,
+                            defaultValue: this.getUserImageNames()[0] || '__no_images__',
+                            menu: 'user_image_options'
+                        }
                     }
                 },
                 {
@@ -842,6 +863,10 @@ class TinkibotBlocks {
                 ...info.menus.mosaic_options.items
             ])]
         };
+        this._builtinImageOptions = info.menus.image_options.items;
+        this._builtinPreloadImages = info.menus.preload_image_options.items;
+        info.menus.user_image_options = {acceptReporters: false, items: 'getUserImageOptions'};
+        info.menus.preload_image_options.items = 'getProjectPreloadImageOptions';
         info.blocks = info.blocks.map(block => {
             if (block === '---') return block;
             return Object.assign({}, block, {
@@ -959,6 +984,11 @@ class TinkibotBlocks {
     }
 
     _handleRobotMessage (response) {
+        if (response.event === 'image_upload_progress' && response['client-uuid'] === this._clientUuid &&
+            this._pendingResponse && response['request-id'] === this._pendingResponse.requestId) {
+            if (this._imageProgress) this._imageProgress(response.progress);
+            return;
+        }
         if (response.event === 'connected_robots') {
             this._setConnectedRobots(response.robots || response.nicknames, true);
         } else if (response.event === 'robot_connected') {
@@ -968,7 +998,8 @@ class TinkibotBlocks {
                     nickname: response.nickname,
                     connected: true,
                     ...(response['claim-status'] ? {claimStatus: response['claim-status']} : {}),
-                    claimedBy: Object.prototype.hasOwnProperty.call(response, 'client-uuid') ?
+                    claimedBy: response['claim-status'] === 'free' ? null :
+                        Object.prototype.hasOwnProperty.call(response, 'client-uuid') ?
                         response['client-uuid'] : robot.claimedBy} : robot)) :
                 [...this._connectedRobots, response]);
             this.runtime.emit('TINKIBOT_ROBOT_CONNECTION_CHANGED');
@@ -1098,8 +1129,7 @@ class TinkibotBlocks {
         this._setConnectedRobots(this._connectedRobots.map(robot => (robot.botUuid === botUuid ?
             Object.assign({}, robot, {
                 claimedBy: clientUuid,
-                ...(this.connectionManager.method === 'web-serial' ?
-                    {claimStatus: clientUuid ? 'accepted' : 'free'} : {})}) : robot)));
+                claimStatus: clientUuid ? 'accepted' : 'free'}) : robot)));
     }
 
     _claimResponseMatches (response) {
@@ -1144,6 +1174,7 @@ class TinkibotBlocks {
     }
 
     async claimRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         const alreadyClaimingOrPaired = this._pendingClaims.size > 0 ||
             this._connectedRobots.some(connectedRobot => connectedRobot.botUuid !== botUuid &&
@@ -1151,6 +1182,7 @@ class TinkibotBlocks {
         if (!robot || robot.connected === false ||
             !['free', 'reserved', 'confirmable'].includes(robot.claimState) || alreadyClaimingOrPaired) return;
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingClaims.set(robot.botUuid, requestId);
         this._sendRobotRequest({
@@ -1163,9 +1195,11 @@ class TinkibotBlocks {
     }
 
     async releaseRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(connectedRobot => connectedRobot.botUuid === botUuid);
         if (!robot || !['paired', 'pending', 'reserved'].includes(robot.claimState)) return;
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingReleases.set(botUuid, requestId);
         this._sendRobotRequest({
@@ -1179,6 +1213,7 @@ class TinkibotBlocks {
     }
 
     async removeRobot (botUuid) {
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const robot = this._connectedRobots.find(item => item.botUuid === botUuid);
         if (!robot || robot.claimState === 'claimed' || this._pendingRemovals.has(botUuid)) return;
         if (robot.connected === false && (!this._connected || this.connectionManager.paused ||
@@ -1192,6 +1227,7 @@ class TinkibotBlocks {
             return;
         }
         await this.connect();
+        if (this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
         const requestId = uuid.v4();
         this._pendingRemovals.set(botUuid, requestId);
         this._sendRobotRequest({'command': 'remove',
@@ -1223,7 +1259,7 @@ class TinkibotBlocks {
         if (!pending) return;
         this._pendingResponse = null;
         if (pending.timeout) clearTimeout(pending.timeout);
-        if (notify) this._notifyCommandError(error);
+        if (notify && !pending.silent) this._notifyCommandError(error);
         pending.reject(error);
     }
 
@@ -1246,11 +1282,109 @@ class TinkibotBlocks {
         });
     }
 
-    _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null) {
+    getProjectImageOptions () {
+        return [...(this._builtinImageOptions || [])];
+    }
+
+    getUserImageNames () {
+        return this.runtime.imageSync ? this.runtime.imageSync.uploadedNames() : [];
+    }
+
+    getUserImageOptions () {
+        const names = this.getUserImageNames();
+        return names.length ? names : [{text: formatMessage({
+            id: 'tinkibot.noUserImages',
+            default: 'no images',
+            description: 'Empty dropdown when no current project images have been uploaded to the robot'
+        }), value: '__no_images__'}];
+    }
+
+    getProjectPreloadImageOptions () {
+        return [...new Set([...(this._builtinPreloadImages || []), ...this.getUserImageNames()])];
+    }
+
+    async _resetImages (robot, token, valid) {
+        const {reset} = require('../../tinkibot-images/sync-reset');
+        const context = {botUuid: robot.botUuid, valid, sync: true};
+        try {
+            await reset(command => this._sendCommand(command, 'reset_images', null, null, context),
+                token, this._clientUuid, valid);
+        } catch (error) {
+            if (/unknown|unavailable|unsupported/i.test(error.message)) {
+                throw new Error(formatMessage({
+                    id: 'tinkibot.imageSyncFirmwareRequired',
+                    default: 'Image sync needs updated robot firmware and proxy or modem software.',
+                    description: 'An older robot or gateway cannot prepare project images'
+                }));
+            }
+            throw error;
+        }
+    }
+
+    async uploadImage (image, progress = () => {}, context) {
+        if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
+        if (!context) {
+            const collection = this.runtime.tinkibotImages;
+            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false);
+            context = {botUuid: robot && robot.botUuid, valid: () => collection === this.runtime.tinkibotImages};
+        }
+        if (!context.valid()) throw new Error('Image synchronisation superseded');
+        if (this._imageUploading) throw new Error('An image upload is already in progress');
+        this._imageUploading = true;
+        try {
+            return await this._uploadImage(image, progress, context);
+        } finally {
+            this._imageUploading = false;
+        }
+    }
+
+    async _uploadImage (image, progress, context) {
+        const {encode} = require('../../tinkibot-images/rgb565');
+        const {Buffer} = require('buffer');
+        const bytes = encode(image.pixels);
+        const name = `${image.name}.rgb565`;
+        if (this.connectionManager.method === 'local-proxy') {
+            this._imageProgress = progress;
+            try {
+                progress(0);
+                await this._sendCommand({command: 'upload_image',
+                    filename: name,
+                    ...(context.showComplete === false ? {'show-complete': false} : {}),
+                    data: Buffer.from(bytes).toString('base64')}, 'upload_image', null, null, context);
+                progress(100);
+            } finally {
+                this._imageProgress = null;
+            }
+            return;
+        }
         this._queuedCommands++;
         const operation = this._commandQueue.then(async () => {
+            if (!context.valid()) throw new Error('Image synchronisation superseded');
+            const robot = this._connectedRobots.find(item => item.claimState === 'paired' && item.connected !== false &&
+                (!context.botUuid || item.botUuid === context.botUuid));
+            if (!robot) throw new Error('Claim a connected robot in Connections before uploading');
+            const {upload} = require('../../tinkibot-images/serial-upload');
+            await upload(this.connectionManager, robot, name, bytes, progress, context);
+        });
+        const tracked = operation.finally(() => {
+            this._queuedCommands--;
+        });
+        this._commandQueue = tracked.catch(() => {});
+        return tracked;
+    }
+
+    _sendCommand (command, responseCommand = command.command, bundlePlan = null, sourceThread = null, context) {
+        if ((!context || !context.sync) && this.runtime.imageSync && this.runtime.imageSync.blocking) {
+            return Promise.reject(new Error('Wait for project image uploading to finish'));
+        }
+        this._queuedCommands++;
+        const operation = this._commandQueue.then(async () => {
+            if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
-            const robot = this._connectedRobots.find(connectedRobot => connectedRobot.claimState === 'paired');
+            if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
+            const candidates = this._connectedRobots.filter(connectedRobot => connectedRobot.claimState === 'paired' &&
+                (!context || !context.botUuid || connectedRobot.botUuid === context.botUuid));
+            const robot = candidates.find(candidate => candidate.connected !== false) || candidates[0];
             if (!robot) {
                 const message = formatMessage({
                     id: 'tinkibot.robotClaimRequired',
@@ -1272,10 +1406,17 @@ class TinkibotBlocks {
             } else {
                 await this.connect();
             }
+            if ((!context || !context.sync) && this.runtime.imageSync) this.runtime.imageSync.assertInteractive();
             if (sourceThread && !sourceThread.stack.length) throw new Error('Tinkibot script stopped before dispatch');
+            if (context && context.valid && !context.valid()) throw new Error('Image synchronisation superseded');
+            if (context && context.botUuid && !this._connectedRobots.some(item => item.botUuid === context.botUuid &&
+                item.claimState === 'paired' && item.connected !== false)) {
+                throw new Error('Robot changed during image sync');
+            }
             return new Promise((resolve, reject) => {
                 const requestId = uuid.v4();
                 const pending = {command: responseCommand,
+                    silent: Boolean(context && context.sync),
                     requestId,
                     resolve,
                     reject,
@@ -1379,7 +1520,21 @@ class TinkibotBlocks {
     }
 
     preload_image (args, util) {
-        return this._bundler.run('preload_image', args, util);
+        return this._runImageAction('preload_image', args, util);
+    }
+
+    _runImageAction (opcode, args, util) {
+        const sync = this.runtime.imageSync;
+        if (sync) sync.assertInteractive();
+        if (sync && sync.busy && this.runtime.tinkibotImages.images.some(image => image.name === args.IMAGE)) {
+            const captured = util && {thread: util.thread, sequencer: util.sequencer};
+            return sync.wait().then(() => this._bundler.run(opcode, args, captured));
+        }
+        return this._bundler.run(opcode, args, util);
+    }
+
+    display_user_image (args, util) {
+        return this._runImageAction('display_user_image', args, util);
     }
 
     display_image (args, util) {

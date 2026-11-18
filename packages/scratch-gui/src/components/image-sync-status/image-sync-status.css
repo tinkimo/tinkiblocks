@@ -1,0 +1,18 @@
+@import "../../css/colors.css";
+.status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    max-width: 760px;
+    margin-bottom: 0.8rem;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-white;
+    color: $text-primary;
+    font-size: 0.85rem;
+}
+.status[role="alert"] { color: #b91c1c; }
+.status progress { flex: 0 0 100%; max-width: 20rem; }
+.status button { cursor: pointer; padding: 0.4rem 0.6rem; }

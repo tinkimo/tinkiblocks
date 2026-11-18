@@ -12,7 +12,7 @@ beforeEach(t => {
 
 const makeExtension = () => {
     const stage = {tempo: 60};
-    return new TinkibotBlocks({getTargetForStage: () => stage});
+    return new TinkibotBlocks({getTargetForStage: () => stage, emit: () => {}});
 };
 
 test('drum dropdown uses supported Scratch instruments and beats set the wait', t => {
