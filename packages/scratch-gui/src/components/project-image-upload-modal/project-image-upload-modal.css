@@ -3,11 +3,14 @@
 
 .modal {
     width: min(32rem, calc(100vw - 2rem));
+    margin: clamp(1rem, 6vh, 5rem) auto;
 }
 .body {
     background: $ui-white;
     padding: 1.5rem 2rem;
     overflow-wrap: anywhere;
+    max-height: calc(100dvh - 10rem);
+    overflow-y: auto;
 }
 .body progress {
     width: 100%;
@@ -26,4 +29,52 @@
     max-width: 100%;
     margin: 0 auto 1rem;
     object-fit: contain;
+}
+
+.reassurance {
+    line-height: 1.5;
+}
+.error {
+    padding: 0.8rem 1rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 0.5rem;
+    background: $ui-primary;
+    line-height: 1.5;
+}
+.details {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+.details summary {
+    cursor: pointer;
+}
+.details code {
+    display: block;
+    margin-top: 0.5rem;
+    user-select: text;
+}
+.buttons button {
+    min-height: 2.75rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid $ui-black-transparent;
+    background: $ui-white;
+    font: inherit;
+    font-weight: bold;
+}
+.buttons .primary {
+    background: $motion-primary;
+    border-color: $motion-primary;
+    color: $ui-white;
+}
+.buttons button[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: default;
+}
+@media (max-width: 420px) {
+    .body {
+        padding: 1rem 1.25rem;
+    }
+    .illustration {
+        height: 9rem;
+    }
 }

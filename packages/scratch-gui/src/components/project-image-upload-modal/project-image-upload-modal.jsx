@@ -6,6 +6,9 @@ import Button from '../button/button.jsx';
 import styles from './project-image-upload-modal.css';
 import cleaningImage from './tinkibot-cleaning.png';
 import uploadingImage from './tinkibot-uploading.png';
+import surprisedImage from './tinkibot-surprised.png';
+
+const illustrations = {clearing: cleaningImage, uploading: uploadingImage, error: surprisedImage};
 
 const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
     const intl = useIntl();
@@ -72,7 +75,11 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
         <Modal
             aria={{modal: true}}
             className={styles.modal}
-            contentLabel={intl.formatMessage(preparing ? {
+            contentLabel={intl.formatMessage(failed ? {
+                id: 'gui.projectImageUpload.failedTitle',
+                defaultMessage: 'Image upload failed',
+                description: 'Title of the project image upload error dialog'
+            } : preparing ? {
                 id: 'gui.projectImageUpload.preparingTitle',
                 defaultMessage: 'Preparing robot for use.',
                 description: 'Title while a newly claimed robot is cleared and prepared'
@@ -89,9 +96,9 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
                 ref={body}
                 className={styles.body}
             >
-                {preparing || state.phase === 'uploading' ? <img
+                {illustrations[state.phase] ? <img
                     className={styles.illustration}
-                    src={preparing ? cleaningImage : uploadingImage}
+                    src={illustrations[state.phase]}
                     alt=""
                     aria-hidden="true"
                 /> : null}
@@ -128,9 +135,46 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
                     })}
                 /> : null}
                 {failed ? <React.Fragment>
-                    <p role="alert">{state.error}</p>
+                    <p className={styles.reassurance}>
+                        <FormattedMessage
+                            id="gui.projectImageUpload.reassurance"
+                            defaultMessage="Your images are still in your project. Try again, or close to keep editing."
+                            description="Reassurance and recovery guidance after an image upload fails"
+                        />
+                    </p>
+                    <div
+                        role="alert"
+                        className={styles.error}
+                    >
+                        {state.error === 'invalid_image_upload_parameters' ? <FormattedMessage
+                            id="gui.projectImageUpload.invalidRequest"
+                            defaultMessage={'The image upload request wasn’t accepted. ' +
+                                'Save your project, then refresh Tinkiblocks and try again.'}
+                            description="Friendly explanation of rejected image upload parameters"
+                        /> : /^[a-z][a-z0-9_]+$/.test(state.error) ? <FormattedMessage
+                            id="gui.projectImageUpload.unexpectedError"
+                            defaultMessage="The upload stopped before this image was ready."
+                            description="Friendly explanation for a technical image upload error code"
+                        /> : state.error}
+                    </div>
+                    {/^[a-z][a-z0-9_]+$/.test(state.error) ? <details className={styles.details}>
+                        <summary><FormattedMessage
+                            id="gui.projectImageUpload.technicalDetails"
+                            defaultMessage="Technical details"
+                            description="Expandable technical error code for troubleshooting"
+                        /></summary>
+                        <code>{state.error}</code>
+                    </details> : null}
                     <div className={styles.buttons}>
+                        <Button onClick={close}>
+                            <FormattedMessage
+                                id="gui.projectImageUpload.close"
+                                defaultMessage="Close"
+                                description="Dismiss a stopped, failed upload and restore workspace interaction"
+                            />
+                        </Button>
                         <Button
+                            className={styles.primary}
                             disabled={!state.canRetry}
                             aria-disabled={!state.canRetry}
                             onClick={retry}
@@ -139,13 +183,6 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
                                 id="gui.projectImageUpload.retry"
                                 defaultMessage="Retry"
                                 description="Retry only the failed image and remaining snapshot"
-                            />
-                        </Button>
-                        <Button onClick={close}>
-                            <FormattedMessage
-                                id="gui.projectImageUpload.close"
-                                defaultMessage="Close"
-                                description="Dismiss a stopped, failed upload and restore workspace interaction"
                             />
                         </Button>
                     </div>

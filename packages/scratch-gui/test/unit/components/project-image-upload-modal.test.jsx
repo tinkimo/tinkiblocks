@@ -129,7 +129,7 @@ test('preparation and upload have distinct friendly visuals without changing the
     expect(h.getByRole('status')).toHaveTextContent('0 of 2 images completed');
     expect(h.runtime.imageSync.request).toHaveBeenCalledTimes(1);
     act(() => h.update({phase: 'error', error: 'Transfer failed', canRetry: true}));
-    expect(uploading.querySelector('img[aria-hidden="true"]')).toBeNull();
+    expect(uploading.querySelector('img[aria-hidden="true"]')).toHaveAttribute('alt', '');
     expect(h.getByRole('alert')).toHaveTextContent('Transfer failed');
 });
 
@@ -150,6 +150,24 @@ test('overall progress advances across files and waits for robot acknowledgement
     expect(h.getByRole('progressbar')).toHaveAttribute('value', '99.5');
     expect(h.workspace).toHaveAttribute('inert');
     act(() => h.update({phase: 'ready', completed: 2, blocking: false}));
+    expect(h.queryByRole('dialog')).toBeNull();
+    expect(h.workspace).not.toHaveAttribute('inert');
+});
+
+
+test('upload errors show a reassuring illustrated message and keep diagnostic details available', () => {
+    const h = setup();
+    h.workspace.setAttribute('data-test-workspace', '');
+    act(() => h.update({phase: 'error', error: 'invalid_image_upload_parameters', canRetry: true}));
+    const dialog = h.getByRole('dialog', {name: 'Image upload failed'});
+    expect(dialog.querySelector('img[aria-hidden="true"]')).toHaveAttribute('alt', '');
+    expect(h.getByRole('alert')).toHaveTextContent('The image upload request wasn’t accepted.');
+    expect(h.getByText('Technical details')).toBeInTheDocument();
+    expect(h.getByText('invalid_image_upload_parameters')).toBeInTheDocument();
+    expect(h.getByRole('status')).toHaveTextContent('first.rgb565');
+    expect(h.getByRole('button', {name: 'Retry'})).toBeInTheDocument();
+    expect(h.workspace).toHaveAttribute('inert');
+    fireEvent.click(h.getAllByRole('button', {name: 'Close'}).pop());
     expect(h.queryByRole('dialog')).toBeNull();
     expect(h.workspace).not.toHaveAttribute('inert');
 });

@@ -846,3 +846,25 @@ test('disconnected paired robot survives reconnect and Remove frees the next cla
     t.equal(socket.publicSent.at(-1).command, 'claim');
     t.equal(socket.publicSent.at(-1)['bot-uuid'], 'blue-uuid');
 });
+
+test('image completion option stays boolean in the actual public WebSocket frame', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    MockWebSocket.instance.open();
+    for (const showComplete of [false, true]) {
+        const request = extension._sendCommand({command: 'upload_image', filename: 'image1.rgb565',
+            data: 'pixels', 'show-complete': showComplete}, 'upload_image');
+        await new Promise(resolve => setImmediate(resolve));
+        const frame = MockWebSocket.instance.publicSent.at(-1);
+        t.equal(frame.command, 'upload_image');
+        t.equal(frame['show-complete'], showComplete);
+        t.equal(typeof frame['show-complete'], 'boolean');
+        MockWebSocket.instance.respond('upload_image', 'OK');
+        await request;
+    }
+    const api = require('../../src/extensions/tinkimo_tinkibot/api');
+    t.same(api.command({command: 'drive', motor: 'left', speed: 50}),
+        {command: 'drive', motor: 'left', speed: '50'}, 'ordinary command parameters remain strings');
+    t.same(api.command({command: 'upload_image', filename: 'one.rgb565', data: 'pixels'}),
+        {command: 'upload_image', filename: 'one.rgb565', data: 'pixels'}, 'default option stays omitted');
+});

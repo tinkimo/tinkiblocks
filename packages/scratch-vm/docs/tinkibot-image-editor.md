@@ -340,3 +340,14 @@ suppressed. The final upload uses the normal completion screen and OK button.
 Project restoration sets this option from the fixed snapshot index. Retry retains
 the failed file's intermediate/final role. Manual single-image and console file
 uploads keep the normal completion screen.
+
+
+The shared public API adapter keeps `upload_image.show-complete` as a JSON boolean;
+serializing it as the string `"false"` is invalid. Wire-level WebSocket regression
+coverage checks both booleans, omitted defaults and ordinary string parameters.
+
+Upload failures retain the blocking modal and show a matching surprised Tinkibot,
+the affected filename/count, reassuring recovery guidance and clear Close/Retry
+buttons. Human-readable backend errors remain visible; technical error codes move
+to an expandable details section. The dialog fits narrow viewports and keeps the
+existing focus trap, retry ordering, claim checks and terminal-only unlock rules.

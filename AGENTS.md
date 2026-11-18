@@ -252,3 +252,9 @@ Batch START metadata may append flags byte 1 to suppress only successful
 intermediate completion UI. Preserve default wire metadata and acknowledged commits;
 never suppress errors/overwrite prompts. Only the last fixed-snapshot image requests
 completion UI. See the file/image transfer documentation for rollout requirements.
+
+
+The public API adapter preserves upload_image.show-complete as a JSON boolean;
+ordinary block parameters remain strings. Test typed options on the actual emitted
+WebSocket frame. Upload failures use the matching surprised mascot, accessible
+recovery controls, friendly text and expandable technical codes.

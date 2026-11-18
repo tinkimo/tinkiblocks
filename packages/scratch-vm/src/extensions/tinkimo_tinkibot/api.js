@@ -3,7 +3,7 @@ const protocol = require('./bundles/protocol');
 /**
  * Convert internal Scratch payloads at one public API boundary.
  * @param {object} payload internal command and block arguments
- * @returns {object} public command with string parameters
+ * @returns {object} public command with string parameters and typed upload options
  */
 const command = payload => {
     const value = {...payload};
@@ -17,7 +17,10 @@ const command = payload => {
     } else if (value.command === 'display_image') {
         value.command = 'display';
     }
-    for (const key of Object.keys(value)) value[key] = String(value[key]);
+    for (const key of Object.keys(value)) {
+        if (value.command === 'upload_image' && key === 'show-complete') continue;
+        value[key] = String(value[key]);
+    }
     return value;
 };
 
