@@ -498,6 +498,7 @@ test('Tinkibot claims and releases a robot with the persistent client UUID', asy
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
         claimedBy: clientUuid,
+        claimStatus: 'accepted',
         claimState: 'paired'
     }]);
 
@@ -512,6 +513,7 @@ test('Tinkibot claims and releases a robot with the persistent client UUID', asy
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
         claimedBy: null,
+        claimStatus: 'free',
         claimState: 'free'
     }]);
 

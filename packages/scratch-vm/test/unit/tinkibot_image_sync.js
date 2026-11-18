@@ -314,3 +314,38 @@ test('a superseded serial upload sends cancellation but no more image data', asy
     t.equal(manager.listenerCount('disconnected'), 0);
     t.equal(manager.listenerCount('message'), 0);
 });
+
+test('reconnect UI state prevents image sync until the live claim is confirmed', async t => {
+    const VM = require('../../src/virtual-machine');
+    const Tinkibot = require('../../src/extensions/tinkimo_tinkibot');
+    const vm = new VM();
+    t.teardown(() => vm.clear());
+    const extension = new Tinkibot(vm.runtime);
+    let resets = 0;
+    vm.runtime.resetTinkibotImages = async () => { resets++; };
+    vm.runtime.uploadTinkibotImage = async () => {};
+    vm.projectImages.create('saved');
+    const identity = {'bot-uuid': 'robot-one', nickname: 'lime'};
+    extension._setConnectedRobots([{...identity, 'client-uuid': extension._clientUuid, 'claim-status': 'accepted'}]);
+    vm.runtime.emit('PROJECT_LOADED');
+    await vm.imageSync.wait();
+    t.equal(resets, 1);
+    extension._handleRobotMessage({...identity, event: 'robot_disconnected'});
+    extension._handleRobotMessage({...identity, event: 'robot_connected', 'claim-status': 'free'});
+    t.equal(extension._connectedRobots[0].claimState, 'free');
+    t.equal(extension._connectedRobots[0].claimedBy, null, 'a free reply clears the cached browser owner');
+    t.equal(resets, 1, 'a rebooted, unclaimed robot never triggers restoration');
+    extension._handleRobotMessage({...identity, event: 'robot_connected', 'claim-status': 'uncertain',
+        'client-uuid': extension._clientUuid});
+    t.equal(extension._connectedRobots[0].claimState, 'reserved');
+    t.equal(resets, 1, 'unverified reservations cannot upload');
+    extension._handleRobotMessage({...identity, event: 'robot_connected', 'claim-status': 'accepted',
+        'client-uuid': extension._clientUuid});
+    await vm.imageSync.wait();
+    t.equal(resets, 2, 'retained robot-confirmed ownership safely restores images');
+    extension._handleRobotMessage({...identity, event: 'robot_connected', 'claim-status': 'uncertain',
+        'client-uuid': extension._clientUuid});
+    extension._updateRobotClaim('robot-one', extension._clientUuid);
+    t.equal(extension._connectedRobots[0].claimStatus, 'accepted', 'proxy claim acceptance clears uncertainty');
+    await vm.imageSync.wait();
+});

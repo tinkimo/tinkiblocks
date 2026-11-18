@@ -256,3 +256,10 @@ stop further files and keep the VM locked until the current promise settles.
 Late progress from failed/completed attempts cannot reopen the dialog. On success
 or safe close, interaction, inert/ARIA attributes, document listeners and focus
 are restored. Project data and the robot protocol are unchanged.
+
+
+Reconnect restoration requires robot-confirmed accepted ownership. The proxy and
+modem query the matching firmware's read-only claim-status getter; an uncertain
+reservation, pending claim, free robot or another browser's owner cannot start
+image sync. A robot_connected update with claim-status free clears cached browser
+ownership. Physical claim acceptance clears uncertainty on either transport.

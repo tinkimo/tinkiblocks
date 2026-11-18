@@ -998,7 +998,8 @@ class TinkibotBlocks {
                     nickname: response.nickname,
                     connected: true,
                     ...(response['claim-status'] ? {claimStatus: response['claim-status']} : {}),
-                    claimedBy: Object.prototype.hasOwnProperty.call(response, 'client-uuid') ?
+                    claimedBy: response['claim-status'] === 'free' ? null :
+                        Object.prototype.hasOwnProperty.call(response, 'client-uuid') ?
                         response['client-uuid'] : robot.claimedBy} : robot)) :
                 [...this._connectedRobots, response]);
             this.runtime.emit('TINKIBOT_ROBOT_CONNECTION_CHANGED');
@@ -1128,8 +1129,7 @@ class TinkibotBlocks {
         this._setConnectedRobots(this._connectedRobots.map(robot => (robot.botUuid === botUuid ?
             Object.assign({}, robot, {
                 claimedBy: clientUuid,
-                ...(this.connectionManager.method === 'web-serial' ?
-                    {claimStatus: clientUuid ? 'accepted' : 'free'} : {})}) : robot)));
+                claimStatus: clientUuid ? 'accepted' : 'free'}) : robot)));
     }
 
     _claimResponseMatches (response) {
