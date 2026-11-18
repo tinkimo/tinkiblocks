@@ -112,3 +112,22 @@ test('unmount removes listeners and interaction locks and interrupts the operati
     expect(h.workspace).not.toHaveAttribute('inert');
     expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
+
+test('preparation and upload have distinct friendly visuals without changing the operation', () => {
+    const h = setup();
+    h.workspace.setAttribute('data-test-workspace', '');
+    act(() => h.update({phase: 'clearing', total: 0, completed: 0, filename: ''}));
+    const preparing = h.getByRole('dialog', {name: 'Preparing robot for use.'});
+    expect(h.getByRole('status')).toHaveTextContent('Getting your Tinkibot ready for this project');
+    expect(h.getByRole('status')).not.toHaveTextContent('0 of 0');
+    expect(preparing.querySelector('img[aria-hidden="true"]')).toHaveAttribute('alt', '');
+    expect(h.workspace).toHaveAttribute('inert');
+    act(() => h.update({phase: 'uploading', total: 2, filename: 'first.rgb565'}));
+    const uploading = h.getByRole('dialog', {name: 'Uploading project images'});
+    expect(uploading.querySelector('img[aria-hidden="true"]')).toBeInTheDocument();
+    expect(h.getByRole('status')).toHaveTextContent('0 of 2 images completed');
+    expect(h.runtime.imageSync.request).toHaveBeenCalledTimes(1);
+    act(() => h.update({phase: 'error', error: 'Transfer failed', canRetry: true}));
+    expect(uploading.querySelector('img[aria-hidden="true"]')).toBeNull();
+    expect(h.getByRole('alert')).toHaveTextContent('Transfer failed');
+});

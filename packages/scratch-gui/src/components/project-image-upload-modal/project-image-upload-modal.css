@@ -18,3 +18,12 @@
     gap: 0.75rem;
     margin-top: 1rem;
 }
+
+.illustration {
+    display: block;
+    width: 15rem;
+    height: 11rem;
+    max-width: 100%;
+    margin: 0 auto 1rem;
+    object-fit: contain;
+}

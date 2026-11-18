@@ -239,8 +239,10 @@ filenames and independent RGB buffers when the operation is requested, including
 when another interrupted transfer must settle first. Do not rebuild its queue
 from the live collection. Normal manual uploads remain independent.
 
-The GUI mounts the standard styled Modal as “Uploading project images” for the
-whole operation. It displays the current .rgb565 filename, acknowledged count and
+The GUI mounts the standard styled Modal for the whole operation. Preparation
+uses “Preparing robot for use.” with a Tinkibot cleaning illustration; transfer
+uses “Uploading project images” with matching picture-upload artwork. Decorative
+art is hidden from assistive technology, and empty preparation hides a 0-of-0 count. It displays the current .rgb565 filename, acknowledged count and
 available transfer progress. ReactModal traps focus and hides the app from
 assistive technology; the workspace is inert and document shortcuts/outside
 clicks are blocked. VM image mutations, green flag, project loading/export and

@@ -4,6 +4,8 @@ import {FormattedMessage, useIntl} from 'react-intl';
 import Modal from '../modal/modal.jsx';
 import Button from '../button/button.jsx';
 import styles from './project-image-upload-modal.css';
+import cleaningImage from './tinkibot-cleaning.png';
+import uploadingImage from './tinkibot-uploading.png';
 
 const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
     const intl = useIntl();
@@ -13,6 +15,7 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
     const previousFocus = useRef(document.activeElement);
     const blocking = Boolean(state && state.blocking);
     const failed = state && state.phase === 'error';
+    const preparing = state && state.phase === 'clearing';
     const retry = useCallback(() => runtime.imageSync.retry(), [runtime]);
     const close = useCallback(() => runtime.imageSync.close(), [runtime]);
     useEffect(() => {
@@ -67,7 +70,11 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
         <Modal
             aria={{modal: true}}
             className={styles.modal}
-            contentLabel={intl.formatMessage({
+            contentLabel={intl.formatMessage(preparing ? {
+                id: 'gui.projectImageUpload.preparingTitle',
+                defaultMessage: 'Preparing robot for use.',
+                description: 'Title while a newly claimed robot is cleared and prepared'
+            } : {
                 id: 'gui.projectImageUpload.title',
                 defaultMessage: 'Uploading project images',
                 description: 'Title of the blocking project image restore dialog'
@@ -80,28 +87,34 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
                 ref={body}
                 className={styles.body}
             >
+                {preparing || state.phase === 'uploading' ? <img
+                    className={styles.illustration}
+                    src={preparing ? cleaningImage : uploadingImage}
+                    alt=""
+                    aria-hidden="true"
+                /> : null}
                 <div
                     role="status"
                     aria-live="polite"
                     aria-atomic="true"
                 >
-                    {state.phase === 'clearing' ? <FormattedMessage
+                    {preparing ? <FormattedMessage
                         id="gui.projectImageUpload.preparing"
-                        defaultMessage="Preparing the robot for this project's images…"
-                        description="Progress while old uploaded files are cleared"
+                        defaultMessage="Getting your Tinkibot ready for this project…"
+                        description="Friendly caption while the robot is prepared for the project"
                     /> : state.phase === 'stopping' ? <FormattedMessage
                         id="gui.projectImageUpload.stopping"
                         defaultMessage="Waiting for the active transfer to stop safely…"
                         description="The workspace stays blocked until an interrupted transfer settles"
                     /> : <p>{state.filename}</p>}
-                    <p>
+                    {!preparing || state.total > 0 ? <p>
                         <FormattedMessage
                             id="gui.projectImageUpload.count"
                             defaultMessage="{completed} of {total} images completed"
                             description="Robot-acknowledged images completed out of the fixed snapshot total"
                             values={{completed: state.completed, total: state.total}}
                         />
-                    </p>
+                    </p> : null}
                 </div>
                 {!failed && state.phase === 'uploading' ? <progress
                     max={100}
