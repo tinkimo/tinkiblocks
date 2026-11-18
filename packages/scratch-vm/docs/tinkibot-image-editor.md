@@ -265,3 +265,46 @@ modem query the matching firmware's read-only claim-status getter; an uncertain
 reservation, pending claim, free robot or another browser's owner cannot start
 image sync. A robot_connected update with claim-status free clears cached browser
 ownership. Physical claim acceptance clears uncertainty on either transport.
+
+
+The restoration dialog shows overall batch progress: acknowledged image count
+plus the current file's acknowledged byte fraction, divided by the fixed snapshot
+total. The bar advances across file boundaries rather than resetting. The current
+file is capped below 100% until COMPLETE; the workspace remains locked through
+verification and commit. Retry retains previously acknowledged files.
+
+
+### Negotiated image compression
+
+Editor image senders may append `rgb565-rle1` to `tfp:open <nonce> <capacity>`
+(after the optional BLE proof). A supporting robot echoes the token after its
+normal `TFP1 <nonce> <capacity>` reply. The modem forwards only requested,
+nonce/peer-matched capabilities in `TFP1-MODEM`. Ordinary requests/replies remain
+unchanged. An unsupported open is retried without the token; a reply without it
+means raw images only. The browser uses a new nonce on compatibility fallback so a late
+capability reply cannot authorize the fallback route.
+
+TFP v1 packets, CRCs, offsets, START metadata and overwrite confirmation are
+unchanged. Only negotiated `.rgb565` images whose packed length is smaller than
+40,960 bytes are compressed. Other files and incompressible images remain raw.
+The envelope is `TIR1` + SHA-256 of the 40,960 original bytes + RGB565 PackBits:
+each control byte describes `(control & 127) + 1` two-byte pixels. Bit 7 means
+repeat the next pixel; otherwise read that many literal pixels. Pixel byte order
+is unchanged. The fixed expanded size is 40,960; no arbitrary-size expansion is
+allowed. Both browser and desktop encoder share deterministic digest vectors.
+
+START size/hash and DATA/ACK offsets describe the transferred envelope. The robot
+first verifies the wire hash, then expands at most 256 output bytes per poll into
+a separate private staging file. It checks the exact expanded length and hash
+before the existing durable atomic commit and COMPLETE. Quotas use the expanded
+size; free-space admission reserves both staged files. Disconnect, cancellation,
+bad input and recovery remove both staging artifacts and preserve an existing
+destination. `/files/user/<name>.rgb565` always contains the original raw bytes;
+the saved project, image format, LCD orientation and status strip are unchanged.
+
+A flat-colour test image packs from 40,960 to 516 bytes (98.74% less image data).
+This is a payload comparison, not a measured radio throughput claim. MicroPython
+expansion uses only existing `hashlib` and file APIs, without optional zlib/deflate
+modules. Updated firmware is required to enable compression; old firmware retains
+raw uploads. The local WebSocket image API still accepts the same raw base64 data;
+compression is applied on the slower proxy-to-robot or browser-to-modem transfer.

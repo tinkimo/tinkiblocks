@@ -1,4 +1,5 @@
 // TFP v1, matching proxy transfer/protocol.py and transfer/sender.py.
+const {compress} = require('./compression');
 /**
  * @param {Uint8Array} bytes Packet bytes excluding their checksum.
  * @returns {number} Standard IEEE CRC-32 checksum.
@@ -135,6 +136,7 @@ class FileSender {
         if (filename.length < 1 || filename.length > 80 || /[/\\\0]|\.\./.test(name)) {
             throw new Error('Invalid upload filename');
         }
+        if (this.channel.compression && name.endsWith('.rgb565')) bytes = await compress(bytes);
         const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
         const payload = new Uint8Array(1 + filename.length + 4 + digest.length);
         payload[0] = filename.length;

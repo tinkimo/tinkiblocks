@@ -57,7 +57,7 @@ test('upload modal blocks workspace events, traps focus, reports acknowledged pr
     expect(h.workspace).toHaveAttribute('aria-busy', 'true');
     expect(h.getByRole('status')).toHaveTextContent('first.rgb565');
     expect(h.getByRole('status')).toHaveTextContent('0 of 2 images completed');
-    expect(h.getByRole('progressbar')).toHaveAttribute('value', '30');
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '15');
     expect(h.queryByRole('button', {name: /cancel|close/i})).toBeNull();
     fireEvent.click(h.create);
     fireEvent.keyDown(h.create, {key: 's', ctrlKey: true});
@@ -71,6 +71,7 @@ test('upload modal blocks workspace events, traps focus, reports acknowledged pr
     expect(dialog).toHaveFocus();
     act(() => h.update({completed: 1, filename: 'second.rgb565', progress: 5}));
     expect(h.getByRole('status')).toHaveTextContent('1 of 2 images completed');
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '52.5');
     act(() => h.update({phase: 'ready', blocking: false, completed: 2}));
     expect(h.queryByRole('dialog')).toBeNull();
     expect(h.workspace).not.toHaveAttribute('inert');
@@ -130,4 +131,25 @@ test('preparation and upload have distinct friendly visuals without changing the
     act(() => h.update({phase: 'error', error: 'Transfer failed', canRetry: true}));
     expect(uploading.querySelector('img[aria-hidden="true"]')).toBeNull();
     expect(h.getByRole('alert')).toHaveTextContent('Transfer failed');
+});
+
+
+test('overall progress advances across files and waits for robot acknowledgement', () => {
+    const h = setup();
+    h.workspace.setAttribute('data-test-workspace', '');
+    expect(h.getByRole('progressbar', {name: 'Overall project image upload progress'}))
+        .toHaveAttribute('value', '15');
+    act(() => h.update({progress: 100}));
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '49.5');
+    expect(h.getByRole('status')).toHaveTextContent('0 of 2 images completed');
+    act(() => h.update({completed: 1, filename: 'second.rgb565', progress: 0}));
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '50');
+    act(() => h.update({progress: 50}));
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '75');
+    act(() => h.update({progress: 100}));
+    expect(h.getByRole('progressbar')).toHaveAttribute('value', '99.5');
+    expect(h.workspace).toHaveAttribute('inert');
+    act(() => h.update({phase: 'ready', completed: 2, blocking: false}));
+    expect(h.queryByRole('dialog')).toBeNull();
+    expect(h.workspace).not.toHaveAttribute('inert');
 });

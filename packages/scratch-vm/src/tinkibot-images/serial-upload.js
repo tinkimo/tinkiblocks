@@ -15,10 +15,11 @@ const upload = async (manager, robot, name, bytes, progress, context) => {
     if (!manager.apiReady || manager.method !== 'web-serial' || manager.uploadChannel) {
         throw new Error('USB connection is not ready for an upload');
     }
-    const nonce = uuid.v4().replace(/-/g, '')
+    let nonce = uuid.v4().replace(/-/g, '')
         .slice(0, 16);
     let negotiation;
     let negotiationTimer;
+    let fallback;
     let waiter;
     let closed;
     const inbox = [];
@@ -32,13 +33,18 @@ const upload = async (manager, robot, name, bytes, progress, context) => {
     const channel = {
         capacity: 512,
         text: value => {
-            if (!negotiation || !value.startsWith('TFP1-MODEM ')) return false;
-            const match = /^TFP1-MODEM ([a-f0-9]{16}) ([0-9]+)$/.exec(value);
+            if (!negotiation) return false;
+            if (value === 'ERR tfp-invalid-tfp-open' && fallback) {
+                fallback();
+                return true;
+            }
+            if (!value.startsWith('TFP1-MODEM ')) return false;
+            const match = /^TFP1-MODEM ([a-f0-9]{16}) ([0-9]+)( rgb565-rle1)?$/.exec(value);
             if (!match || match[1] !== nonce) return false;
             const capacity = Number(match[2]);
             if (capacity < 24 || capacity > 512) negotiation.reject(new Error('Invalid modem TFP capacity'));
             else {
-                channel.capacity = capacity; negotiation.resolve();
+                channel.capacity = capacity; channel.compression = Boolean(match[3]); negotiation.resolve();
             }
             return true;
         },
@@ -88,10 +94,17 @@ const upload = async (manager, robot, name, bytes, progress, context) => {
     try {
         const ready = new Promise((resolve, fail) => {
             negotiation = {resolve, reject: fail};
+            fallback = () => {
+                fallback = null;
+                // A late capability reply must never authorize a different route.
+                nonce = uuid.v4().replace(/-/g, '')
+                    .slice(0, 16);
+                manager.send(`${robot.nickname}.tfp:open ${nonce} 512\n`).catch(fail);
+            };
             negotiationTimer = setTimeout(() => fail(new Error('Modem does not support TFP upload negotiation')), 5000);
         });
         // Register the waiter before writing: a fast modem can reply immediately.
-        await Promise.all([ready, manager.send(`${robot.nickname}.tfp:open ${nonce} 512\n`)]);
+        await Promise.all([ready, manager.send(`${robot.nickname}.tfp:open ${nonce} 512 rgb565-rle1\n`)]);
         clearTimeout(negotiationTimer);
         negotiation = null;
         await new FileSender(channel).upload(name, bytes, progress);

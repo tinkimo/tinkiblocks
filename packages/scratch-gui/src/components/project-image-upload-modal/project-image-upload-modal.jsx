@@ -16,6 +16,8 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
     const blocking = Boolean(state && state.blocking);
     const failed = state && state.phase === 'error';
     const preparing = state && state.phase === 'clearing';
+    const overallProgress = state && state.total ?
+        ((state.completed + (Math.min(99, state.progress) / 100)) / state.total) * 100 : 0;
     const retry = useCallback(() => runtime.imageSync.retry(), [runtime]);
     const close = useCallback(() => runtime.imageSync.close(), [runtime]);
     useEffect(() => {
@@ -118,11 +120,11 @@ const ProjectImageUploadModal = ({runtime, workspaceRef, isRtl}) => {
                 </div>
                 {!failed && state.phase === 'uploading' ? <progress
                     max={100}
-                    value={state.progress}
+                    value={overallProgress}
                     aria-label={intl.formatMessage({
                         id: 'gui.projectImageUpload.progress',
-                        defaultMessage: 'Current image upload progress',
-                        description: 'Accessible label of the image transfer progress bar'
+                        defaultMessage: 'Overall project image upload progress',
+                        description: 'Accessible label of the progress bar for all project images'
                     })}
                 /> : null}
                 {failed ? <React.Fragment>

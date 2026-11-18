@@ -302,9 +302,10 @@ test('USB upload negotiates one existing modem route and streams TFP acknowledge
     manager.method = 'web-serial';
     manager.log = () => {};
     const wires = [];
+    let supportCompression = false;
     manager.send = async line => {
-        t.match(line, /^lime\.tfp:open [a-f0-9]{16} 512\n$/);
-        manager.uploadChannel.text(`TFP1-MODEM ${line.split(' ')[1]} 244`);
+        t.match(line, /^lime\.tfp:open [a-f0-9]{16} 512 rgb565-rle1\n$/);
+        manager.uploadChannel.text(`TFP1-MODEM ${line.split(' ')[1]} 244${supportCompression ? ' rgb565-rle1' : ''}`);
     };
     manager.transport = {write: async frame => {
         wires.push(frame);
@@ -321,6 +322,14 @@ test('USB upload negotiates one existing modem route and streams TFP acknowledge
     t.ok(wires.every(wire => wire.length <= 244));
     t.equal(manager.uploadChannel, null);
     t.equal(manager.listenerCount('disconnected'), 0);
+    supportCompression = true;
+    const compressedStart = wires.length;
+    await upload(manager, {nickname: 'lime', botUuid: 'robot'}, 'image1.rgb565', new Uint8Array(40960));
+    const packed = Buffer.concat(wires.slice(compressedStart).map(frame => decode(frame.slice(1, -1)))
+        .filter(packet => packet.kind === 4).map(packet => Buffer.from(packet.payload)));
+    t.equal(packed.length, 516, 'confirmed capability enables smaller serial transfer');
+    t.same(packed, Buffer.from(await require('../../src/tinkibot-images/compression').compress(new Uint8Array(40960))));
+    t.equal(manager.uploadChannel, null);
     manager.send = async () => {
         throw new Error('Modem unavailable');
     };
@@ -464,4 +473,54 @@ test('normal robot requests cannot dispatch when a project restore starts during
     restore();
     await vm.imageSync.wait();
     t.equal(sent, 0);
+});
+
+
+test('RGB565 compression matches desktop vectors and never expands data', async t => {
+    const {compress} = require('../../src/tinkibot-images/compression');
+    const {createHash} = require('crypto');
+    const vectors = require('../fixtures/image-compression.json');
+    for (const vector of vectors) {
+        const pattern = Buffer.from(vector.pattern, 'hex');
+        const raw = new Uint8Array(40960);
+        for (let index = 0; index < raw.length; index++) raw[index] = pattern[index % pattern.length];
+        const packed = await compress(raw);
+        t.equal(packed.length, vector.packedSize, vector.name);
+        t.equal(createHash('sha256').update(packed).digest('hex'), vector.packedSha256);
+        t.ok(packed.length <= raw.length);
+    }
+    const other = new Uint8Array(50);
+    t.equal(await compress(other), other, 'other files remain untouched');
+});
+
+
+test('serial compression falls back with a fresh nonce and ignores late capability replies', async t => {
+    const EventEmitter = require('events');
+    const {upload} = require('../../src/tinkibot-images/serial-upload');
+    const manager = new EventEmitter();
+    Object.assign(manager, {apiReady: true, method: 'web-serial', log: () => {}});
+    const opens = [];
+    const received = [];
+    manager.send = async line => {
+        opens.push(line);
+        if (opens.length === 1) return;
+        t.not(line.split(' ')[1], opens[0].split(' ')[1], 'fallback owns a fresh negotiation');
+        t.equal(manager.uploadChannel.text(`TFP1-MODEM ${opens[0].split(' ')[1]} 244 rgb565-rle1`),
+            false, 'late capability cannot authorize compression on the fallback route');
+        manager.uploadChannel.text(`TFP1-MODEM ${line.split(' ')[1]} 244`);
+    };
+    manager.transport = {write: async frame => {
+        const packet = decode(frame.slice(1, -1));
+        if (packet.kind === 4) received.push(...packet.payload);
+        const kind = {1: 2, 4: 5, 6: 7}[packet.kind];
+        const offset = packet.kind === 4 ? packet.offset + packet.payload.length : packet.offset;
+        manager.uploadChannel.feed(encode(kind, packet.id, offset,
+            packet.kind === 1 ? new Uint8Array([128, 0]) : new Uint8Array()).slice(1, -1));
+    }};
+    const result = upload(manager, {nickname: 'lime', botUuid: 'robot'}, 'image1.rgb565', new Uint8Array(40960));
+    manager.uploadChannel.text('ERR tfp-invalid-tfp-open');
+    await result;
+    t.equal(opens.length, 2);
+    t.equal(received.length, 40960, 'unsupported peer receives the original raw file');
+    t.equal(manager.uploadChannel, null);
 });
