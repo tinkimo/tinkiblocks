@@ -5,6 +5,7 @@ import VM from '@scratch/scratch-vm';
 
 import styles from './connections-tab.css';
 import robotImage from './tinkibot-outline.png';
+import ImageSyncStatus from '../image-sync-status/image-sync-status';
 import ConnectionControls, {ConnectionDebugPanel} from './connection-controls.jsx';
 
 const ConnectionsTab = ({vm}) => {
@@ -74,6 +75,7 @@ const ConnectionsTab = ({vm}) => {
                 state={connection}
                 onToggleExpert={toggleExpert}
             /> : null}
+            <ImageSyncStatus runtime={vm.runtime} />
             {actionError ? <p
                 className={styles.actionError}
                 role="alert"

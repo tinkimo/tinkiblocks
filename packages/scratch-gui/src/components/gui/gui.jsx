@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import omit from 'lodash.omit';
 import PropTypes from 'prop-types';
-import React, {useEffect, useCallback, useState} from 'react';
+import React, {useEffect, useCallback, useState, useRef} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import MediaQuery from 'react-responsive';
@@ -15,6 +15,9 @@ import CostumeTab from '../../containers/costume-tab.jsx';
 import TargetPane from '../../containers/target-pane.jsx';
 import SoundTab from '../../containers/sound-tab.jsx';
 import ConnectionsTab from '../connections-tab/connections-tab.jsx';
+import ImagesTab from '../images-tab/images-tab.jsx';
+import ScreenIcon from '../images-tab/screen-icon.jsx';
+import {IMAGES_TAB_INDEX} from '../../reducers/editor-tab';
 import StageWrapper from '../../containers/stage-wrapper.jsx';
 import Loader from '../loader/loader.jsx';
 import Box from '../box/box.jsx';
@@ -44,6 +47,7 @@ import codeIcon from './icon--code.svg';
 import costumesIcon from './icon--costumes.svg';
 import soundsIcon from './icon--sounds.svg';
 import DebugModal from '../debug-modal/debug-modal.jsx';
+import ProjectImageUploadModal from '../project-image-upload-modal/project-image-upload-modal.jsx';
 import {setPlatform} from '../../reducers/platform.js';
 import {setTheme} from '../../reducers/settings.js';
 import {PLATFORM} from '../../lib/platform.js';
@@ -213,6 +217,7 @@ const GUIComponent = props => {
     }
 
     const [connectionsChanged, setConnectionsChanged] = useState(false);
+    const workspaceRef = useRef(null);
 
     useEffect(() => {
         if (props.platform) {
@@ -287,6 +292,7 @@ const GUIComponent = props => {
         ) : (
             <ModalFocusProvider>
                 <Box
+                    componentRef={workspaceRef}
                     className={styles.pageWrapper}
                     dir={isRtl ? 'rtl' : 'ltr'}
                     {...componentProps}
@@ -518,6 +524,18 @@ const GUIComponent = props => {
                                                 </span>
                                             ) : null}
                                         </Tab>
+                                        <Tab
+                                            className={tabClassNames.tab}
+                                            role="tab"
+                                            tabIndex="0"
+                                        >
+                                            <ScreenIcon className={styles.connectionsTabIcon} />
+                                            <FormattedMessage
+                                                defaultMessage="Images"
+                                                description="Button to create pictures for a Tinkibot"
+                                                id="gui.gui.imagesTab"
+                                            />
+                                        </Tab>
                                     </TabList>
                                 </Box>
                                 <TabPanel
@@ -582,6 +600,12 @@ const GUIComponent = props => {
                                 >
                                     <ConnectionsTab vm={vm} />
                                 </TabPanel>
+                                <TabPanel
+                                    className={tabClassNames.tabPanel}
+                                    role="tabpanel"
+                                >
+                                    {activeTabIndex === IMAGES_TAB_INDEX ? <ImagesTab vm={vm} /> : null}
+                                </TabPanel>
                             </Tabs>
                             {backpackVisible && backpackConfigured ? (
                                 <Backpack
@@ -631,6 +655,11 @@ const GUIComponent = props => {
                     </Box>
                     <DragLayer />
                 </Box>
+                <ProjectImageUploadModal
+                    isRtl={isRtl}
+                    runtime={vm.runtime}
+                    workspaceRef={workspaceRef}
+                />
             </ModalFocusProvider>
         );
     }}</MediaQuery>);

@@ -577,6 +577,7 @@ const serialize = function (runtime, targetId) {
     // Assemble metadata
     const meta = Object.create(null);
     meta.semver = '3.0.0';
+    if (runtime.tinkibotImages) meta.tinkibotImages = runtime.tinkibotImages.serialize();
     meta.vm = vmPackage.version;
     if (runtime.origin) {
         meta.origin = runtime.origin;

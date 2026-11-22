@@ -113,6 +113,10 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 ### scratch-vm specifics
 
+- Project robot images live in `src/tinkibot-images/` and `meta.tinkibotImages` in project JSON.
+  The Images tab edits native 128 × 140 RGB888 under the existing 20-pixel status bar on the 128 × 160 portrait display; uploads use existing RGB565/TFP.
+  See `packages/scratch-vm/docs/tinkibot-image-editor.md` for persistence and transport prerequisites.
+
 - Web Serial robot API transport lives in `src/extensions/tinkimo_tinkibot/connection/`; see
   `packages/scratch-vm/docs/tinkibot-web-serial.md` for gateway compatibility and hardware testing.
   The normal Connections view shows a status light/transport; Expert reveals manual controls and diagnostics.
@@ -215,3 +219,42 @@ Review all changes and confirm:
 - **Build passes**: `npm run build` (or `npm run build` in the affected package) completes successfully.
 - **Tests pass**: `npm test` (or `npm test` in the affected package) completes with no failures.
 - **No lint errors**: `npm run test:lint` (or `npm run lint`) passes in the affected package.
+
+Project image restoration is coordinated by `packages/scratch-vm/src/tinkibot-images/sync.js`.
+Preserve project-generation guards, UUID-pinned transfers and claim checks when changing lifecycle events.
+The matching firmware/proxy/modem `reset_images` operation clears only uploaded user RGB565 files.
+See `packages/scratch-vm/docs/tinkibot-image-editor.md`.
+
+The custom-image dropdown uses the coordinator's confirmed upload records, not the raw project image list.
+Keep upload availability ephemeral and scoped to the project/robot; edits replace immutable pixel buffers.
+The Images tab commits text and warns about pending uploads when it unmounts.
+
+Automatic restoration uses a fixed per-operation image snapshot and the existing
+project-image-upload-modal. Never resnapshot edits into an active job. Image
+mutations and ordinary robot requests are locked while the dialog is active;
+only acknowledged files advance completion, and Retry resumes the failed index.
+Internal interruption must settle the active transfer before releasing the lock.
+
+
+Image compression is opt-in through the `rgb565-rle1` TFP negotiation token.
+Preserve raw fallback and unchanged TFP v1 packet metadata. Only smaller packed
+40,960-byte RGB565 images may use it; the robot must verify bounded expansion
+before COMPLETE and store raw bytes. See the image/file transfer documentation.
+
+
+Image import uses the shared Modal in `images-tab/image-import-modal.jsx`.
+Its robot/sketchpad artwork is decorative; keep the live native-size canvas on
+its paper so contain/crop previews always match the pixels added to the project.
+Do not allow image-editor shortcuts to mutate the current image while importing.
+
+
+Batch START metadata may append flags byte 1 to suppress only successful
+intermediate completion UI. Preserve default wire metadata and acknowledged commits;
+never suppress errors/overwrite prompts. Only the last fixed-snapshot image requests
+completion UI. See the file/image transfer documentation for rollout requirements.
+
+
+The public API adapter preserves upload_image.show-complete as a JSON boolean;
+ordinary block parameters remain strings. Test typed options on the actual emitted
+WebSocket frame. Upload failures use the matching surprised mascot, accessible
+recovery controls, friendly text and expandable technical codes.

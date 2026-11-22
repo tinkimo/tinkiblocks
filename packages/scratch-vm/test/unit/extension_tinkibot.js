@@ -100,7 +100,7 @@ test('Tinkibot blocks are grouped into focused categories', t => {
         Sensors: ['measure_line_sensor', 'measure_distance', 'measure_voltage'],
         Sounds: ['playNoteForBeats', 'playDrumForBeats', 'restForBeats', 'setTempo', 'changeTempo',
             'volume', 'play_sound', 'preload_audio'],
-        Display: ['display_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
+        Display: ['display_image', 'display_user_image', 'display_letter', 'display_number', 'mosaic', 'write_text', 'text_colour',
             'background_colour', 'backlight', 'preload_image', 'clear']
     });
     t.strictSame(infos.map(info => info.color1), ['#B832D0', '#A52A50', '#007F96', '#12833A', '#7950E8', '#AD5E00']);
@@ -498,6 +498,7 @@ test('Tinkibot claims and releases a robot with the persistent client UUID', asy
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
         claimedBy: clientUuid,
+        claimStatus: 'accepted',
         claimState: 'paired'
     }]);
 
@@ -512,6 +513,7 @@ test('Tinkibot claims and releases a robot with the persistent client UUID', asy
         nickname: 'orange',
         botUuid: 'orange-robot-uuid',
         claimedBy: null,
+        claimStatus: 'free',
         claimState: 'free'
     }]);
 
@@ -658,6 +660,7 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
 
     const startedHats = [];
     const extension = new TinkibotBlocks({
+        emit: () => {},
         startHats: opcode => {
             startedHats.push(opcode);
             t.equal(extension.when_button_event({BUTTON: 'top-right', STATE: 'pressed'}), false);
@@ -693,7 +696,8 @@ test('Tinkibot button events start event hats and filter by their menus', t => {
 });
 
 test('Tinkibot preload blocks provide combined media menus', t => {
-    const infos = new TinkibotBlocks(makeRuntime()).getInfos();
+    const extension = new TinkibotBlocks(makeRuntime());
+    const infos = extension.getInfos();
     const display = infos.find(info => info.id === 'tinkibotDisplay');
     const sounds = infos.find(info => info.id === 'tinkibotSounds');
     t.match(display.blocks.find(block => block.opcode === 'preload_image'), {
@@ -707,8 +711,11 @@ test('Tinkibot preload blocks provide combined media menus', t => {
         arguments: {AUDIO: {type: 'string', menu: 'sound_options'}}
     });
     const menus = display.menus;
-    t.strictSame(menus.preload_image_options.items, [...new Set([
-        ...menus.image_options.items, ...menus.letter_options.items,
+    t.strictSame(menus.image_options.items, extension.getProjectImageOptions());
+    t.equal(menus.user_image_options.items, 'getUserImageOptions');
+    t.equal(menus.preload_image_options.items, 'getProjectPreloadImageOptions');
+    t.strictSame(extension.getProjectPreloadImageOptions(), [...new Set([
+        ...extension.getProjectImageOptions(), ...menus.letter_options.items,
         ...menus.number_options.items, ...menus.mosaic_options.items
     ])]);
     const vm = new VirtualMachine();
@@ -838,4 +845,26 @@ test('disconnected paired robot survives reconnect and Remove frees the next cla
     await extension.claimRobot('blue-uuid');
     t.equal(socket.publicSent.at(-1).command, 'claim');
     t.equal(socket.publicSent.at(-1)['bot-uuid'], 'blue-uuid');
+});
+
+test('image completion option stays boolean in the actual public WebSocket frame', async t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    pairRobot(extension);
+    MockWebSocket.instance.open();
+    for (const showComplete of [false, true]) {
+        const request = extension._sendCommand({command: 'upload_image', filename: 'image1.rgb565',
+            data: 'pixels', 'show-complete': showComplete}, 'upload_image');
+        await new Promise(resolve => setImmediate(resolve));
+        const frame = MockWebSocket.instance.publicSent.at(-1);
+        t.equal(frame.command, 'upload_image');
+        t.equal(frame['show-complete'], showComplete);
+        t.equal(typeof frame['show-complete'], 'boolean');
+        MockWebSocket.instance.respond('upload_image', 'OK');
+        await request;
+    }
+    const api = require('../../src/extensions/tinkimo_tinkibot/api');
+    t.same(api.command({command: 'drive', motor: 'left', speed: 50}),
+        {command: 'drive', motor: 'left', speed: '50'}, 'ordinary command parameters remain strings');
+    t.same(api.command({command: 'upload_image', filename: 'one.rgb565', data: 'pixels'}),
+        {command: 'upload_image', filename: 'one.rgb565', data: 'pixels'}, 'default option stays omitted');
 });

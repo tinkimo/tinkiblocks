@@ -12,7 +12,7 @@ class SerialFramer {
         for (const byte of bytes) {
             if (byte === 0) {
                 if (this.binary && this.pending.length && !this.discard) {
-                    messages.push({kind: 'binary', bytes: this.pending.length});
+                    messages.push({kind: 'binary', bytes: this.pending.length, data: new Uint8Array(this.pending)});
                 }
                 this.binary = !this.binary;
                 this.pending = [];
@@ -89,7 +89,7 @@ class SerialTransport {
         const writer = this.writer;
         const operation = this.writeTail.then(() => {
             if (this.closing || !writer || writer !== this.writer) throw new Error('Serial device disconnected');
-            return writer.write(new TextEncoder().encode(text));
+            return writer.write(typeof text === 'string' ? new TextEncoder().encode(text) : text);
         });
         this.writeTail = operation.catch(() => {});
         return operation;

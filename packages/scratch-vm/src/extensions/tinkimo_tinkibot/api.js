@@ -3,7 +3,7 @@ const protocol = require('./bundles/protocol');
 /**
  * Convert internal Scratch payloads at one public API boundary.
  * @param {object} payload internal command and block arguments
- * @returns {object} public command with string parameters
+ * @returns {object} public command with string parameters and typed upload options
  */
 const command = payload => {
     const value = {...payload};
@@ -17,7 +17,10 @@ const command = payload => {
     } else if (value.command === 'display_image') {
         value.command = 'display';
     }
-    for (const key of Object.keys(value)) value[key] = String(value[key]);
+    for (const key of Object.keys(value)) {
+        if (value.command === 'upload_image' && key === 'show-complete') continue;
+        value[key] = String(value[key]);
+    }
     return value;
 };
 
@@ -26,7 +29,7 @@ const command = payload => {
  * @param {object} value decoded public response
  * @param {object} pending originating command metadata
  * @param {string} clientUuid local client identity
- * @returns {string|number|Array<object>} command result or ordered bundle results
+ * @returns {string|number|boolean|undefined|Array<object>} command result or ordered bundle results
  */
 const response = (value, pending, clientUuid) => {
     if (value['client-uuid'] !== clientUuid || value['bot-uuid'] !== pending.botUuid ||
@@ -54,7 +57,8 @@ const response = (value, pending, clientUuid) => {
     if (expected && typeof value.message !== 'undefined' && result !== expected) {
         throw new Error(result || 'Incomplete music response');
     }
-    return typeof result === 'undefined' ? '' : result;
+    if (result === '') return;
+    return result;
 };
 
 // Match the proxy/gateway execution budget without shortening long music bundles.

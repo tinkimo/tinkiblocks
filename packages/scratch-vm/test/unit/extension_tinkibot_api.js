@@ -88,9 +88,23 @@ test('bundle byte limit reserves the proxy transaction envelope overhead', t => 
 test('successful music needs no message and successful reporters use result', t => {
     const value = {'client-uuid': 'client', 'bot-uuid': bot, 'status': 'OK', 'command': 'play_drum'};
     const pending = {botUuid: bot, publicCommands: [{command: 'play_drum'}]};
-    t.equal(api.response(value, pending, 'client'), '');
+    t.equal(typeof api.response(value, pending, 'client'), 'undefined');
     t.equal(api.response({...value, command: 'measure_voltage', result: '4.2'},
         {botUuid: bot, publicCommands: [{command: 'measure_voltage'}]}, 'client'), '4.2');
+    t.end();
+});
+
+test('empty robot replies suppress visual reports while preserving nonempty results', t => {
+    const pending = {botUuid: bot, publicCommands: [{command: 'backlight'}]};
+    const value = {'client-uuid': 'client', 'bot-uuid': bot, 'status': 'OK', 'command': 'backlight'};
+    t.equal(typeof api.response(value, pending, 'client'), 'undefined', 'missing message has no reported value');
+    t.equal(typeof api.response({...value, message: ''}, pending, 'client'), 'undefined',
+        'empty message has no reported value');
+    t.equal(typeof api.response({...value, result: ''}, pending, 'client'), 'undefined',
+        'empty result has no reported value');
+    for (const result of [0, false, '0', 'OK backlight']) {
+        t.equal(api.response({...value, result}, pending, 'client'), result, 'nonempty result is preserved');
+    }
     t.end();
 });
 

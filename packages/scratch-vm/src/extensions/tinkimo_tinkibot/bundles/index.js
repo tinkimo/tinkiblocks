@@ -115,7 +115,8 @@ class ActionBundles {
 
     collect (opcode, payload, thread) {
         if (!thread || !thread.target) return [];
-        const robot = this.extension._connectedRobots.find(item => item.claimState === 'paired');
+        const robot = this.extension._connectedRobots.find(item =>
+            item.claimState === 'paired' && item.connected !== false);
         if (!robot) return [];
         const blocks = thread.target.blocks;
         const metadata = this._getMetadata();

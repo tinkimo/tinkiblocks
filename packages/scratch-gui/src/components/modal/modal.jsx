@@ -16,6 +16,7 @@ import styles from './modal.css';
 const ModalComponent = props => (
     <ReactModal
         isOpen
+        aria={props.aria}
         className={classNames(styles.modalContent, props.className, {
             [styles.fullScreen]: props.fullScreen,
             // Used by scratch-platorm to distinguish between editor modals and other modals
@@ -71,7 +72,7 @@ const ModalComponent = props => (
                         styles.headerItemClose
                     )}
                 >
-                    {props.fullScreen ? (
+                    {props.hideCloseButton ? null : props.fullScreen ? (
                         <Button
                             className={styles.backButton}
                             iconSrc={backIcon}
@@ -97,6 +98,7 @@ const ModalComponent = props => (
 );
 
 ModalComponent.propTypes = {
+    aria: PropTypes.shape({modal: PropTypes.bool}),
     children: PropTypes.node,
     className: PropTypes.string,
     contentLabel: PropTypes.oneOfType([
@@ -106,6 +108,7 @@ ModalComponent.propTypes = {
     fullScreen: PropTypes.bool,
     headerClassName: PropTypes.string,
     headerImage: PropTypes.string,
+    hideCloseButton: PropTypes.bool,
     isRtl: PropTypes.bool,
     onHelp: PropTypes.func,
     onRequestClose: PropTypes.func

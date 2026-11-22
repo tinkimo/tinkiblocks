@@ -1,0 +1,26 @@
+[
+  {
+    "name": "blank",
+    "pattern": "ffff",
+    "packedSize": 516,
+    "packedSha256": "bc49ca24b37905ce499f331af3f187a2010857a0011f34a46a023466df0c51df"
+  },
+  {
+    "name": "bands",
+    "pattern": "00000000ffff12345678",
+    "packedSize": 40960,
+    "packedSha256": "7baa50ec8155a15da69103062dfb28146681456d80d213726103a914cea2705f"
+  },
+  {
+    "name": "mixed",
+    "pattern": "000100020003000300030004",
+    "packedSize": 34171,
+    "packedSha256": "939963e8f39651d080a70a4eda00da884fe7f5dce1bd319a558392bf75903b70"
+  },
+  {
+    "name": "literal",
+    "pattern": "12345678",
+    "packedSize": 40960,
+    "packedSha256": "018c585b5ae977546ebc193a91a8d1091076223e912dc431c244af476a857095"
+  }
+]

@@ -19,6 +19,7 @@ import {BLOCKS_DEFAULT_SCALE, STAGE_DISPLAY_SIZES} from '../lib/layout-constants
 import DropAreaHOC from '../lib/drop-area-hoc.jsx';
 import DragConstants from '../lib/drag-constants';
 import defineDynamicBlock from '../lib/define-dynamic-block';
+import updateUserImageBlocks, {styleUserImageBlocks} from '../lib/user-image-blocks';
 import {DEFAULT_MODE, getColorsForMode, colorModeMap} from '../lib/settings/color-mode';
 import {CAT_BLOCKS_THEME} from '../lib/settings/theme';
 import {
@@ -78,6 +79,7 @@ class Blocks extends React.Component {
             'handleMonitorsUpdate',
             'handleExtensionAdded',
             'handleBlocksInfoUpdate',
+            'handleProjectImagesChanged',
             'onTargetsUpdate',
             'onVisualReport',
             'onWorkspaceUpdate',
@@ -298,6 +300,8 @@ class Blocks extends React.Component {
 
         this.workspace.updateToolbox(this.props.toolboxXML);
         this.workspace.getToolbox().runAfterRerender(() => {
+            styleUserImageBlocks(this.workspace);
+            styleUserImageBlocks(this.workspace.getFlyout().getWorkspace());
             const newCategoryScrollPosition = this.workspace
                 .getFlyout()
                 .getCategoryScrollPosition(selectedCategoryName);
@@ -344,6 +348,7 @@ class Blocks extends React.Component {
         this.props.vm.addListener('MONITORS_UPDATE', this.handleMonitorsUpdate);
         this.props.vm.addListener('EXTENSION_ADDED', this.handleExtensionAdded);
         this.props.vm.addListener('BLOCKSINFO_UPDATE', this.handleBlocksInfoUpdate);
+        this.props.vm.addListener('TINKIBOT_IMAGES_CHANGED', this.handleProjectImagesChanged);
         this.props.vm.addListener('PERIPHERAL_CONNECTED', this.handleStatusButtonUpdate);
         this.props.vm.addListener('PERIPHERAL_DISCONNECTED', this.handleStatusButtonUpdate);
     }
@@ -358,6 +363,7 @@ class Blocks extends React.Component {
         this.props.vm.removeListener('MONITORS_UPDATE', this.handleMonitorsUpdate);
         this.props.vm.removeListener('EXTENSION_ADDED', this.handleExtensionAdded);
         this.props.vm.removeListener('BLOCKSINFO_UPDATE', this.handleBlocksInfoUpdate);
+        this.props.vm.removeListener('TINKIBOT_IMAGES_CHANGED', this.handleProjectImagesChanged);
         this.props.vm.removeListener('PERIPHERAL_CONNECTED', this.handleStatusButtonUpdate);
         this.props.vm.removeListener('PERIPHERAL_DISCONNECTED', this.handleStatusButtonUpdate);
     }
@@ -487,6 +493,8 @@ class Blocks extends React.Component {
             this.workspace.resize();
         }
 
+        this.handleProjectImagesChanged(true);
+
         // Clear the undo state of the workspace since this is a
         // fresh workspace and we don't want any changes made to another sprites
         // workspace to be 'undone' here.
@@ -597,6 +605,14 @@ class Blocks extends React.Component {
         if (toolboxXML) {
             this.props.updateToolboxState(toolboxXML);
         }
+    }
+    handleProjectImagesChanged (force = false) {
+        if (!this.props.vm.imageSync.projectReady || this.props.vm.imageSync.blocking) return;
+        const names = this.props.vm.imageSync.uploadedNames();
+        const signature = JSON.stringify(names);
+        if (!force && signature === this._userImageBlockNames) return;
+        this._userImageBlockNames = signature;
+        updateUserImageBlocks(this.workspace, names);
     }
     handleBlocksInfoUpdate (categoryInfo) {
         // @todo Later we should replace this to avoid all the warnings from redefining blocks.

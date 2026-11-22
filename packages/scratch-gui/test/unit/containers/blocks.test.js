@@ -6,6 +6,7 @@ describe('Blocks container onWorkspaceUpdate', () => {
     beforeEach(() => {
         // Minimal mock instance — just enough for onWorkspaceUpdate to run
         instance = {
+            handleProjectImagesChanged: jest.fn(),
             getToolboxXML: jest.fn().mockReturnValue(null),
             onWorkspaceMetricsChange: jest.fn(),
             toolboxUpdateChangeListener: jest.fn(),
