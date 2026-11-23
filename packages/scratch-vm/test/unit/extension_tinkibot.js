@@ -117,6 +117,18 @@ test('Tinkibot blocks are grouped into focused categories', t => {
     t.end();
 });
 
+test('Arc offers turn directions and Move offers travel directions', t => {
+    const extension = new TinkibotBlocks(makeRuntime());
+    const movement = extension.getInfos().find(info => info.id === 'tinkibotMovement');
+    const arc = movement.blocks.find(block => block.opcode === 'arc');
+    const move = movement.blocks.find(block => block.opcode === 'move');
+
+    t.equal(arc.arguments.DIRECTION.defaultValue, 'left');
+    t.strictSame(movement.menus[arc.arguments.DIRECTION.menu].items, ['left', 'right']);
+    t.strictSame(movement.menus[move.arguments.DIRECTION.menu].items, ['forward', 'reverse']);
+    t.end();
+});
+
 test('Every Tinkibot block is assigned to exactly one category', t => {
     const extension = new TinkibotBlocks(makeRuntime());
     const allOpcodes = extension._getCombinedInfo().blocks
