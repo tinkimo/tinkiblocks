@@ -106,14 +106,14 @@ const renderExpertConnections = (robots, manager) => {
 };
 
 describe('Web Serial Connections tab', () => {
-    test('serial robot cards use shared claim/release operations and show UUIDs', () => {
+    test('serial robot cards use UUIDs for claim/release without displaying them', () => {
         const manager = createManager({status: 'connected', modem: 'identified'});
         const {getByText, getAllByText, getByRole, runtime, unmount} = renderExpertConnections([
             {nickname: 'USB lime', botUuid: 'usb-robot-uuid', connected: true, claimState: 'free'}
         ], manager);
         expect(getByText('Discovered Tinkibots')).toBeVisible();
         expect(getByText('USB lime')).toBeVisible();
-        expect(getByText('usb-robot-uuid')).toBeVisible();
+        expect(within(getByText('USB lime').closest('div')).queryByText('usb-robot-uuid')).toBeNull();
         fireEvent.click(getByRole('button', {name: 'Claim'}));
         expect(runtime.claimTinkibotRobot).toHaveBeenCalledWith('usb-robot-uuid');
         act(() => runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED', [
