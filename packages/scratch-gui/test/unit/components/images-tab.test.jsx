@@ -108,15 +108,16 @@ test('import has explicit contain and crop strategies at native dimensions', () 
     importCanvas(image, 'crop', [255, 255, 255]);
     expect(context.drawImage).toHaveBeenLastCalledWith(image, -64, 0, 256, 140);
 });
-test('editor works offline, renders LCD icon and fixed canvases, and manages images', () => {
-    const {getByRole, getByLabelText, vm} = editor();
+test('editor works offline, renders the LCD icon and drawing canvas, and manages images', () => {
+    const {getByRole, getByLabelText, queryByLabelText, vm} = editor();
     expect(getByRole('button', {name: 'New image'})).toBeEnabled();
     fireEvent.click(getByRole('button', {name: 'New image'}));
     const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
     expect(canvas).toHaveAttribute('width', '256');
     expect(canvas).toHaveAttribute('height', '280');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('width', '128');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('height', '140');
+    expect(queryByLabelText('Robot preview')).toBeNull();
+    expect(getByRole('toolbar')).toBeInTheDocument();
+    expect(getByRole('group', {name: 'Colours'})).toBeInTheDocument();
     expect(getByRole('button', {name: 'Upload to Robot'})).toBeDisabled();
     expect(vm.projectImages.get().pixels.length).toBe(128 * 140 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));
@@ -134,6 +135,18 @@ test('editor works offline, renders LCD icon and fixed canvases, and manages ima
     expect(icon).toHaveAttribute('viewBox', '0 0 24 24');
     expect(icon.querySelector('rect')).toHaveAttribute('rx', '2');
 });
+test('New image draws the new canvas and thumbnail once without repainting the gallery', () => {
+    const {getByRole, vm} = editor();
+    const create = () => fireEvent.click(getByRole('button', {name: 'New image'}));
+    create();
+    create();
+    context.drawImage.mockClear();
+    create();
+    expect(getByRole('option', {name: 'image3'})).toHaveAttribute('aria-selected', 'true');
+    expect(vm.projectImages.get().pixels[0]).toBe(255);
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+});
+
 test('undo/redo and project switching preserve isolation', () => {
     const {getByRole, vm} = editor();
     fireEvent.click(getByRole('button', {name: 'New image'}));

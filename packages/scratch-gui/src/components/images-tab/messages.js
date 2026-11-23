@@ -302,11 +302,6 @@ export default defineMessages({
         defaultMessage: 'Paste',
         description: 'Image editor: paste'
     },
-    preview: {
-        id: 'gui.images.preview',
-        defaultMessage: 'Robot preview',
-        description: 'Image editor: preview'
-    },
     canvas: {
         id: 'gui.images.canvas',
         defaultMessage: 'Drawing canvas, 128 by 140 pixels',

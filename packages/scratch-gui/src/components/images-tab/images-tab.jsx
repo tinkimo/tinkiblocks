@@ -6,7 +6,6 @@ import {useIntl} from 'react-intl';
 import messages from './messages';
 import styles from './images-tab.css';
 import FilenameField from './filename-field';
-import RobotPreview from './robot-preview';
 import ToolIcon from './tool-icon';
 import ImageImportModal from './image-import-modal';
 import ImageSyncStatus from '../image-sync-status/image-sync-status';
@@ -22,7 +21,7 @@ const palette = ['#000000', '#ffffff', '#ef4444', '#f97316', '#facc15', '#84cc16
     '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#92400e', '#64748b', '#cbd5e1'];
 const histories = new WeakMap();
 
-const Thumbnail = ({pixels}) => {
+const Thumbnail = React.memo(function Thumbnail ({pixels}) {
     const canvas = useRef(null);
     useEffect(() => {
         const context = canvas.current.getContext('2d');
@@ -35,7 +34,7 @@ const Thumbnail = ({pixels}) => {
         height={HEIGHT}
         aria-hidden
     />);
-};
+});
 Thumbnail.propTypes = {pixels: PropTypes.instanceOf(Uint8Array).isRequired};
 
 const ImagesTab = ({vm}) => {
@@ -61,7 +60,6 @@ const ImagesTab = ({vm}) => {
     const finishTextRef = useRef(null);
     const leaveWarningRef = useRef(null);
     const canvas = useRef(null);
-    const preview = useRef(null);
     const root = useRef(null);
     const file = useRef(null);
     const gesture = useRef(null);
@@ -86,15 +84,12 @@ const ImagesTab = ({vm}) => {
         }
     };
     const paint = data => {
-        if (!canvas.current || !preview.current || !data) return;
-        const source = imageCanvas(data);
-        for (const target of [canvas.current, preview.current]) {
-            const context = target.getContext('2d');
-            context.imageSmoothingEnabled = false;
-            context.clearRect(0, 0, target.width, target.height);
-            context.drawImage(source, 0, 0, target.width, target.height);
-        }
-        const context = canvas.current.getContext('2d');
+        const target = canvas.current;
+        if (!target || !data) return;
+        const context = target.getContext('2d');
+        context.imageSmoothingEnabled = false;
+        context.clearRect(0, 0, target.width, target.height);
+        context.drawImage(imageCanvas(data), 0, 0, target.width, target.height);
         context.setLineDash([]);
         if (selection.current) {
             const box = selection.current;
@@ -193,15 +188,13 @@ const ImagesTab = ({vm}) => {
         gesture.current = null;
         selection.current = null;
         updateTextDraft(null);
-        pixels.current = current ? new Uint8Array(current.pixels) : null;
-        paint(pixels.current);
         setImported(null);
         setUpload(null);
     }, [collection, current && current.id]);
     useEffect(() => {
-        if (!gesture.current && current) pixels.current = new Uint8Array(current.pixels);
+        if (!gesture.current) pixels.current = current ? new Uint8Array(current.pixels) : null;
         paint(pixels.current);
-    }, [current && current.pixels]);
+    }, [collection, current && current.id, current && current.pixels]);
 
     const undo = redo => {
         if (!current) return;
@@ -453,129 +446,130 @@ const ImagesTab = ({vm}) => {
                             onValidityChange={setNameInvalid}
                         />
                     </div>
-                    <div className={styles.quickActions}>
-                        {button('undo', () => undo(false), !history.undo.length)}
-                        {button('redo', () => undo(true), !history.redo.length)}
-                        {button('clear', () => {
-                            if (window.confirm(label('clearConfirm'))) {
-                                const data = new Uint8Array((WIDTH * HEIGHT) * 3);
-                                for (let i = 0; i < (WIDTH * HEIGHT); i++) data.set(rgb(background), i * 3);
-                                commit(data);
-                            }
-                        })}
-                    </div>
-                    <div
-                        className={styles.ribbon}
-                        role="toolbar"
-                        aria-label={label('tools')}
-                    >
-                        {toolGroups.map(group => (
-                            <fieldset
-                                className={styles.ribbonGroup}
-                                key={group.label}
-                            >
-                                <legend>{label(group.label)}</legend>
-                                <div className={styles.toolGrid}>
-                                    {group.items.map(item => (
-                                        <button
-                                            key={item}
-                                            type="button"
-                                            aria-pressed={tool === item || tool === `${item}Filled`}
-                                            title={label(`${item}Help`)}
-                                            onClick={() => {
-                                                finishText();
-                                                cancel();
-                                                setTool(filledShapes && ['rectangle', 'ellipse'].includes(item) ?
-                                                    `${item}Filled` : item);
-                                            }}
+                    <div className={styles.editingArea}>
+                        <div className={styles.drawingControls}>
+                            <div className={styles.quickActions}>
+                                {button('undo', () => undo(false), !history.undo.length)}
+                                {button('redo', () => undo(true), !history.redo.length)}
+                                {button('clear', () => {
+                                    if (window.confirm(label('clearConfirm'))) {
+                                        const data = new Uint8Array((WIDTH * HEIGHT) * 3);
+                                        for (let i = 0; i < (WIDTH * HEIGHT); i++) data.set(rgb(background), i * 3);
+                                        commit(data);
+                                    }
+                                })}
+                                <div className={styles.toolOptions}>
+                                    {['brush', 'eraser', 'line', 'rectangle', 'ellipse'].includes(tool) ?
+                                        <label>{label('size')} <select
+                                            value={size}
+                                            onChange={event => setSize(Number(event.target.value))}
                                         >
-                                            <ToolIcon name={item} />{label(item)}
-                                        </button>
-                                    ))}
+                                            {[1, 3, 5, 9, 15].map(value => <option key={value}>{value}</option>)}
+                                        </select></label> : null}
+                                    {tool === 'text' ? <React.Fragment>
+                                        <label data-text-format>{label('fontSize')} <select
+                                            value={fontSize}
+                                            onChange={event => setFontSize(Number(event.target.value))}
+                                        >
+                                            {[8, 10, 12, 16, 24, 32].map(value => <option key={value}>{value}</option>)}
+                                        </select></label>
+                                        {textDraft ? <button
+                                            type="button"
+                                            data-text-format
+                                            onClick={() => {
+                                                finishText(); canvas.current.focus();
+                                            }}
+                                        >{label('finishText')}</button> : null}
+                                    </React.Fragment> : null}
                                 </div>
-                                {group.label === 'selectionActions' ? <div className={styles.clipboard}>
-                                    {button('cut', () => copy(true), !selection.current)}
-                                    {button('copy', () => copy(false), !selection.current)}
-                                    {button('paste', paste, !clipboard.current)}
-                                </div> : null}
-                                {group.label === 'shapeTools' ? <label className={styles.shapeFill}>
-                                    <input
-                                        type="checkbox"
-                                        checked={filledShapes}
-                                        onChange={event => {
-                                            cancel();
-                                            const filled = event.target.checked;
-                                            setFilledShapes(filled);
-                                            const base = tool.replace('Filled', '');
-                                            if (['rectangle', 'ellipse'].includes(base)) {
-                                                setTool(filled ? `${base}Filled` : base);
-                                            }
-                                        }}
-                                    />{label('fillShape')}
-                                </label> : null}
-                            </fieldset>
-                        ))}
-                    </div>
-                    <div className={styles.toolOptions}>
-                        <p className={styles.toolHint}>
-                            <strong>{label(tool.replace('Filled', ''))}</strong>
-                            {' — '}{label(`${tool.replace('Filled', '')}Help`)}
-                        </p>
-                        {['brush', 'eraser', 'line', 'rectangle', 'ellipse'].includes(tool) ?
-                            <label>{label('size')} <select
-                                value={size}
-                                onChange={event => setSize(Number(event.target.value))}
+                            </div>
+                            <div
+                                className={styles.ribbon}
+                                role="toolbar"
+                                aria-label={label('tools')}
                             >
-                                {[1, 3, 5, 9, 15].map(value => <option key={value}>{value}</option>)}
-                            </select></label> : null}
-                        {tool === 'text' ? <React.Fragment>
-                            <label data-text-format>{label('fontSize')} <select
-                                value={fontSize}
-                                onChange={event => setFontSize(Number(event.target.value))}
-                            >
-                                {[8, 10, 12, 16, 24, 32].map(value => <option key={value}>{value}</option>)}
-                            </select></label>
-                            {textDraft ? <button
-                                type="button"
+                                {toolGroups.map(group => (
+                                    <fieldset
+                                        className={styles.ribbonGroup}
+                                        key={group.label}
+                                    >
+                                        <legend>{label(group.label)}</legend>
+                                        <div className={styles.toolGrid}>
+                                            {group.items.map(item => (
+                                                <button
+                                                    key={item}
+                                                    type="button"
+                                                    aria-label={label(item)}
+                                                aria-pressed={tool === item || tool === `${item}Filled`}
+                                                    title={label(`${item}Help`)}
+                                                    onClick={() => {
+                                                        finishText();
+                                                        cancel();
+                                                        setTool(filledShapes && ['rectangle', 'ellipse'].includes(item) ?
+                                                            `${item}Filled` : item);
+                                                    }}
+                                                >
+                                                    <ToolIcon name={item} /><span>{label(item)}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {group.label === 'selectionActions' ? <div className={styles.clipboard}>
+                                            {button('cut', () => copy(true), !selection.current)}
+                                            {button('copy', () => copy(false), !selection.current)}
+                                            {button('paste', paste, !clipboard.current)}
+                                        </div> : null}
+                                        {group.label === 'shapeTools' ? <label className={styles.shapeFill}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filledShapes}
+                                                onChange={event => {
+                                                    cancel();
+                                                    const filled = event.target.checked;
+                                                    setFilledShapes(filled);
+                                                    const base = tool.replace('Filled', '');
+                                                    if (['rectangle', 'ellipse'].includes(base)) {
+                                                        setTool(filled ? `${base}Filled` : base);
+                                                    }
+                                                }}
+                                            />{label('fillShape')}
+                                        </label> : null}
+                                    </fieldset>
+                                ))}
+                            </div>
+                            <fieldset
                                 data-text-format
-                                onClick={() => {
-                                    finishText(); canvas.current.focus();
-                                }}
-                            >{label('finishText')}</button> : null}
-                        </React.Fragment> : null}
-                    </div>
-                    <fieldset
-                        data-text-format
-                        className={`${styles.controlGroup} ${styles.colourPanel}`}
-                    >
-                        <legend>{label('palette')}</legend>
-                        <div className={styles.colourWells}>
-                            <label><input
-                                type="color"
-                                value={colour}
-                                onChange={event => setColour(event.target.value)}
-                            />{label('colour')}</label>
-                            <label><input
-                                type="color"
-                                value={background}
-                                onChange={event => setBackground(event.target.value)}
-                            />{label('background')}</label>
+                                className={`${styles.controlGroup} ${styles.colourPanel}`}
+                            >
+                                <legend>{label('palette')}</legend>
+                                <div className={styles.paletteContent}>
+                                    <div className={styles.colourWells}>
+                                        <label><input
+                                            type="color"
+                                            value={colour}
+                                            onChange={event => setColour(event.target.value)}
+                                        />{label('colour')}</label>
+                                        <label><input
+                                            type="color"
+                                            value={background}
+                                            title={label('paperHelp')}
+                                            onChange={event => setBackground(event.target.value)}
+                                        />{label('background')}</label>
+                                    </div>
+                                    <div className={styles.swatches}>
+                                        {palette.map(value => (<button
+                                            key={value}
+                                            type="button"
+                                            aria-label={`${label('colour')} ${value}`}
+                                            title={`${label('colour')} ${value}`}
+                                            aria-pressed={colour === value}
+                                            style={{backgroundColor: value}}
+                                            onClick={() => setColour(value)}
+                                        />))}
+                                    </div>
+                                </div>
+                            </fieldset>
                         </div>
-                        <div className={styles.swatches}>
-                            {palette.map(value => (<button
-                                key={value}
-                                type="button"
-                                aria-label={`${label('colour')} ${value}`}
-                                title={`${label('colour')} ${value}`}
-                                aria-pressed={colour === value}
-                                style={{backgroundColor: value}}
-                                onClick={() => setColour(value)}
-                            />))}
-                        </div>
-                        <p>{label('paperHelp')}</p>
-                    </fieldset>
-                    <div className={styles.canvases}>
-                        <div>
+                        <div className={styles.drawingSurface}>
                             <div className={styles.canvasFrame}>
                                 <canvas
                                     ref={canvas}
@@ -626,13 +620,7 @@ const ImagesTab = ({vm}) => {
                                 /> : null}
                             </div>
                             <p>{tool === 'select' ? label('selectionHint') : label('nativeSize')}</p>
-                        </div>
-                        <div className={styles.preview}><h3>{label('preview')}</h3>
-                            <RobotPreview
-                                ref={preview}
-                                nickname={((vm.runtime.tinkibotConnectedRobots || [])
-                                    .find(robot => robot.claimState === 'paired') || {}).nickname}
-                            />
+                            <p>{label(`${tool.replace('Filled', '')}Help`)}</p>
                         </div>
                     </div>
                     <div className={styles.row}>
