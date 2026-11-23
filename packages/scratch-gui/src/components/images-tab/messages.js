@@ -327,6 +327,21 @@ export default defineMessages({
         defaultMessage: 'Uploading…',
         description: 'Image editor: uploading'
     },
+    uploadDialog: {
+        id: 'gui.images.uploadDialog',
+        defaultMessage: 'Uploading image…',
+        description: 'Dialog title for a single image upload to a robot'
+    },
+    uploadedStatus: {
+        id: 'gui.images.uploadedStatus',
+        defaultMessage: 'Uploaded',
+        description: 'Gallery status for an image available on the claimed robot'
+    },
+    notUploadedStatus: {
+        id: 'gui.images.notUploadedStatus',
+        defaultMessage: 'Not uploaded',
+        description: 'Gallery status for an image unavailable on the claimed robot'
+    },
     uploaded: {
         id: 'gui.images.uploaded',
         defaultMessage: 'Image uploaded. Use its filename in the display image block.',

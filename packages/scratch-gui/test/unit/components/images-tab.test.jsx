@@ -33,7 +33,7 @@ const editor = () => {
     const vm = new EventEmitter();
     vm.runtime = new EventEmitter();
     vm.runtime.tinkibotConnectedRobots = [];
-    vm.imageSync = {pendingImages: () => []};
+    vm.imageSync = {pendingImages: () => [], uploadedNames: () => []};
     vm.projectImages = new ImageCollection(() => vm.emit('TINKIBOT_IMAGES_CHANGED'));
     vm.uploadProjectImage = jest.fn(() => Promise.resolve());
     const view = render(<IntlProvider locale="en"><ImagesTab vm={vm} /></IntlProvider>);
@@ -173,6 +173,40 @@ test('upload feedback uses the selected image and surfaces failures', async () =
     expect(await findByRole('alert')).toHaveTextContent('Disconnected');
 });
 
+
+test('manual upload opens the progress dialog and updates the uploaded image row', async () => {
+    const {getByRole, getByText, queryByRole, queryByText, vm} = editor();
+    act(() => {
+        vm.runtime.tinkibotConnectedRobots = [{claimState: 'paired'}];
+        vm.runtime.emit('TINKIBOT_IMAGE_SYNC_CHANGED', {phase: 'ready', pending: 2});
+    });
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    expect(queryByText('2 images need uploading before use.')).toBeNull();
+    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
+    let complete;
+    vm.uploadProjectImage.mockImplementation((id, progress) => new Promise(resolve => {
+        progress(42);
+        complete = resolve;
+    }));
+    fireEvent.click(getByRole('button', {name: 'Upload to Robot'}));
+    expect(getByRole('dialog', {name: 'Uploading image…'})).toBeVisible();
+    expect(getByText('image2.rgb565')).toBeVisible();
+    expect(getByRole('progressbar')).toHaveValue(42);
+    await act(async () => {
+        vm.imageSync.uploadedNames = () => ['image2'];
+        complete();
+    });
+    expect(queryByRole('dialog')).toBeNull();
+    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Uploaded');
+    act(() => {
+        vm.imageSync.uploadedNames = () => [];
+        vm.emit('TINKIBOT_IMAGES_CHANGED');
+    });
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
+});
 
 test('controls are grouped by purpose and the grid control is removed', () => {
     const {getByRole, queryByRole} = editor();

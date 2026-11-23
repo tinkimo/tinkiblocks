@@ -9,6 +9,9 @@ import FilenameField from './filename-field';
 import ToolIcon from './tool-icon';
 import ImageImportModal from './image-import-modal';
 import ImageSyncStatus from '../image-sync-status/image-sync-status';
+import Modal from '../modal/modal.jsx';
+import uploadStyles from '../project-image-upload-modal/project-image-upload-modal.css';
+import uploadingImage from '../project-image-upload-modal/tinkibot-uploading.png';
 import {WIDTH, HEIGHT, HISTORY_LIMIT, point, rgb, hex, colourAt, line, fill, shape, region,
     copyRegion, pasteRegion, eraseRegion, imageCanvas, text, importCanvas} from './pixels';
 
@@ -391,6 +394,7 @@ const ImagesTab = ({vm}) => {
     );
     const paired = (vm.runtime.tinkibotConnectedRobots || []).some(robot =>
         robot.claimState === 'paired' && robot.connected !== false);
+    const uploadedNames = new Set(vm.imageSync.uploadedNames());
     const history = current ? historyFor() : {undo: [], redo: []};
     const importPixels = imported ? importCanvas(imported, fit, rgb(background)) : null;
     return (
@@ -426,17 +430,27 @@ const ImagesTab = ({vm}) => {
                             type="button"
                             role="option"
                             aria-selected={image.id === collection.selectedId}
+                            aria-label={image.name}
+                            aria-describedby={`image-upload-status-${image.id}`}
                             onClick={() => collection.select(image.id)}
                         >
                             <Thumbnail pixels={image.pixels} />
                             <span>{image.name}</span>
+                            <span
+                                className={styles.uploadStatus}
+                                data-uploaded={uploadedNames.has(image.name)}
+                                id={`image-upload-status-${image.id}`}
+                            >{label(uploadedNames.has(image.name) ? 'uploadedStatus' : 'notUploadedStatus')}</span>
                         </button>
                     ))}
                 </div>
                 <p>{label('savedHint')}</p>
             </aside>
             <main className={styles.workspace}>
-                <ImageSyncStatus runtime={vm.runtime} />
+                <ImageSyncStatus
+                    runtime={vm.runtime}
+                    showReady={false}
+                />
                 {current ? <div className={styles.content}>
                     <div className={styles.imageHeader}>
                         <FilenameField
@@ -639,15 +653,28 @@ const ImagesTab = ({vm}) => {
                             })}
                         </fieldset>
                     </div>
-                    {upload && upload.busy ? (
-                        <div role="status">
+                    {upload && upload.busy && !vm.imageSync.blocking ? <Modal
+                        aria={{modal: true}}
+                        className={uploadStyles.modal}
+                        contentLabel={label('uploadDialog')}
+                        hideCloseButton
+                    >
+                        <div className={uploadStyles.body}>
+                            <img
+                                className={uploadStyles.illustration}
+                                src={uploadingImage}
+                                alt=""
+                                aria-hidden="true"
+                            />
+                            <p>{current.name}.rgb565</p>
                             <progress
+                                aria-label={label('uploadDialog')}
                                 max={100}
                                 {...(upload.progress === null ? {} : {value: upload.progress})}
                             />
                             <p>{label('overwrite')}</p>
                         </div>
-                    ) : null}
+                    </Modal> : null}
                     {upload && upload.success ? <p role="status">{label('uploaded')}</p> : null}
                     {paired ? null : <p>{label('offline')}</p>}
                 </div> : <p className={styles.empty}>{label('empty')}</p>}
@@ -670,7 +697,11 @@ const ImagesTab = ({vm}) => {
 };
 ImagesTab.propTypes = {
     vm: PropTypes.shape({
-        imageSync: PropTypes.shape({pendingImages: PropTypes.func.isRequired, blocking: PropTypes.bool}).isRequired,
+        imageSync: PropTypes.shape({
+            pendingImages: PropTypes.func.isRequired,
+            uploadedNames: PropTypes.func.isRequired,
+            blocking: PropTypes.bool
+        }).isRequired,
         on: PropTypes.func.isRequired,
         removeListener: PropTypes.func.isRequired,
         uploadProjectImage: PropTypes.func.isRequired,
