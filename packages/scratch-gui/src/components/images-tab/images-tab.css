@@ -218,7 +218,7 @@
 .ribbon {
     display: flex;
     flex-wrap: wrap;
-    align-items: start;
+    align-items: flex-start;
     gap: 0.35rem 0.65rem;
     padding: 0.4rem;
     border: 1px solid $ui-black-transparent;
