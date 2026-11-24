@@ -239,11 +239,6 @@ class VirtualMachine extends EventEmitter {
     }
 
     _notifyProjectImageChanges () {
-        const names = JSON.stringify(this.runtime.tinkibotImages.images.map(image => image.name));
-        if (names !== this._projectImageMenuNames) {
-            this._projectImageMenuNames = names;
-            this.runtime.emit(Runtime.TOOLBOX_EXTENSIONS_NEED_UPDATE);
-        }
         this.emit('TINKIBOT_IMAGES_CHANGED');
         this.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
     }

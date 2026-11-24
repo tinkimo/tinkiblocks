@@ -33,7 +33,7 @@ const editor = () => {
     const vm = new EventEmitter();
     vm.runtime = new EventEmitter();
     vm.runtime.tinkibotConnectedRobots = [];
-    vm.imageSync = {pendingImages: () => []};
+    vm.imageSync = {pendingImages: () => [], uploadStatus: () => 'not-uploaded'};
     vm.projectImages = new ImageCollection(() => vm.emit('TINKIBOT_IMAGES_CHANGED'));
     vm.uploadProjectImage = jest.fn(() => Promise.resolve());
     const view = render(<IntlProvider locale="en"><ImagesTab vm={vm} /></IntlProvider>);
@@ -108,19 +108,21 @@ test('import has explicit contain and crop strategies at native dimensions', () 
     importCanvas(image, 'crop', [255, 255, 255]);
     expect(context.drawImage).toHaveBeenLastCalledWith(image, -64, 0, 256, 140);
 });
-test('editor works offline, renders LCD icon and fixed canvases, and manages images', () => {
-    const {getByRole, getByLabelText, vm} = editor();
+test('editor works offline, renders the LCD icon and drawing canvas, and manages images', () => {
+    const {getByRole, getByLabelText, queryByLabelText, vm} = editor();
     expect(getByRole('button', {name: 'New image'})).toBeEnabled();
     fireEvent.click(getByRole('button', {name: 'New image'}));
     const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
     expect(canvas).toHaveAttribute('width', '256');
     expect(canvas).toHaveAttribute('height', '280');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('width', '128');
-    expect(getByLabelText('Robot preview')).toHaveAttribute('height', '140');
+    expect(queryByLabelText('Robot preview')).toBeNull();
+    expect(getByRole('toolbar')).toBeInTheDocument();
+    expect(getByRole('group', {name: 'Colours'})).toBeInTheDocument();
     expect(getByRole('button', {name: 'Upload to Robot'})).toBeDisabled();
     expect(vm.projectImages.get().pixels.length).toBe(128 * 140 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));
     expect(vm.projectImages.images.length).toBe(2);
+    expect(getByRole('listbox').firstElementChild).toHaveAccessibleName('image2');
     const name = getByLabelText('Image filename');
     fireEvent.change(name, {target: {value: 'rainbow'}});
     fireEvent.blur(name);
@@ -134,6 +136,24 @@ test('editor works offline, renders LCD icon and fixed canvases, and manages ima
     expect(icon).toHaveAttribute('viewBox', '0 0 24 24');
     expect(icon.querySelector('rect')).toHaveAttribute('rx', '2');
 });
+test('New image draws the new canvas and thumbnail once without repainting the gallery', () => {
+    const {getByRole, vm} = editor();
+    const create = () => fireEvent.click(getByRole('button', {name: 'New image'}));
+    create();
+    create();
+    context.drawImage.mockClear();
+    const gallery = getByRole('complementary');
+    gallery.scrollTop = 120;
+    create();
+    const newest = getByRole('listbox').firstElementChild;
+    expect(newest).toHaveAccessibleName('image3');
+    expect(newest).toHaveAttribute('aria-selected', 'true');
+    expect(gallery.scrollTop).toBe(0);
+    expect(vm.projectImages.images.map(image => image.name)).toEqual(['image1', 'image2', 'image3']);
+    expect(vm.projectImages.get().pixels[0]).toBe(255);
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+});
+
 test('undo/redo and project switching preserve isolation', () => {
     const {getByRole, vm} = editor();
     fireEvent.click(getByRole('button', {name: 'New image'}));
@@ -160,6 +180,43 @@ test('upload feedback uses the selected image and surfaces failures', async () =
     expect(await findByRole('alert')).toHaveTextContent('Disconnected');
 });
 
+
+test('manual upload opens the progress dialog and updates the uploaded image row', async () => {
+    const {getByRole, getByText, queryByRole, queryByText, vm} = editor();
+    act(() => {
+        vm.runtime.tinkibotConnectedRobots = [{claimState: 'paired'}];
+        vm.runtime.emit('TINKIBOT_IMAGE_SYNC_CHANGED', {phase: 'ready', pending: 2});
+    });
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    expect(queryByText('2 images need uploading before use.')).toBeNull();
+    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
+    let complete;
+    vm.uploadProjectImage.mockImplementation((id, progress) => new Promise(resolve => {
+        progress(42);
+        complete = resolve;
+    }));
+    fireEvent.click(getByRole('button', {name: 'Upload to Robot'}));
+    expect(getByRole('dialog', {name: 'Uploading image…'})).toBeVisible();
+    expect(getByText('image2.rgb565')).toBeVisible();
+    expect(getByRole('progressbar')).toHaveValue(42);
+    await act(async () => {
+        vm.imageSync.uploadStatus = image => image.name === 'image2' ? 'synced' : 'not-uploaded';
+        complete();
+    });
+    expect(queryByRole('dialog')).toBeNull();
+    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('In sync');
+    act(() => {
+        vm.imageSync.uploadStatus = image => image.name === 'image2' ? 'modified' : 'not-uploaded';
+        vm.emit('TINKIBOT_IMAGES_CHANGED');
+    });
+    const modified = getByRole('option', {name: 'image2'});
+    expect(modified).toHaveAccessibleDescription('Modified');
+    expect(modified.querySelector('[data-upload-status="modified"]')).toBeVisible();
+    expect(queryByRole('heading', {name: 'Upload status key'})).toBeNull();
+});
 
 test('controls are grouped by purpose and the grid control is removed', () => {
     const {getByRole, queryByRole} = editor();
@@ -225,6 +282,25 @@ test('Paint-style shape fill toggles the drawing mode without duplicate tools', 
     fireEvent.click(getByRole('button', {name: 'Ellipse', exact: true}));
     expect(getByRole('checkbox', {name: 'Fill shape'})).toBeChecked();
     expect(getByText(/Drag to draw an oval/)).toBeVisible();
+});
+
+test.each(['rectangle', 'ellipse'])('Paint bucket fills a closed %s in one undo step', outline => {
+    const {getByRole, getByLabelText, vm} = editor();
+    const pixels = buffer();
+    shape(pixels, outline, {x: 10, y: 10}, {x: 30, y: 30}, [0, 0, 0]);
+    act(() => { vm.projectImages.create('outlined-shape', pixels); });
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    fireEvent.click(getByRole('button', {name: 'Drawing colour #ef4444'}));
+    fireEvent.click(getByRole('button', {name: 'Paint bucket'}));
+    fireEvent(canvas, new MouseEvent('pointerdown', {bubbles: true, clientX: 40, clientY: 40}));
+    fireEvent(canvas, new MouseEvent('pointerup', {bubbles: true, clientX: 40, clientY: 40}));
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 20, 20))).toEqual(rgb('#ef4444'));
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 20, 10))).toEqual([0, 0, 0]);
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 5, 5))).toEqual([255, 255, 255]);
+    fireEvent.click(getByRole('button', {name: 'Undo'}));
+    expect(vm.projectImages.get().pixels).toEqual(pixels);
+    expect(getByRole('button', {name: 'Undo'})).toBeDisabled();
 });
 
 test('text is typed on the image, finishes as one undo step, and Escape discards a draft', () => {

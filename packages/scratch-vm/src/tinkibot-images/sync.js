@@ -13,6 +13,7 @@ class ImageSync {
         this.running = null;
         this.operation = null;
         this.uploaded = new Map();
+        this.previouslyUploaded = new Set();
         this.availableNames = '[]';
         runtime.imageSync = this;
         runtime.retryTinkibotImageSync = () => this.retry();
@@ -82,6 +83,7 @@ class ImageSync {
         this.key = key;
         this.generation++;
         this.uploaded.clear();
+        this.previouslyUploaded.clear();
         this.refreshAvailability();
         if (!key) {
             this.interrupt(this.projectReady ? 'Robot disconnected during project image upload' : 'Project changed',
@@ -235,6 +237,13 @@ class ImageSync {
         }).map(image => image.name);
     }
 
+    uploadStatus (image) {
+        if (!this.projectReady || !this.key || this.key !== this.fingerprint(this.robot()) ||
+            !this.previouslyUploaded.has(image.id)) return 'not-uploaded';
+        const uploaded = this.uploaded.get(image.id);
+        return uploaded && uploaded.name === image.name && uploaded.pixels === image.pixels ? 'synced' : 'modified';
+    }
+
     pendingImages () {
         const available = new Set(this.uploadedNames());
         return this.runtime.tinkibotImages.images.filter(image => !available.has(image.name));
@@ -243,6 +252,7 @@ class ImageSync {
     recordUploaded (image, valid) {
         if (!valid()) return;
         this.uploaded.set(image.id, {...image});
+        this.previouslyUploaded.add(image.id);
         this.refreshAvailability();
     }
 
@@ -251,6 +261,9 @@ class ImageSync {
         for (const [id, uploaded] of this.uploaded) {
             if (!images.some(image => image.id === id && image.name === uploaded.name &&
                 image.pixels === uploaded.pixels)) this.uploaded.delete(id);
+        }
+        for (const id of this.previouslyUploaded) {
+            if (!images.some(image => image.id === id)) this.previouslyUploaded.delete(id);
         }
         const names = this.uploadedNames();
         const pending = images.length - names.length;

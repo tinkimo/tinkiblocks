@@ -27,18 +27,22 @@ test('only successfully uploaded current image versions are available', async t 
     h.runtime.emit('PROJECT_LOADED');
     await h.sync.wait();
     t.same(h.sync.uploadedNames(), ['first'], 'restoration records confirmed uploads');
+    t.equal(h.sync.uploadStatus(first), 'synced');
     const second = h.runtime.tinkibotImages.create('second');
     h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
     t.same(h.sync.uploadedNames(), ['first'], 'new images stay out of the dropdown');
     t.same(h.sync.pendingImages().map(image => image.name), ['second']);
+    t.equal(h.sync.uploadStatus(second), 'not-uploaded');
     const before = {...first};
     h.runtime.tinkibotImages.update(first.id, new Uint8Array(first.pixels));
     h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
     t.same(h.sync.uploadedNames(), [], 'edits are tracked even when pixels happen to match');
+    t.equal(h.sync.uploadStatus(first), 'modified');
     h.sync.recordUploaded(before, () => true);
     t.same(h.sync.uploadedNames(), [], 'an older upload cannot mark a newer edit uploaded');
     h.sync.recordUploaded({...first}, () => true);
     t.same(h.sync.uploadedNames(), ['first']);
+    t.equal(h.sync.uploadStatus(first), 'synced');
     h.runtime.tinkibotImages.select(second.id);
     h.runtime.emit('TINKIBOT_PROJECT_IMAGES_CHANGED');
     t.same(h.sync.uploadedNames(), ['first'], 'selection alone does not require upload');
@@ -47,6 +51,10 @@ test('only successfully uploaded current image versions are available', async t 
     t.same(h.sync.uploadedNames(), [], 'a new robot filename needs upload');
     h.sync.recordUploaded({...first}, () => false);
     t.same(h.sync.uploadedNames(), [], 'stale robot/project completion is ignored');
+    t.equal(h.sync.uploadStatus(first), 'modified');
+    h.runtime.tinkibotConnectedRobots = [];
+    h.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED');
+    t.equal(h.sync.uploadStatus(first), 'not-uploaded');
 });
 
 test('failed restoration only exposes images confirmed before the failure', async t => {

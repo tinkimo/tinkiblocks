@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import {FormattedMessage} from 'react-intl';
 import styles from './image-sync-status.css';
 
-const ImageSyncStatus = ({runtime}) => {
+const ImageSyncStatus = ({runtime, showReady = true}) => {
     const [state, setState] = useState(runtime.tinkibotImageSync);
     const retry = useCallback(() => runtime.retryTinkibotImageSync(), [runtime]);
     useEffect(() => {
@@ -11,7 +11,7 @@ const ImageSyncStatus = ({runtime}) => {
         runtime.on('TINKIBOT_IMAGE_SYNC_CHANGED', setState);
         return () => runtime.removeListener('TINKIBOT_IMAGE_SYNC_CHANGED', setState);
     }, [runtime]);
-    if (!state || state.phase === 'waiting') return null;
+    if (!state || state.phase === 'waiting' || (!showReady && state.phase === 'ready')) return null;
     return (
         <div
             className={styles.status}
@@ -72,5 +72,5 @@ ImageSyncStatus.propTypes = {runtime: PropTypes.shape({
     removeListener: PropTypes.func.isRequired,
     tinkibotImageSync: PropTypes.shape({phase: PropTypes.string, error: PropTypes.string}),
     retryTinkibotImageSync: PropTypes.func
-}).isRequired};
+}).isRequired, showReady: PropTypes.bool};
 export default ImageSyncStatus;

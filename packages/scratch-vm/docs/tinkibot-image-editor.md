@@ -8,33 +8,30 @@ only while selected, so its keyboard shortcuts do not capture Code-tab keys.
 
 `packages/scratch-gui/src/components/images-tab/` contains the React editor,
 localized labels, styling, screen icon and pure RGB pixel operations. The model
-is always 128 × 140 RGB888, with a 256 × 280 nearest-neighbour drawing canvas and
-128 × 140 robot preview beneath the existing 20-pixel status bar. The robot LCD
-stays at its normal 128 × 160 portrait orientation. Native PNG exports preserve
-all 128 × 140 artwork pixels. The drawing surface can shrink while keeping its aspect ratio. No status pixels or editing overlays enter image data. Drawing, shapes, selection,
-image editing, image actions and export/upload controls have labeled groups.
-Duplicate and Delete sit beneath the canvas beside Export and Upload.
-There is no pixel grid control. The Paint-style ribbon groups Selection (with
-Cut/Copy/Paste), Tools and Shapes using consistent SVG icons and visible names.
-Rectangle and Ellipse share a Fill shape option rather than separate filled
-buttons. Undo/Redo/Clear image sit above the ribbon; active-tool instructions
-and relevant size/text controls appear below it. Colours have separate drawing
-and paper wells, a compact swatch grid and an explanation that paper colour is
-used by Eraser and Clear image without recolouring existing pixels.
+is always 128 × 140 RGB888, with a nearest-neighbour drawing canvas that can
+shrink while keeping its aspect ratio. Native PNG exports and robot uploads
+contain all 128 × 140 artwork pixels. The robot LCD stays at its normal
+128 × 160 portrait orientation.
 
-The preview sits inside a clean vector illustration of the yellow robot top,
-with a tall raised centre cover, silver button mounts, black switches, corner
-screws, a portrait screen bezel and a separate status strip.
-Only the native artwork is exported or uploaded. The editing area has a bounded
-width and compact wrapping control groups, so wide windows do not stretch the
-tools or export controls across the screen.
+The editor puts the drawing tools and colour palette beside the canvas on wider
+workspaces and directly above it on narrow workspaces. Undo, Redo and Clear sit
+with the drawing tools. Duplicate and Delete sit beneath the canvas beside
+Export and Upload. Rectangle and Ellipse share a Fill shape option. Changing
+the paper colour affects Eraser and Clear image. The import dialog includes a
+preview for choosing how the imported image fits. The main editor uses a single
+drawing canvas.
 
-Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
+Creating or editing a local draft updates the Images tab immediately. The robot
+image menu refreshes when uploaded image availability changes.
+
+Pencil, adjustable brush/eraser, Paint bucket, line, outlined/filled
 rectangle and ellipse, thresholded monospace text, colour sampling, region
 copy/cut/paste/move, palette and custom colour input work without a robot.
-Dragging interpolates strokes; shapes and text preview before committing.
+Choose a colour and click inside a closed outline with Paint bucket. It fills
+the connected area of matching pixels as one undo step. Dragging interpolates
+strokes, and shapes and text preview before committing.
 The A/Text tool opens a focused text box directly on the image. Typing previews
-native pixels on the canvas and robot screen; Enter inserts a line and text wraps
+native pixels on the canvas. Enter inserts a line and text wraps
 at the picture edge. Font size and colour remain editable while the box is open.
 Done, Ctrl/Cmd-Enter, clicking outside, export/upload or leaving the Images tab
 finishes the text as one undo step. Escape discards it. Loading another project
@@ -48,7 +45,8 @@ the uncommitted image. Undo history persists across image/tab switches, holds
 (about 8 MiB). History is intentionally not part of the saved project.
 
 Create, rename, duplicate and confirmed delete use `ImageCollection`, with stable
-UUIDs, case-insensitive unique filenames, and a 64-image project limit. Filenames
+UUIDs, case-insensitive unique filenames, and a 64-image project limit. New,
+duplicated and imported images appear at the top of the gallery. Filenames
 are 1–64 lowercase ASCII letters/digits/hyphens, starting with a letter or digit.
 Filename rules appear above the input; capitals become lowercase and spaces or
 underscores become hyphens. Empty or duplicate names show an error beside the
@@ -192,8 +190,8 @@ Companion proxy and firmware tests live in `tests/test_image_upload.py` and
 * Real Chromium testing covered icon alignment, canvas dimensions, drawing,
   undo/redo, native PNG export without grid pixels, import preview, multiple
   images, saving an `.sb3`, reloading the application and reopening that project,
-  retained pixels and responsive aspect ratio. Portrait preview checks cover
-  upright asymmetric artwork, native pixels below the existing status bar and compact groups.
+  retained pixels and responsive aspect ratio. Portrait import checks cover
+  upright asymmetric artwork and native pixels below the existing status bar.
   Physical robot/modem testing is still required.
 
 ## Automatic project image sync
@@ -224,11 +222,14 @@ that buffer, so tracking needs no pixel comparisons or remote file reads. A
 changed filename or buffer requires upload again. Successful automatic restores
 and manual uploads both update the record; failed, pending or superseded uploads
 never mark newer edits available. Robot/project changes clear these records.
+The Images gallery shows Not uploaded (red), Modified (amber) or In sync
+(green), each with a status icon. Modified means the claimed robot
+received an earlier version and the current filename or pixels need uploading. Upload to Robot opens a progress dialog with the selected
+filename and the robot's overwrite instructions.
 
 Leaving the Images tab with any new or edited image that still needs upload shows
 an alert explaining Upload to Robot and the display my image block. Pending text
-is committed before checking. The ready status also shows an upload reminder
-while edits are pending; selecting images alone does not mark them changed.
+is committed before checking. Selecting images alone does not mark them changed.
 
 
 ## Blocking project restoration

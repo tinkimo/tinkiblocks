@@ -33,7 +33,7 @@ export default defineMessages({
     },
     fillHelp: {
         id: 'gui.images.fillHelp',
-        defaultMessage: 'Click an area to fill connected pixels of the same colour.',
+        defaultMessage: 'Choose a colour, then click inside a closed shape to fill it.',
         description: 'Image editor: fillHelp'
     },
     pickerHelp: {
@@ -204,7 +204,7 @@ export default defineMessages({
     },
     fill: {
         id: 'gui.images.fill',
-        defaultMessage: 'Fill',
+        defaultMessage: 'Paint bucket',
         description: 'Image editor: fill'
     },
     line: {
@@ -302,11 +302,6 @@ export default defineMessages({
         defaultMessage: 'Paste',
         description: 'Image editor: paste'
     },
-    preview: {
-        id: 'gui.images.preview',
-        defaultMessage: 'Robot preview',
-        description: 'Image editor: preview'
-    },
     canvas: {
         id: 'gui.images.canvas',
         defaultMessage: 'Drawing canvas, 128 by 140 pixels',
@@ -331,6 +326,26 @@ export default defineMessages({
         id: 'gui.images.uploading',
         defaultMessage: 'Uploading…',
         description: 'Image editor: uploading'
+    },
+    uploadDialog: {
+        id: 'gui.images.uploadDialog',
+        defaultMessage: 'Uploading image…',
+        description: 'Dialog title for a single image upload to a robot'
+    },
+    uploadedStatus: {
+        id: 'gui.images.uploadedStatus',
+        defaultMessage: 'In sync',
+        description: 'Gallery status for an image available on the claimed robot'
+    },
+    modifiedStatus: {
+        id: 'gui.images.modifiedStatus',
+        defaultMessage: 'Modified',
+        description: 'Gallery status for a previously uploaded image with newer local changes'
+    },
+    notUploadedStatus: {
+        id: 'gui.images.notUploadedStatus',
+        defaultMessage: 'Not uploaded',
+        description: 'Gallery status for an image unavailable on the claimed robot'
     },
     uploaded: {
         id: 'gui.images.uploaded',

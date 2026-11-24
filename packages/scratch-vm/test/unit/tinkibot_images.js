@@ -386,20 +386,20 @@ test('the toolbox disables the empty user image block and refreshes its default'
     t.match(xml(), /<block type="tinkibotDisplay_display_user_image" disabled="true">/);
 });
 
-test('image pixels do not rebuild the toolbox, but image filenames do', t => {
+test('toolbox refreshes when robot image availability changes', async t => {
     const vm = new VM();
+    await prepareImageUploads(vm);
     let updates = 0;
     vm.runtime.on('TOOLBOX_EXTENSIONS_NEED_UPDATE', () => updates++);
     const image = vm.projectImages.create('first');
-    t.equal(updates, 1);
     vm.projectImages.update(image.id, new Uint8Array(BYTE_LENGTH));
-    t.equal(updates, 1);
     vm.projectImages.rename(image.id, 'second');
-    t.equal(updates, 2);
+    t.equal(updates, 0, 'editing a local draft does not rebuild robot blocks');
+    await vm.uploadProjectImage(image.id);
+    t.equal(updates, 1);
     vm.projectImages.remove(image.id);
-    t.equal(updates, 3);
+    t.equal(updates, 2);
     vm.clear();
-    t.end();
 });
 
 test('old literal user-image blocks migrate while built-ins and reporter inputs stay intact', t => {

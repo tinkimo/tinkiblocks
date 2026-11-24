@@ -667,7 +667,7 @@ class TinkibotBlocks {
                         DIRECTION: {
                             type: ArgumentType.STRING,
                             defaultValue: 'left',
-                            menu: "direction_options"
+                            menu: "arc_direction_options"
                         },
                         DEGREES: {
                             type: ArgumentType.NUMBER,
@@ -828,6 +828,10 @@ class TinkibotBlocks {
                     acceptReporters: true,
                     items: ['forward', 'reverse']
                 },    
+                arc_direction_options: {
+                    acceptReporters: true,
+                    items: ['left', 'right']
+                },
                 rotation_options: {
                     acceptReporters: true,
                     items: ['clockwise', 'anticlockwise']
