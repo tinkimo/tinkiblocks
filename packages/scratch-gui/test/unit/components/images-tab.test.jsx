@@ -122,6 +122,7 @@ test('editor works offline, renders the LCD icon and drawing canvas, and manages
     expect(vm.projectImages.get().pixels.length).toBe(128 * 140 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));
     expect(vm.projectImages.images.length).toBe(2);
+    expect(getByRole('listbox').firstElementChild).toHaveAccessibleName('image2');
     const name = getByLabelText('Image filename');
     fireEvent.change(name, {target: {value: 'rainbow'}});
     fireEvent.blur(name);
@@ -141,8 +142,14 @@ test('New image draws the new canvas and thumbnail once without repainting the g
     create();
     create();
     context.drawImage.mockClear();
+    const gallery = getByRole('complementary');
+    gallery.scrollTop = 120;
     create();
-    expect(getByRole('option', {name: 'image3'})).toHaveAttribute('aria-selected', 'true');
+    const newest = getByRole('listbox').firstElementChild;
+    expect(newest).toHaveAccessibleName('image3');
+    expect(newest).toHaveAttribute('aria-selected', 'true');
+    expect(gallery.scrollTop).toBe(0);
+    expect(vm.projectImages.images.map(image => image.name)).toEqual(['image1', 'image2', 'image3']);
     expect(vm.projectImages.get().pixels[0]).toBe(255);
     expect(context.drawImage).toHaveBeenCalledTimes(2);
 });

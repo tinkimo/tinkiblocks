@@ -45,7 +45,8 @@ the uncommitted image. Undo history persists across image/tab switches, holds
 (about 8 MiB). History is intentionally not part of the saved project.
 
 Create, rename, duplicate and confirmed delete use `ImageCollection`, with stable
-UUIDs, case-insensitive unique filenames, and a 64-image project limit. Filenames
+UUIDs, case-insensitive unique filenames, and a 64-image project limit. New,
+duplicated and imported images appear at the top of the gallery. Filenames
 are 1–64 lowercase ASCII letters/digits/hyphens, starting with a letter or digit.
 Filename rules appear above the input; capitals become lowercase and spaces or
 underscores become hyphens. Empty or duplicate names show an error beside the

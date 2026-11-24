@@ -69,6 +69,7 @@ const ImagesTab = ({vm}) => {
     const leaveWarningRef = useRef(null);
     const canvas = useRef(null);
     const root = useRef(null);
+    const gallery = useRef(null);
     const file = useRef(null);
     const gesture = useRef(null);
     const selection = useRef(null);
@@ -389,6 +390,10 @@ const ImagesTab = ({vm}) => {
             }
         }
     };
+    const createImage = pixels => {
+        collection.create(null, pixels);
+        gallery.current.scrollTop = 0;
+    };
     const button = (key, action, disabled = false) => (
         <button
             type="button"
@@ -427,9 +432,12 @@ const ImagesTab = ({vm}) => {
             onKeyDown={shortcut}
             onKeyUp={event => event.stopPropagation()}
         >
-            <aside className={styles.gallery}>
+            <aside
+                className={styles.gallery}
+                ref={gallery}
+            >
                 <h2>{label('heading')}</h2>
-                {button('newImage', () => collection.create(), collection.images.length >= 64)}
+                {button('newImage', () => createImage(), collection.images.length >= 64)}
                 {button('importImage', () => file.current.click(), collection.images.length >= 64)}
                 <input
                     ref={file}
@@ -443,7 +451,7 @@ const ImagesTab = ({vm}) => {
                     role="listbox"
                     aria-label={label('heading')}
                 >
-                    {collection.images.map(image => (
+                    {[...collection.images].reverse().map(image => (
                         <button
                             key={image.id}
                             type="button"
@@ -661,7 +669,7 @@ const ImagesTab = ({vm}) => {
                         </fieldset>
                         <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
                             <legend>{label('imageActions')}</legend>
-                            {button('duplicate', () => collection.create(null, current.pixels),
+                            {button('duplicate', () => createImage(current.pixels),
                                 collection.images.length >= 64)}
                             {button('deleteImage', () => {
                                 if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
@@ -702,7 +710,8 @@ const ImagesTab = ({vm}) => {
                     fit={fit}
                     onFitChange={setFit}
                     onAdd={() => {
-                        collection.create(null, importPixels); setImported(null);
+                        createImage(importPixels);
+                        setImported(null);
                     }}
                     onCancel={() => setImported(null)}
                 /> : null}
