@@ -33,7 +33,7 @@ export default defineMessages({
     },
     fillHelp: {
         id: 'gui.images.fillHelp',
-        defaultMessage: 'Click an area to fill connected pixels of the same colour.',
+        defaultMessage: 'Choose a colour, then click inside a closed shape to fill it.',
         description: 'Image editor: fillHelp'
     },
     pickerHelp: {
@@ -204,7 +204,7 @@ export default defineMessages({
     },
     fill: {
         id: 'gui.images.fill',
-        defaultMessage: 'Fill',
+        defaultMessage: 'Paint bucket',
         description: 'Image editor: fill'
     },
     line: {

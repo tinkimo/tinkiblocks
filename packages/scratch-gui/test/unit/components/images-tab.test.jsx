@@ -274,6 +274,25 @@ test('Paint-style shape fill toggles the drawing mode without duplicate tools', 
     expect(getByText(/Drag to draw an oval/)).toBeVisible();
 });
 
+test.each(['rectangle', 'ellipse'])('Paint bucket fills a closed %s in one undo step', outline => {
+    const {getByRole, getByLabelText, vm} = editor();
+    const pixels = buffer();
+    shape(pixels, outline, {x: 10, y: 10}, {x: 30, y: 30}, [0, 0, 0]);
+    act(() => { vm.projectImages.create('outlined-shape', pixels); });
+    const canvas = getByLabelText('Drawing canvas, 128 by 140 pixels');
+    canvas.getBoundingClientRect = () => ({left: 0, top: 0, width: 256, height: 280});
+    fireEvent.click(getByRole('button', {name: 'Drawing colour #ef4444'}));
+    fireEvent.click(getByRole('button', {name: 'Paint bucket'}));
+    fireEvent(canvas, new MouseEvent('pointerdown', {bubbles: true, clientX: 40, clientY: 40}));
+    fireEvent(canvas, new MouseEvent('pointerup', {bubbles: true, clientX: 40, clientY: 40}));
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 20, 20))).toEqual(rgb('#ef4444'));
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 20, 10))).toEqual([0, 0, 0]);
+    expect(Array.from(colourAt(vm.projectImages.get().pixels, 5, 5))).toEqual([255, 255, 255]);
+    fireEvent.click(getByRole('button', {name: 'Undo'}));
+    expect(vm.projectImages.get().pixels).toEqual(pixels);
+    expect(getByRole('button', {name: 'Undo'})).toBeDisabled();
+});
+
 test('text is typed on the image, finishes as one undo step, and Escape discards a draft', () => {
     window.PointerEvent = MouseEvent;
     const {getByRole, getByLabelText, queryByRole, vm} = editor();

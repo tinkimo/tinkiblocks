@@ -270,8 +270,14 @@ const ImagesTab = ({vm}) => {
             return;
         }
         canvas.current.focus();
-        canvas.current.setPointerCapture(event.pointerId);
         const start = point(event, canvas.current.getBoundingClientRect());
+        if (tool === 'fill') {
+            const filled = new Uint8Array(current.pixels);
+            fill(filled, start, rgb(colour));
+            commit(filled);
+            return;
+        }
+        canvas.current.setPointerCapture(event.pointerId);
         const base = new Uint8Array(current.pixels);
         const box = selection.current;
         const moving = tool === 'select' && box && start.x >= box.x && start.x < (box.x + box.width) &&
@@ -280,10 +286,6 @@ const ImagesTab = ({vm}) => {
         pixels.current = new Uint8Array(base);
         if (tool === 'picker') {
             setColour(hex(colourAt(base, start.x, start.y)));
-            gesture.current = null;
-        } else if (tool === 'fill') {
-            fill(pixels.current, start, rgb(colour));
-            commit(pixels.current);
             gesture.current = null;
         } else {
             move(event);

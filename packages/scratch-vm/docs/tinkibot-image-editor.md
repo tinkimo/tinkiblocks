@@ -24,10 +24,12 @@ drawing canvas.
 Creating or editing a local draft updates the Images tab immediately. The robot
 image menu refreshes when uploaded image availability changes.
 
-Pencil, adjustable brush/eraser, bounded flood fill, line, outlined/filled
+Pencil, adjustable brush/eraser, Paint bucket, line, outlined/filled
 rectangle and ellipse, thresholded monospace text, colour sampling, region
 copy/cut/paste/move, palette and custom colour input work without a robot.
-Dragging interpolates strokes; shapes and text preview before committing.
+Choose a colour and click inside a closed outline with Paint bucket. It fills
+the connected area of matching pixels as one undo step. Dragging interpolates
+strokes, and shapes and text preview before committing.
 The A/Text tool opens a focused text box directly on the image. Typing previews
 native pixels on the canvas. Enter inserts a line and text wraps
 at the picture edge. Font size and colour remain editable while the box is open.
