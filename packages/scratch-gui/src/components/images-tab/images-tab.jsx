@@ -394,6 +394,9 @@ const ImagesTab = ({vm}) => {
         collection.create(null, pixels);
         gallery.current.scrollTop = 0;
     };
+    const deleteImage = id => {
+        if (window.confirm(label('deleteConfirm'))) collection.remove(id);
+    };
     const button = (key, action, disabled = false) => (
         <button
             type="button"
@@ -447,27 +450,46 @@ const ImagesTab = ({vm}) => {
                     hidden
                     onChange={readFile}
                 />
-                <div
+                <ul
                     className={styles.imageList}
-                    role="listbox"
                     aria-label={label('heading')}
                 >
-                    {[...collection.images].reverse().map(image => (
-                        <button
-                            key={image.id}
-                            type="button"
-                            role="option"
-                            aria-selected={image.id === collection.selectedId}
-                            aria-label={image.name}
-                            aria-describedby={`image-upload-status-${image.id}`}
-                            onClick={() => collection.select(image.id)}
-                        >
-                            <Thumbnail pixels={image.pixels} />
-                            <span>{image.name}</span>
-                            {uploadBadge(vm.imageSync.uploadStatus(image), `image-upload-status-${image.id}`)}
-                        </button>
-                    ))}
-                </div>
+                    {[...collection.images].reverse().map(image => {
+                        const deleteLabel = intl.formatMessage(messages.deleteThumbnail, {name: image.name});
+                        return (
+                            <li
+                                key={image.id}
+                                className={styles.imageCard}
+                            >
+                                <button
+                                    type="button"
+                                    className={styles.imageSelect}
+                                    aria-pressed={image.id === collection.selectedId}
+                                    aria-label={image.name}
+                                    aria-describedby={`image-upload-status-${image.id}`}
+                                    onClick={() => collection.select(image.id)}
+                                >
+                                    <Thumbnail pixels={image.pixels} />
+                                    <span>{image.name}</span>
+                                    {uploadBadge(vm.imageSync.uploadStatus(image), `image-upload-status-${image.id}`)}
+                                </button>
+                                <button
+                                    type="button"
+                                    className={styles.deleteThumbnail}
+                                    aria-label={deleteLabel}
+                                    title={deleteLabel}
+                                    disabled={syncBusy || vm.imageSync.blocking}
+                                    onClick={() => {
+                                        finishText();
+                                        attempt(() => deleteImage(image.id));
+                                    }}
+                                >
+                                    <span aria-hidden="true">×</span>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
                 <p>{label('savedHint')}</p>
             </aside>
             <main className={styles.workspace}>
@@ -673,9 +695,7 @@ const ImagesTab = ({vm}) => {
                             <legend>{label('imageActions')}</legend>
                             {button('duplicate', () => createImage(current.pixels),
                                 collection.images.length >= 64)}
-                            {button('deleteImage', () => {
-                                if (window.confirm(label('deleteConfirm'))) collection.remove(current.id);
-                            })}
+                            {button('deleteImage', () => deleteImage(current.id))}
                         </fieldset>
                     </div>
                     {upload && upload.busy && !vm.imageSync.blocking ? <Modal

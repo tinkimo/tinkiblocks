@@ -172,6 +172,11 @@ export default defineMessages({
         defaultMessage: 'Delete',
         description: 'Image editor: deleteImage'
     },
+    deleteThumbnail: {
+        id: 'gui.images.deleteThumbnail',
+        defaultMessage: 'Delete {name}',
+        description: 'Accessible name and tooltip for the image gallery delete button'
+    },
     deleteConfirm: {
         id: 'gui.images.deleteConfirm',
         defaultMessage: 'Delete this image? This cannot be undone.',

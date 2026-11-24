@@ -1,6 +1,6 @@
 import React from 'react';
 import EventEmitter from 'events';
-import {render, fireEvent, act} from '@testing-library/react';
+import {render, fireEvent, act, within} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import {IntlProvider} from 'react-intl';
 import ImagesTab from '../../../src/components/images-tab/images-tab';
@@ -137,12 +137,12 @@ test('editor works offline, renders the LCD icon and drawing canvas, and manages
     expect(vm.projectImages.get().pixels.length).toBe(128 * 140 * 3);
     fireEvent.click(getByRole('button', {name: 'Duplicate'}));
     expect(vm.projectImages.images.length).toBe(2);
-    expect(getByRole('listbox').firstElementChild).toHaveAccessibleName('image2');
+    expect(within(getByRole('list').firstElementChild).getByRole('button', {name: 'image2'})).toBeInTheDocument();
     const name = getByLabelText('Image filename');
     fireEvent.change(name, {target: {value: 'rainbow'}});
     fireEvent.blur(name);
     expect(vm.projectImages.get().name).toBe('rainbow');
-    fireEvent.click(getByRole('option', {name: 'image1'}));
+    fireEvent.click(getByRole('button', {name: 'image1'}));
     expect(vm.projectImages.get().name).toBe('image1');
     fireEvent.click(getByRole('button', {name: 'Delete'}));
     expect(window.confirm).toHaveBeenCalled();
@@ -151,6 +151,20 @@ test('editor works offline, renders the LCD icon and drawing canvas, and manages
     expect(icon).toHaveAttribute('viewBox', '0 0 24 24');
     expect(icon.querySelector('rect')).toHaveAttribute('rx', '2');
 });
+test('gallery delete confirms before removing an unselected image', () => {
+    const {getByRole, queryByRole, vm} = editor();
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    fireEvent.click(getByRole('button', {name: 'New image'}));
+    const remove = getByRole('button', {name: 'Delete image1'});
+    window.confirm.mockReturnValueOnce(false);
+    fireEvent.click(remove);
+    expect(getByRole('button', {name: 'image1'})).toBeInTheDocument();
+    expect(vm.projectImages.get().name).toBe('image2');
+    fireEvent.click(remove);
+    expect(queryByRole('button', {name: 'image1'})).toBeNull();
+    expect(vm.projectImages.get().name).toBe('image2');
+});
+
 test('New image draws the new canvas and thumbnail once without repainting the gallery', () => {
     const {getByRole, vm} = editor();
     const create = () => fireEvent.click(getByRole('button', {name: 'New image'}));
@@ -160,9 +174,8 @@ test('New image draws the new canvas and thumbnail once without repainting the g
     const gallery = getByRole('complementary');
     gallery.scrollTop = 120;
     create();
-    const newest = getByRole('listbox').firstElementChild;
-    expect(newest).toHaveAccessibleName('image3');
-    expect(newest).toHaveAttribute('aria-selected', 'true');
+    const newest = within(getByRole('list').firstElementChild).getByRole('button', {name: 'image3'});
+    expect(newest).toHaveAttribute('aria-pressed', 'true');
     expect(gallery.scrollTop).toBe(0);
     expect(vm.projectImages.images.map(image => image.name)).toEqual(['image1', 'image2', 'image3']);
     expect(vm.projectImages.get().pixels[0]).toBe(255);
@@ -205,8 +218,8 @@ test('manual upload opens the progress dialog and updates the uploaded image row
     fireEvent.click(getByRole('button', {name: 'New image'}));
     fireEvent.click(getByRole('button', {name: 'New image'}));
     expect(queryByText('2 images need uploading before use.')).toBeNull();
-    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
-    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('button', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('button', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
     let complete;
     vm.uploadProjectImage.mockImplementation((id, progress) => new Promise(resolve => {
         progress(42);
@@ -221,13 +234,13 @@ test('manual upload opens the progress dialog and updates the uploaded image row
         complete();
     });
     expect(queryByRole('dialog')).toBeNull();
-    expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
-    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('In sync');
+    expect(getByRole('button', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
+    expect(getByRole('button', {name: 'image2'})).toHaveAccessibleDescription('In sync');
     act(() => {
         vm.imageSync.uploadStatus = image => image.name === 'image2' ? 'modified' : 'not-uploaded';
         vm.emit('TINKIBOT_IMAGES_CHANGED');
     });
-    const modified = getByRole('option', {name: 'image2'});
+    const modified = getByRole('button', {name: 'image2'});
     expect(modified).toHaveAccessibleDescription('Modified');
     expect(modified.querySelector('[data-upload-status="modified"]')).toBeVisible();
     expect(queryByRole('heading', {name: 'Upload status key'})).toBeNull();
