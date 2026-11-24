@@ -89,13 +89,48 @@
     image-rendering: pixelated;
 }
 .upload-status {
-    padding: 0.15rem 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.4rem;
     border-radius: 0.3rem;
-    background: $ui-primary;
     font-size: 0.7rem;
-}
-.upload-status[data-uploaded="true"] {
     font-weight: 600;
+    line-height: 1.25;
+    text-align: start;
+}
+.upload-status[data-upload-status="not-uploaded"] {
+    background: #fee2e2;
+    color: #991b1b;
+}
+.upload-status[data-upload-status="modified"] {
+    background: #fef3c7;
+    color: #854d0e;
+}
+.upload-status[data-upload-status="synced"] {
+    background: #dcfce7;
+    color: #166534;
+}
+.upload-status-icon {
+    flex: 0 0 auto;
+    width: 0.8rem;
+    font-size: 0.85rem;
+    text-align: center;
+}
+.upload-key {
+    border-top: 1px solid $ui-black-transparent;
+    padding-top: 0.5rem;
+}
+.upload-key h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.75rem;
+}
+.upload-key ul {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
 }
 .workspace {
     padding: 1rem;

@@ -334,8 +334,18 @@ export default defineMessages({
     },
     uploadedStatus: {
         id: 'gui.images.uploadedStatus',
-        defaultMessage: 'Uploaded',
+        defaultMessage: 'In sync',
         description: 'Gallery status for an image available on the claimed robot'
+    },
+    uploadStatusKey: {
+        id: 'gui.images.uploadStatusKey',
+        defaultMessage: 'Upload status key',
+        description: 'Legend for robot image upload indicators'
+    },
+    modifiedStatus: {
+        id: 'gui.images.modifiedStatus',
+        defaultMessage: 'Modified',
+        description: 'Gallery status for a previously uploaded image with newer local changes'
     },
     notUploadedStatus: {
         id: 'gui.images.notUploadedStatus',

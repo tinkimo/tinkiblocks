@@ -33,7 +33,7 @@ const editor = () => {
     const vm = new EventEmitter();
     vm.runtime = new EventEmitter();
     vm.runtime.tinkibotConnectedRobots = [];
-    vm.imageSync = {pendingImages: () => [], uploadedNames: () => []};
+    vm.imageSync = {pendingImages: () => [], uploadStatus: () => 'not-uploaded'};
     vm.projectImages = new ImageCollection(() => vm.emit('TINKIBOT_IMAGES_CHANGED'));
     vm.uploadProjectImage = jest.fn(() => Promise.resolve());
     const view = render(<IntlProvider locale="en"><ImagesTab vm={vm} /></IntlProvider>);
@@ -195,17 +195,22 @@ test('manual upload opens the progress dialog and updates the uploaded image row
     expect(getByText('image2.rgb565')).toBeVisible();
     expect(getByRole('progressbar')).toHaveValue(42);
     await act(async () => {
-        vm.imageSync.uploadedNames = () => ['image2'];
+        vm.imageSync.uploadStatus = image => image.name === 'image2' ? 'synced' : 'not-uploaded';
         complete();
     });
     expect(queryByRole('dialog')).toBeNull();
     expect(getByRole('option', {name: 'image1'})).toHaveAccessibleDescription('Not uploaded');
-    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Uploaded');
+    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('In sync');
     act(() => {
-        vm.imageSync.uploadedNames = () => [];
+        vm.imageSync.uploadStatus = image => image.name === 'image2' ? 'modified' : 'not-uploaded';
         vm.emit('TINKIBOT_IMAGES_CHANGED');
     });
-    expect(getByRole('option', {name: 'image2'})).toHaveAccessibleDescription('Not uploaded');
+    const modified = getByRole('option', {name: 'image2'});
+    expect(modified).toHaveAccessibleDescription('Modified');
+    expect(modified.querySelector('[data-upload-status="modified"]')).toBeVisible();
+    const key = getByRole('list', {name: 'Upload status key'});
+    expect(Array.from(key.querySelectorAll('[data-upload-status]'), badge => badge.textContent))
+        .toEqual(['×Not uploaded', '!Modified', '✓In sync']);
 });
 
 test('controls are grouped by purpose and the grid control is removed', () => {

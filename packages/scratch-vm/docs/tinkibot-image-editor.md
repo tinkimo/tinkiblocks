@@ -221,8 +221,9 @@ that buffer, so tracking needs no pixel comparisons or remote file reads. A
 changed filename or buffer requires upload again. Successful automatic restores
 and manual uploads both update the record; failed, pending or superseded uploads
 never mark newer edits available. Robot/project changes clear these records.
-The Images gallery shows Uploaded or Not uploaded for each image on the
-claimed robot. Upload to Robot opens a progress dialog with the selected
+The Images gallery shows Not uploaded (red), Modified (amber) or In sync
+(green), with an icon and a status key. Modified means the claimed robot
+received an earlier version and the current filename or pixels need uploading. Upload to Robot opens a progress dialog with the selected
 filename and the robot's overwrite instructions.
 
 Leaving the Images tab with any new or edited image that still needs upload shows

@@ -22,6 +22,11 @@ const toolGroups = [
 ];
 const palette = ['#000000', '#ffffff', '#ef4444', '#f97316', '#facc15', '#84cc16', '#22c55e',
     '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#92400e', '#64748b', '#cbd5e1'];
+const uploadStatuses = {
+    'not-uploaded': {label: 'notUploadedStatus', icon: '×'},
+    modified: {label: 'modifiedStatus', icon: '!'},
+    synced: {label: 'uploadedStatus', icon: '✓'}
+};
 const histories = new WeakMap();
 
 const Thumbnail = React.memo(function Thumbnail ({pixels}) {
@@ -396,7 +401,19 @@ const ImagesTab = ({vm}) => {
     );
     const paired = (vm.runtime.tinkibotConnectedRobots || []).some(robot =>
         robot.claimState === 'paired' && robot.connected !== false);
-    const uploadedNames = new Set(vm.imageSync.uploadedNames());
+    const uploadBadge = (status, id) => (
+        <span
+            className={styles.uploadStatus}
+            data-upload-status={status}
+            id={id}
+        >
+            <span
+                className={styles.uploadStatusIcon}
+                aria-hidden="true"
+            >{uploadStatuses[status].icon}</span>
+            {label(uploadStatuses[status].label)}
+        </span>
+    );
     const history = current ? historyFor() : {undo: [], redo: []};
     const importPixels = imported ? importCanvas(imported, fit, rgb(background)) : null;
     return (
@@ -421,6 +438,15 @@ const ImagesTab = ({vm}) => {
                     hidden
                     onChange={readFile}
                 />
+                <div className={styles.uploadKey}>
+                    <h3 id="image-upload-key">{label('uploadStatusKey')}</h3>
+                    <ul
+                        role="list"
+                        aria-labelledby="image-upload-key"
+                    >
+                        {Object.keys(uploadStatuses).map(status => <li key={status}>{uploadBadge(status)}</li>)}
+                    </ul>
+                </div>
                 <div
                     className={styles.imageList}
                     role="listbox"
@@ -438,11 +464,7 @@ const ImagesTab = ({vm}) => {
                         >
                             <Thumbnail pixels={image.pixels} />
                             <span>{image.name}</span>
-                            <span
-                                className={styles.uploadStatus}
-                                data-uploaded={uploadedNames.has(image.name)}
-                                id={`image-upload-status-${image.id}`}
-                            >{label(uploadedNames.has(image.name) ? 'uploadedStatus' : 'notUploadedStatus')}</span>
+                            {uploadBadge(vm.imageSync.uploadStatus(image), `image-upload-status-${image.id}`)}
                         </button>
                     ))}
                 </div>
@@ -701,7 +723,7 @@ ImagesTab.propTypes = {
     vm: PropTypes.shape({
         imageSync: PropTypes.shape({
             pendingImages: PropTypes.func.isRequired,
-            uploadedNames: PropTypes.func.isRequired,
+            uploadStatus: PropTypes.func.isRequired,
             blocking: PropTypes.bool
         }).isRequired,
         on: PropTypes.func.isRequired,
