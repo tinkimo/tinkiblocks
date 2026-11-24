@@ -117,21 +117,6 @@
     font-size: 0.85rem;
     text-align: center;
 }
-.upload-key {
-    border-top: 1px solid $ui-black-transparent;
-    padding-top: 0.5rem;
-}
-.upload-key h3 {
-    margin: 0 0 0.4rem;
-    font-size: 0.75rem;
-}
-.upload-key ul {
-    display: grid;
-    gap: 0.3rem;
-    margin: 0;
-    padding: 0;
-    list-style-type: none;
-}
 .workspace {
     padding: 1rem;
     flex: 1;

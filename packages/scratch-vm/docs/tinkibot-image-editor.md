@@ -222,7 +222,7 @@ changed filename or buffer requires upload again. Successful automatic restores
 and manual uploads both update the record; failed, pending or superseded uploads
 never mark newer edits available. Robot/project changes clear these records.
 The Images gallery shows Not uploaded (red), Modified (amber) or In sync
-(green), with an icon and a status key. Modified means the claimed robot
+(green), each with a status icon. Modified means the claimed robot
 received an earlier version and the current filename or pixels need uploading. Upload to Robot opens a progress dialog with the selected
 filename and the robot's overwrite instructions.
 

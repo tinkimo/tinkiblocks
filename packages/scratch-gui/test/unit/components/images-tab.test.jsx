@@ -208,9 +208,7 @@ test('manual upload opens the progress dialog and updates the uploaded image row
     const modified = getByRole('option', {name: 'image2'});
     expect(modified).toHaveAccessibleDescription('Modified');
     expect(modified.querySelector('[data-upload-status="modified"]')).toBeVisible();
-    const key = getByRole('list', {name: 'Upload status key'});
-    expect(Array.from(key.querySelectorAll('[data-upload-status]'), badge => badge.textContent))
-        .toEqual(['×Not uploaded', '!Modified', '✓In sync']);
+    expect(queryByRole('heading', {name: 'Upload status key'})).toBeNull();
 });
 
 test('controls are grouped by purpose and the grid control is removed', () => {

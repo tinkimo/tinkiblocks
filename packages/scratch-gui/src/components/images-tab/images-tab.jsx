@@ -438,15 +438,6 @@ const ImagesTab = ({vm}) => {
                     hidden
                     onChange={readFile}
                 />
-                <div className={styles.uploadKey}>
-                    <h3 id="image-upload-key">{label('uploadStatusKey')}</h3>
-                    <ul
-                        role="list"
-                        aria-labelledby="image-upload-key"
-                    >
-                        {Object.keys(uploadStatuses).map(status => <li key={status}>{uploadBadge(status)}</li>)}
-                    </ul>
-                </div>
                 <div
                     className={styles.imageList}
                     role="listbox"
