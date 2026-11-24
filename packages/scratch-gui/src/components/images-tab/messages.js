@@ -322,6 +322,11 @@ export default defineMessages({
         defaultMessage: 'Upload to Robot',
         description: 'Image editor: upload'
     },
+    uploadAll: {
+        id: 'gui.images.uploadAll',
+        defaultMessage: 'Upload All',
+        description: 'Image editor button that uploads all project images to the paired robot'
+    },
     uploading: {
         id: 'gui.images.uploading',
         defaultMessage: 'Uploading…',

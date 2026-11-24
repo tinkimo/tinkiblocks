@@ -33,12 +33,27 @@ const editor = () => {
     const vm = new EventEmitter();
     vm.runtime = new EventEmitter();
     vm.runtime.tinkibotConnectedRobots = [];
-    vm.imageSync = {pendingImages: () => [], uploadStatus: () => 'not-uploaded'};
+    vm.imageSync = {pendingImages: () => [], uploadStatus: () => 'not-uploaded', uploadAll: jest.fn()};
     vm.projectImages = new ImageCollection(() => vm.emit('TINKIBOT_IMAGES_CHANGED'));
     vm.uploadProjectImage = jest.fn(() => Promise.resolve());
     const view = render(<IntlProvider locale="en"><ImagesTab vm={vm} /></IntlProvider>);
     return {...view, vm};
 };
+
+test('Upload All appears beside Upload to Robot and starts a batch for a paired robot', () => {
+    const {vm, getByRole} = editor();
+    act(() => vm.projectImages.create('first'));
+    const uploadAll = getByRole('button', {name: 'Upload All'});
+    expect(getByRole('button', {name: 'Upload to Robot'}).nextElementSibling).toBe(uploadAll);
+    expect(uploadAll).toBeDisabled();
+    act(() => {
+        vm.runtime.tinkibotConnectedRobots = [{claimState: 'paired'}];
+        vm.runtime.emit('TINKIBOT_CONNECTED_ROBOTS_CHANGED');
+    });
+    fireEvent.click(uploadAll);
+    expect(vm.imageSync.uploadAll).toHaveBeenCalledTimes(1);
+    expect(vm.uploadProjectImage).not.toHaveBeenCalled();
+});
 
 test('pointer mapping respects display scaling, fractional positions and clamped boundaries', () => {
     const bounds = {left: 20, top: 40, width: 256, height: 280};

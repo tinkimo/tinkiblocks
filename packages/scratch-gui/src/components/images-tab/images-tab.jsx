@@ -419,6 +419,7 @@ const ImagesTab = ({vm}) => {
             {label(uploadStatuses[status].label)}
         </span>
     );
+    const uploadDisabled = !paired || nameInvalid || syncBusy || Boolean(upload && upload.busy);
     const history = current ? historyFor() : {undo: [], redo: []};
     const importPixels = imported ? importCanvas(imported, fit, rgb(background)) : null;
     return (
@@ -665,7 +666,8 @@ const ImagesTab = ({vm}) => {
                             <legend>{label('fileActions')}</legend>
                             {button('exportImage', exportImage)}
                             {button(upload && upload.busy ? 'uploading' : 'upload', uploadImage,
-                                !paired || nameInvalid || syncBusy || Boolean(upload && upload.busy))}
+                                uploadDisabled)}
+                            {button('uploadAll', () => vm.imageSync.uploadAll(), uploadDisabled)}
                         </fieldset>
                         <fieldset className={`${styles.controlGroup} ${styles.fileActions}`}>
                             <legend>{label('imageActions')}</legend>
@@ -724,6 +726,7 @@ ImagesTab.propTypes = {
         imageSync: PropTypes.shape({
             pendingImages: PropTypes.func.isRequired,
             uploadStatus: PropTypes.func.isRequired,
+            uploadAll: PropTypes.func.isRequired,
             blocking: PropTypes.bool
         }).isRequired,
         on: PropTypes.func.isRequired,
