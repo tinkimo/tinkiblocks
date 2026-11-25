@@ -90,10 +90,22 @@ class ImageSync {
                 !this.projectReady);
             return;
         }
+        this.begin(robot, false);
+    }
+
+    uploadAll () {
+        this.assertInteractive();
+        if (this.busy || !this.readyForRobot()) {
+            throw new Error('Wait for the paired robot to finish preparing before uploading');
+        }
+        if (this.runtime.tinkibotImages.images.length) this.begin(this.robot(), true);
+    }
+
+    begin (robot, manual) {
         const collection = this.runtime.tinkibotImages;
         const operation = {
             id: uuid.v4(),
-            key,
+            key: this.key,
             generation: this.generation,
             collection,
             robot: {...robot},
@@ -101,13 +113,14 @@ class ImageSync {
                 snapshot: {...image, pixels: new Uint8Array(image.pixels)}})),
             completed: 0,
             progress: 0,
-            cleared: false,
+            manual,
+            cleared: manual,
             attempt: 0,
             interruption: null
         };
         this.operation = operation;
         this.wanted = operation;
-        this.publish(operation, 'clearing', {error: ''});
+        this.publish(operation, manual ? 'uploading' : 'clearing', {error: ''});
         this.runtime.stopAll();
         this.start();
     }
@@ -196,7 +209,12 @@ class ImageSync {
 
     close () {
         if (this.busy || !this.operation || this.operation.phase !== 'error') return false;
-        this.status({blocking: false});
+        const operation = this.operation;
+        if (operation.manual && this.key === operation.key && this.fingerprint(this.robot()) === operation.key) {
+            this.publish(operation, 'ready', {blocking: false, error: ''});
+        } else {
+            this.status({blocking: false});
+        }
         return true;
     }
 

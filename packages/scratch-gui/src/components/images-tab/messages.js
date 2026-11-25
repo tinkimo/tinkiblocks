@@ -172,6 +172,11 @@ export default defineMessages({
         defaultMessage: 'Delete',
         description: 'Image editor: deleteImage'
     },
+    deleteThumbnail: {
+        id: 'gui.images.deleteThumbnail',
+        defaultMessage: 'Delete {name}',
+        description: 'Accessible name and tooltip for the image gallery delete button'
+    },
     deleteConfirm: {
         id: 'gui.images.deleteConfirm',
         defaultMessage: 'Delete this image? This cannot be undone.',
@@ -321,6 +326,11 @@ export default defineMessages({
         id: 'gui.images.upload',
         defaultMessage: 'Upload to Robot',
         description: 'Image editor: upload'
+    },
+    uploadAll: {
+        id: 'gui.images.uploadAll',
+        defaultMessage: 'Upload All',
+        description: 'Image editor button that uploads all project images to the paired robot'
     },
     uploading: {
         id: 'gui.images.uploading',

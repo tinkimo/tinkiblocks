@@ -195,6 +195,32 @@ test('one operation uploads its fixed snapshot exactly once and ignores later im
     t.equal(h.sync.blocking, false);
 });
 
+test('manual Upload All includes previously uploaded images and retries without clearing files', async t => {
+    const h = setup();
+    h.runtime.tinkibotConnectedRobots = [robot('one')];
+    h.runtime.tinkibotImages.create('first');
+    h.runtime.emit('PROJECT_LOADED');
+    await h.sync.wait();
+    h.runtime.tinkibotImages.create('second');
+    h.calls.length = 0;
+    let fail = true;
+    h.runtime.uploadTinkibotImage = async (image, _progress, context) => {
+        h.calls.push([context.botUuid, image.name, context.showComplete]);
+        if (image.name === 'second' && fail) throw new Error('transfer failed');
+    };
+
+    h.sync.uploadAll();
+    t.equal(h.sync.blocking, true);
+    await t.rejects(h.sync.wait(), /transfer failed/);
+    t.same(h.calls, [['one', 'first', false], ['one', 'second', true]]);
+    fail = false;
+    t.equal(h.sync.retry(), true);
+    await h.sync.wait();
+    t.same(h.calls, [['one', 'first', false], ['one', 'second', true], ['one', 'second', true]]);
+    t.same(h.sync.uploadedNames(), ['first', 'second']);
+    t.equal(h.sync.blocking, false);
+});
+
 test('retry resumes the failed snapshot without clearing or uploading completed images again', async t => {
     const h = setup();
     h.runtime.tinkibotConnectedRobots = [robot('one')];

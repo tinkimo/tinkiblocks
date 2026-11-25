@@ -207,7 +207,9 @@ The coordinator in `src/tinkibot-images/sync.js` serializes jobs and pins them t
 the project generation and robot UUID. Superseded jobs stop at transfer boundaries;
 the next job clears partial work before restoring its own snapshot. Each restore captures a fixed snapshot before any transfer starts. The editor is
 blocked until the operation completes or a stopped failure is acknowledged. Ordinary edits after restoration
-still use Upload to Robot.
+can be sent with Upload to Robot for the selected image or Upload All for every
+project image. Upload All reuses the progress dialog and retries from the failed
+image. It leaves other files on the robot in place.
 
 Deploy the matching robot firmware and proxy or USB modem software: automatic
 sync uses the accepted-claim `reset_images` RPC before existing 40,960-byte image

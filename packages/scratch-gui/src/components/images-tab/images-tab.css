@@ -75,13 +75,41 @@
     flex-direction: column;
     gap: 0.6rem;
     margin: 0.75rem 0;
+    padding: 0;
+    list-style: none;
 }
-.image-list button {
+.image-card {
+    position: relative;
+    min-width: 0;
+}
+.image-select {
+    width: 100%;
     display: flex;
     align-items: center;
     flex-direction: column;
     overflow-wrap: anywhere;
     gap: 0.4rem;
+}
+.image-card .delete-thumbnail {
+    position: absolute;
+    inset-block-start: 0.25rem;
+    inset-inline-end: 0.25rem;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0;
+    border-color: #fecaca;
+    background: #fff;
+    color: #b91c1c;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.editor .delete-thumbnail:hover:not(:disabled) {
+    border-color: #b91c1c;
+    background: #fee2e2;
+    box-shadow: none;
 }
 .image-list canvas {
     width: 64px;
